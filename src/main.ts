@@ -651,15 +651,7 @@ function updateLobbyUI() {
       winRateVal.textContent = `${winRate.toFixed(1)}% (${s.wins}승/${s.games}판)`;
     }
 
-    // 대미지 갱신
-    const dmgDealtVal = card.querySelector('.text-neon-green') as HTMLElement;
-    const dmgTakenVal = card.querySelector('.text-neon-red') as HTMLElement;
-    if (dmgDealtVal && dmgTakenVal) {
-      dmgDealtVal.textContent = s.damageDealt.toString();
-      dmgTakenVal.textContent = s.damageTaken.toString();
-    }
-
-    // 카운터 정보 갱신
+    // 대미지 및 카운터 정보 갱신
     const countersAll = getStoredCounters();
     const modeCounters = countersAll[mode] || {};
 
@@ -687,10 +679,18 @@ function updateLobbyUI() {
     const bestVictimName = bestVictimId ? (availableCharacters.find(c => c.id === bestVictimId)?.name || '없음') : '없음';
     const bestVictimStr = bestVictimId ? `${bestVictimName} (${bestVictimCount}킬)` : '없음';
 
-    const worstKillerEl = card.querySelector('.char-history .stat-row:nth-child(3) .stat-val') as HTMLElement;
-    const bestVictimEl = card.querySelector('.char-history .stat-row:nth-child(4) .stat-val') as HTMLElement;
-    if (worstKillerEl) worstKillerEl.textContent = worstKillerStr;
-    if (bestVictimEl) bestVictimEl.textContent = bestVictimStr;
+    const greenEls = card.querySelectorAll('.char-history .text-neon-green');
+    const redEls = card.querySelectorAll('.char-history .text-neon-red');
+
+    // 1. Damage Dealt (1st green)
+    if (greenEls[0]) greenEls[0].textContent = s.damageDealt.toString();
+    // 2. Best Victim (2nd green)
+    if (greenEls[1]) greenEls[1].textContent = bestVictimStr;
+
+    // 3. Damage Taken (1st red)
+    if (redEls[0]) redEls[0].textContent = s.damageTaken.toString();
+    // 4. Worst Killer (2nd red)
+    if (redEls[1]) redEls[1].textContent = worstKillerStr;
   });
 }
 
