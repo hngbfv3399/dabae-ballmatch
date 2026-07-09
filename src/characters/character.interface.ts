@@ -57,4 +57,9 @@ export interface CharacterState extends CharacterConfig {
   isSuInvisible?: boolean; // 수 정밀 저격 은신 및 무적 여부
   totalDamageDealt?: number; // 한 게임 내 가한 총 피해량
   totalDamageTaken?: number; // 한 게임 내 받은 총 피해량
+  isCharmed?: boolean; // 세연 매혹 상태 여부
+  charmTimeLeft?: number; // 매혹 남은 시간 (초)
+  isPoisoned?: boolean; // 푸만 독성 상태 여부
+  poisonTimeLeft?: number; // 독성 남은 시간 (초)
+  poisonDamageTimer?: number; // 독성 대미지 틱 타이머 (초)
 }

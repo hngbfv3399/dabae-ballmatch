@@ -331,6 +331,7 @@ export class GameLounge {
         aliveCharacters.forEach((enemy) => {
           if (enemy.id === char.id) return;
           if (enemy.isSuInvisible) return; // 은신 중인 대상은 타겟 설정 불가
+          if (char.isCharmed && enemy.id === 'seyeon') return; // 매혹 중에는 세연 공격 타겟 제외
           const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
           if (dist < minDist) {
             minDist = dist;
@@ -444,6 +445,12 @@ export class GameLounge {
     // 수 정밀 저격 은신/무적 상태 시 대미지 무시
     if (target.isSuInvisible) {
       console.log(`🛡️ [은신 면역] ${target.name}이 은신 상태이므로 피해를 받지 않습니다.`);
+      return;
+    }
+
+    // 세연 매혹 대미지 무시 판정 (서로 피해 0)
+    if ((target.isCharmed && attacker.id === 'seyeon') || (attacker.isCharmed && target.id === 'seyeon')) {
+      console.log(`🛡️ [매혹 면역] ${attacker.name} ➡️ ${target.name} | 매혹 상태이므로 서로 피해를 입히지 못합니다.`);
       return;
     }
 

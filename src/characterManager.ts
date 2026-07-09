@@ -6,8 +6,14 @@ import { chanikConfig } from './characters/chanik';
 import { chanhwiConfig } from './characters/chanhwi';
 import { nayutaConfig } from './characters/nayuta';
 import { unheeConfig } from './characters/unhee';
+import { dongjunConfig } from './characters/dongjun';
+import { seyeonConfig } from './characters/seyeon';
+import { pumanConfig } from './characters/puman';
+import { eunsuConfig } from './characters/eunsu';
+import { myeongseokConfig } from './characters/myeongseok';
+import { jujuConfig } from './characters/juju';
 
-// 이용 가능한 캐릭터 목록 (도윤, 지호, 수, 찬익, 찬휘, 나유타, 운희 포함)
+// 이용 가능한 캐릭터 목록
 export const availableCharacters: CharacterConfig[] = [
   doyunConfig,
   jihoConfig,
@@ -15,7 +21,13 @@ export const availableCharacters: CharacterConfig[] = [
   chanikConfig,
   chanhwiConfig,
   nayutaConfig,
-  unheeConfig
+  unheeConfig,
+  dongjunConfig,
+  seyeonConfig,
+  pumanConfig,
+  eunsuConfig,
+  myeongseokConfig,
+  jujuConfig
 ];
 
 /**

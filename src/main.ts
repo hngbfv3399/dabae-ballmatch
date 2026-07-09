@@ -64,7 +64,13 @@ const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C'> = {
   nayuta: 'B',
   unhee: 'B',
   doyun: 'C',
-  su: 'C'
+  su: 'C',
+  dongjun: 'B',
+  seyeon: 'A',
+  puman: 'B',
+  eunsu: 'A',
+  myeongseok: 'B',
+  juju: 'S'
 };
 
 // 키구조: { [mode]: { [charId]: CharacterStats } }
@@ -175,11 +181,14 @@ async function recordGameStart(participantIds: string[], playerCount: number) {
 }
 
 async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
+  const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
+  const realChars = allChars.filter(char => !char.id.includes('clone'));
+
   try {
     await convexClient.mutation(api.stats.recordGameEnd, {
-      winnerId,
+      winnerId: finalWinnerId,
       mode: playerCount.toString(),
-      allChars: allChars.map(char => ({
+      allChars: realChars.map(char => ({
         characterId: char.id,
         damageDealt: char.totalDamageDealt || 0,
         damageTaken: char.totalDamageTaken || 0
@@ -204,6 +213,7 @@ function getStoredCounters(): Record<string, Record<string, Record<string, numbe
 }
 
 async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
+  if (victimId.includes('clone') || killerId.includes('clone')) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
       victimId,
