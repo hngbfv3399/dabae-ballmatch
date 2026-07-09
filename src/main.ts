@@ -36,6 +36,7 @@ const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonEl
 // Selected characters state
 const selectedIds: Set<string> = new Set();
 let gameLounge: GameLounge | null = null;
+let isPracticeMode = false;
 
 // 아바타 HTML 렌더러 (이모지 대체)
 function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
@@ -172,6 +173,7 @@ function calculateDynamicTiers() {
 }
 
 async function recordGameStart(participantIds: string[], playerCount: number) {
+  if (isPracticeMode) return;
   try {
     await convexClient.mutation(api.stats.recordGameStart, {
       participantIds,
@@ -181,6 +183,7 @@ async function recordGameStart(participantIds: string[], playerCount: number) {
 }
 
 async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
+  if (isPracticeMode) return;
   const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
   const realChars = allChars.filter(char => !char.id.includes('clone'));
 
@@ -213,6 +216,7 @@ function getStoredCounters(): Record<string, Record<string, Record<string, numbe
 }
 
 async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
+  if (isPracticeMode) return;
   if (victimId.includes('clone') || killerId.includes('clone')) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
@@ -368,6 +372,18 @@ function updateStartButtonState() {
     startBtn.disabled = true;
     startBtn.classList.remove('active');
   }
+
+  // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요)
+  const practiceStartBtn = document.getElementById('practice-start-btn') as HTMLButtonElement;
+  if (practiceStartBtn) {
+    if (selectedIds.size >= 1) {
+      practiceStartBtn.disabled = false;
+      practiceStartBtn.classList.add('active');
+    } else {
+      practiceStartBtn.disabled = true;
+      practiceStartBtn.classList.remove('active');
+    }
+  }
 }
 
 // Start Simulator
@@ -396,6 +412,68 @@ function startGame() {
   const speedMultiplier = parseFloat(gameSpeedSelect.value);
   if (logSimSpeed) {
     logSimSpeed.textContent = `${speedMultiplier.toFixed(1)}x 배속`;
+  }
+
+  if (!gameLounge) {
+    gameLounge = new GameLounge(
+      gameCanvas,
+      updateHUD,
+      showWinner,
+      updateCountdown,
+      recordCharacterDeath,
+      appendBattleLog
+    );
+  }
+
+  gameLounge.init(initialStates, speedMultiplier);
+}
+
+// Start Practice Game (Practice Mode)
+function startPracticeGame() {
+  if (selectedIds.size < 1) return;
+
+  isPracticeMode = true;
+
+  lobbyView.classList.add('hidden');
+  gameView.classList.remove('hidden');
+
+  const selectedConfigs = availableCharacters.filter((char) => selectedIds.has(char.id));
+  
+  // 더미볼 설정 정의
+  const dummyConfig = {
+    id: 'dummy',
+    name: '더미볼',
+    maxHp: 999999,
+    speed: 0.0,
+    attackPower: 0,
+    baseAttackRange: 0,
+    skillName: '훈련 표적',
+    skillDescription: '대미지 측정용 무한 체력 샌드백입니다.',
+    color: '#7f8c8d',
+    skillChargeRate: 0,
+    onUpdate(char: CharacterState) {
+      char.hp = char.maxHp;
+      char.vx = 0;
+      char.vy = 0;
+    }
+  };
+
+  const allConfigs = [...selectedConfigs, dummyConfig];
+  const total = allConfigs.length;
+  const initialStates = allConfigs.map((config, index) => 
+    createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height)
+  );
+
+  totalCountEl.textContent = total.toString();
+  aliveCountEl.textContent = total.toString();
+
+  // 배틀 로그 초기화
+  if (battleLogList) {
+    battleLogList.innerHTML = '<div style="color: #00ddff;">🏋️ 연습모드 시작! (더미볼 소환됨)</div>';
+  }
+  const speedMultiplier = parseFloat(gameSpeedSelect.value);
+  if (logSimSpeed) {
+    logSimSpeed.textContent = `${speedMultiplier.toFixed(1)}x 배속 (연습)`;
   }
 
   if (!gameLounge) {
@@ -542,6 +620,7 @@ function closeWinnerModal() {
 }
 
 function goBackToLobby() {
+  isPracticeMode = false;
   if (gameLounge) {
     gameLounge.stop();
   }
@@ -585,6 +664,11 @@ startBtn.addEventListener('click', startGame);
 backToLobbyBtn.addEventListener('click', goBackToLobby);
 modalCloseBtn.addEventListener('click', closeWinnerModal);
 randomStartBtn.addEventListener('click', startRandomGame);
+
+const practiceStartBtn = document.getElementById('practice-start-btn');
+if (practiceStartBtn) {
+  practiceStartBtn.addEventListener('click', startPracticeGame);
+}
 
 statsModeSelect.addEventListener('change', () => {
   subscribeToGlobalData();
