@@ -111,13 +111,13 @@ export const seyeonConfig: CharacterConfig = {
           ctx.createParticle(enemy.x, enemy.y + (Math.random() - 0.5) * 20, '#ff66b2', 3, 10);
         }
 
-        // 인공지능 조종: 매혹 대상자가 세연(char)을 향해 쫓아오도록 조종 (맹목적 사랑)
+        // 인공지능 조종: 매혹 대상자가 세연(char)을 향해 쫓아오도록 조종 (맹목적 사랑, 더욱 빠른 속도로 접근)
         const angle = Math.atan2(char.y - enemy.y, char.x - enemy.x);
-        const speedVal = 3.5 * enemy.speed;
+        const speedVal = 6.2 * enemy.speed; // 추격 속도 대폭 강화
         
-        // 부드럽게 세연 쪽으로 가속 벡터 병합
-        enemy.vx = enemy.vx * 0.92 + Math.cos(angle) * speedVal * 0.08;
-        enemy.vy = enemy.vy * 0.92 + Math.sin(angle) * speedVal * 0.08;
+        // 반응속도를 민첩하게 하기 위해 가속 가중치를 높임
+        enemy.vx = enemy.vx * 0.82 + Math.cos(angle) * speedVal * 0.18;
+        enemy.vy = enemy.vy * 0.82 + Math.sin(angle) * speedVal * 0.18;
       }
     });
 

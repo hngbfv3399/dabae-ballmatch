@@ -454,9 +454,9 @@ export class GameLounge {
       return;
     }
 
-    // 세연 매혹 대미지 무시 판정 (서로 피해 0)
-    if ((target.isCharmed && attacker.id === 'seyeon') || (attacker.isCharmed && target.id === 'seyeon')) {
-      console.log(`🛡️ [매혹 면역] ${attacker.name} ➡️ ${target.name} | 매혹 상태이므로 서로 피해를 입히지 못합니다.`);
+    // 세연 매혹 대미지 무시 판정 (매혹당한 대상이 세연이에게 입히는 피해 0)
+    if (target.id === 'seyeon' && attacker.isCharmed) {
+      console.log(`🛡️ [매혹 면역] ${attacker.name} ➡️ 세연 | 매혹 상태의 적이 세연에게 입히는 피해는 무효화됩니다.`);
       return;
     }
 
