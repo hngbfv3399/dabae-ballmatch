@@ -36,8 +36,8 @@ export const seyeonConfig: CharacterConfig = {
     });
 
     if (closestEnemy) {
-      char.skillActive = true;
-      char.skillDurationLeft = 999; // 쿨다운 충전 차단
+      char.skillActive = false;
+      char.skillDurationLeft = 0; // 즉시 충전 가능 상태로 전환
       const projectiles = ((char as any).projectiles || []) as HeartProjectile[];
       projectiles.push({
         x: char.x,
@@ -136,17 +136,9 @@ export const seyeonConfig: CharacterConfig = {
       }
     });
 
-    // 3. 세연의 스킬 상태 제어 (매혹이 모두 끝날 때까지 쿨타임 충전 대기)
-    const activeHearts = (char as any).projectiles || [];
-    const hasCharmedEnemy = ctx.characters.some((enemy) => enemy.isCharmed && !enemy.isDead);
-
-    if (activeHearts.length > 0 || hasCharmedEnemy) {
-      char.skillActive = true;
-      char.skillDurationLeft = 1.0; // 충전 정지 유지
-    } else {
-      char.skillActive = false;
-      char.skillDurationLeft = 0; // 충전 개재
-    }
+    // 3. 세연의 스킬 상태 제어 (쿨타임이 즉시 돌도록 처리 완료)
+    char.skillActive = false;
+    char.skillDurationLeft = 0;
   },
 
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
