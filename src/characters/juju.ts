@@ -118,8 +118,8 @@ export const jujuConfig: CharacterConfig = {
             
             // 바깥으로 넉백 튕겨내기
             const angle = Math.atan2(dy, dx);
-            enemy.vx = Math.cos(angle) * 14.5;
-            enemy.vy = Math.sin(angle) * 14.5;
+            enemy.vx = Math.cos(angle) * 28.5;
+            enemy.vy = Math.sin(angle) * 28.5;
           }
         });
 
