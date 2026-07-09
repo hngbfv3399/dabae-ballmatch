@@ -14,6 +14,10 @@ export const eunsuConfig: CharacterConfig = {
   tier: 'A',
 
   onSkillTrigger(char: CharacterState, ctx) {
+    // 쿨타임 즉시 재가동 설정
+    char.skillActive = false;
+    char.skillDurationLeft = 0;
+
     // 30% 확률로 소환 실패
     if (Math.random() < 0.3) {
       ctx.addFloatingText(char.x, char.y - 50, '⚠️ 분신 소환 실패!', '#888888', 1.5);

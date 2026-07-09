@@ -332,6 +332,14 @@ export class GameLounge {
           if (enemy.id === char.id) return;
           if (enemy.isSuInvisible) return; // 은신 중인 대상은 타겟 설정 불가
           if (char.isCharmed && enemy.id === 'seyeon') return; // 매혹 중에는 세연 공격 타겟 제외
+          
+          // 은수 본체와 분신 관계 간의 아군 판정 (상호 타격 타겟 제외)
+          if ((char.id === 'eunsu' && enemy.id.includes('eunsu_clone')) ||
+              (char.id.includes('eunsu_clone') && enemy.id === 'eunsu') ||
+              (char.id.includes('eunsu_clone') && enemy.id.includes('eunsu_clone'))) {
+            return;
+          }
+
           const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
           if (dist < minDist) {
             minDist = dist;
@@ -451,6 +459,13 @@ export class GameLounge {
     // 수 정밀 저격 은신/무적 상태 시 대미지 무시
     if (target.isSuInvisible) {
       console.log(`🛡️ [은신 면역] ${target.name}이 은신 상태이므로 피해를 받지 않습니다.`);
+      return;
+    }
+
+    // 은수 본체와 분신 간 상호 피해 무시
+    if ((attacker.id === 'eunsu' && target.id.includes('eunsu_clone')) ||
+        (attacker.id.includes('eunsu_clone') && target.id === 'eunsu') ||
+        (attacker.id.includes('eunsu_clone') && target.id.includes('eunsu_clone'))) {
       return;
     }
 
