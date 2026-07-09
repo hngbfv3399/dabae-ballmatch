@@ -83,9 +83,11 @@ const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C'> = {
 // 키구조: { [mode]: { [charId]: CharacterStats } }
 let statsUnsubscribe: (() => void) | null = null;
 let countersUnsubscribe: (() => void) | null = null;
+let damageRankingUnsubscribe: (() => void) | null = null;
 
 let currentGlobalStats: any[] = [];
 let currentGlobalCounters: any[] = [];
+let currentGlobalDamageRanking: any[] = [];
 
 function getStoredStats(): Record<string, Record<string, CharacterStats>> {
   const record: Record<string, Record<string, CharacterStats>> = {};
@@ -709,6 +711,7 @@ if (tabWinrateBtn && tabDamageBtn) {
 function subscribeToGlobalData() {
   if (statsUnsubscribe) statsUnsubscribe();
   if (countersUnsubscribe) countersUnsubscribe();
+  if (damageRankingUnsubscribe) damageRankingUnsubscribe();
 
   const mode = statsModeSelect ? statsModeSelect.value : 'all';
 
@@ -719,6 +722,11 @@ function subscribeToGlobalData() {
 
   countersUnsubscribe = convexClient.onUpdate(api.stats.getCounters, { mode }, (countersList) => {
     currentGlobalCounters = countersList;
+    updateLobbyUI();
+  });
+
+  damageRankingUnsubscribe = convexClient.onUpdate(api.stats.getDamageRanking, { mode }, (rankingList) => {
+    currentGlobalDamageRanking = rankingList;
     updateLobbyUI();
   });
 }
@@ -745,39 +753,30 @@ function updateLobbyUI() {
     }
   });
 
-  // 평균 가한 피해량 랭킹 채우기
-  const statsRecord = getStoredStats();
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
-  const stats = statsRecord[mode] || {};
-
-  const charDmgList = availableCharacters.map(char => {
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-    const avgDmg = s.games > 0 ? (s.damageDealt / s.games) : 0;
-    return { char, avgDmg, games: s.games };
-  });
-
-  // 평균 피해량 높은 순으로 정렬
-  charDmgList.sort((a, b) => b.avgDmg - a.avgDmg);
-
-  const maxAvgDmg = Math.max(...charDmgList.map(item => item.avgDmg), 1);
-
+  // 평균 가한 피해량 랭킹 채우기 (Convex 서버에서 계산 및 정렬 완료된 데이터를 직접 렌더링)
   if (damageRankingWrapper) {
     damageRankingWrapper.innerHTML = '';
     
-    charDmgList.forEach((item, index) => {
+    // 최대 평균 피해량을 계산해 바 비례 너비 산출
+    const maxAvgDmg = currentGlobalDamageRanking.reduce((max, item) => Math.max(max, item.avgDamageDealt), 1);
+    
+    currentGlobalDamageRanking.forEach((item, index) => {
+      const char = availableCharacters.find(c => c.id === item.characterId);
+      if (!char) return;
+
       const rank = index + 1;
       const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
-      const percent = (item.avgDmg / maxAvgDmg) * 100;
+      const percent = (item.avgDamageDealt / maxAvgDmg) * 100;
       
       const rankItem = document.createElement('div');
       rankItem.className = 'dmg-rank-item';
       rankItem.innerHTML = `
         <span class="dmg-rank-num ${rankClass}">${rank}</span>
-        <span class="dmg-rank-name" style="color: ${item.char.color};">${item.char.name}</span>
+        <span class="dmg-rank-name" style="color: ${char.color};">${char.name}</span>
         <div class="dmg-rank-bar-container">
-          <div class="dmg-rank-bar" style="width: ${percent}%; background: linear-gradient(90deg, ${item.char.color} 0%, rgba(255,255,255,0.1) 100%);"></div>
+          <div class="dmg-rank-bar" style="width: ${percent}%; background: linear-gradient(90deg, ${char.color} 0%, rgba(255,255,255,0.1) 100%);"></div>
         </div>
-        <span class="dmg-rank-val">${item.avgDmg.toFixed(1)} <span style="font-size: 0.65rem; opacity: 0.6;">(${item.games}판)</span></span>
+        <span class="dmg-rank-val">${item.avgDamageDealt.toFixed(1)} <span style="font-size: 0.65rem; opacity: 0.6;">(${item.games}판)</span></span>
       `;
       damageRankingWrapper.appendChild(rankItem);
     });

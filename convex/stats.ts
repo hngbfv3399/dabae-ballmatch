@@ -174,3 +174,24 @@ export const resetStats = mutation({
     }
   },
 });
+
+// 7. Get sorted average damage ranking for a specific mode
+export const getDamageRanking = query({
+  args: { mode: v.string() },
+  handler: async (ctx, args) => {
+    const stats = await ctx.db
+      .query("globalStats")
+      .withIndex("by_mode_and_char", (q) => q.eq("mode", args.mode))
+      .collect();
+
+    const ranking = stats.map((item) => ({
+      characterId: item.characterId,
+      games: item.games,
+      avgDamageDealt: item.games > 0 ? item.damageDealt / item.games : 0,
+    }));
+
+    // Sort by avgDamageDealt descending
+    ranking.sort((a, b) => b.avgDamageDealt - a.avgDamageDealt);
+    return ranking;
+  },
+});
