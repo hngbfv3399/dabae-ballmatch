@@ -377,7 +377,7 @@ export class GameLounge {
         if (now - anyChar.lastGaugeLogTime >= 1000) {
           anyChar.lastGaugeLogTime = now;
           const isCharging = !char.skillActive && !char.isStunned && !char.nayutaControlled;
-          console.log(`⏱️ [충전 로그] ${char.name} | 게이지: ${char.skillGauge.toFixed(1)}/100 | 충전여부: ${isCharging ? '🟢 충전중' : '🔴 정지'} (skillActive: ${char.skillActive}, isStunned: ${char.isStunned}, nayutaControlled: ${char.nayutaControlled})`);
+          console.log(`⏱️ [충전 로그] ${char.name} | 게이지: ${char.skillGauge.toFixed(1)}/100 | 충전여부: ${isCharging ? '🟢 충전중' : '🔴 정지'} (skillActive: ${char.skillActive}, isStunned: ${char.isStunned}, nayutaControlled: ${!!char.nayutaControlled})`);
         }
       }
 
