@@ -5,7 +5,7 @@ export const doyunConfig: CharacterConfig = {
   name: '도윤',
   maxHp: 150,
   speed: 1.2,
-  attackPower: 20,
+  attackPower: 13,
   baseAttackRange: 45,
   skillName: '불꽃 덩크슛 슬램',
   skillDescription: '5초 쿨타임. 가장 가까운 적에게 공중 도약(크기 확대) 후 유도 돌진하여 내리꽂아 반경 100px 내의 모든 적에게 광역 폭발 피해(공격력의 2.2배 - 5)를 주고 밀쳐냅니다. 추가로 착지 시 3초간 10 대미지를 막아내는 실드를 획득합니다.',

@@ -54,76 +54,85 @@ export const jujuConfig: CharacterConfig = {
     });
     js.swapPortals = js.swapPortals.filter((p) => p.life > 0);
 
-    // 2. 액티브: 블랙홀 흡입 및 만료 붕괴
-    if (js.skillActive && js.blackHoleX !== undefined && js.blackHoleY !== undefined) {
+    // 2. 액티브: 블랙홀 흡입 및 만료 붕괴 (쿨다운 멈춤현상 방지를 위해 항상 시간 차감)
+    if (js.skillActive) {
       js.skillDurationLeft -= dt;
 
-      const bX = js.blackHoleX;
-      const bY = js.blackHoleY;
+      // 블랙홀 좌표가 유효할 때만 흡입 진행
+      if (js.blackHoleX !== undefined && js.blackHoleY !== undefined) {
+        const bX = js.blackHoleX;
+        const bY = js.blackHoleY;
 
-      // 주주를 제외한 주변 250px 내 적들의 기절 봉쇄 및 강제 끌어당김
-      ctx.characters.forEach((enemy: CharacterState) => {
-        if (enemy.isDead || enemy.id === js.id) return;
-        
-        const dx = bX - enemy.x;
-        const dy = bY - enemy.y;
-        const dist = Math.hypot(dx, dy);
+        // 주주를 제외한 주변 250px 내 적들의 기절 봉쇄 및 강제 끌어당김
+        ctx.characters.forEach((enemy: CharacterState) => {
+          if (enemy.isDead || enemy.id === js.id) return;
+          
+          const dx = bX - enemy.x;
+          const dy = bY - enemy.y;
+          const dist = Math.hypot(dx, dy);
 
-        if (dist <= 250) {
-          // A. 기절 처리하여 움직임 무력화 (0.2초 지속 스턴을 프레임마다 리프레시)
-          enemy.isStunned = true;
-          enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
+          if (dist <= 250) {
+            // A. 기절 처리하여 움직임 무력화 (0.2초 지속 스턴을 프레임마다 리프레시)
+            enemy.isStunned = true;
+            enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
 
-          // B. 관성 움직임을 멈춤
-          enemy.vx = 0;
-          enemy.vy = 0;
+            // B. 관성 움직임을 멈춤
+            enemy.vx = 0;
+            enemy.vy = 0;
 
-          // C. 중심 방향으로 강제 좌표 이동 (강제 흡입)
-          if (dist > 15) {
-            const pullSpeed = 4.8; // 강하게 끌고 들어감
-            const angle = Math.atan2(dy, dx);
-            enemy.x += Math.cos(angle) * pullSpeed * (dt * 60);
-            enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
+            // C. 중심 방향으로 강제 좌표 이동 (강제 흡입)
+            if (dist > 15) {
+              const pullSpeed = 4.8; // 강하게 끌고 들어감
+              const angle = Math.atan2(dy, dx);
+              enemy.x += Math.cos(angle) * pullSpeed * (dt * 60);
+              enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
+            }
           }
-        }
-      });
+        });
 
-      // 블랙홀 빨아들이는 궤적 파티클 연출
-      if (Math.random() < 0.7) {
-        const randAngle = Math.random() * Math.PI * 2;
-        const startDist = 120 + Math.random() * 120;
-        const px = bX + Math.cos(randAngle) * startDist;
-        const py = bY + Math.sin(randAngle) * startDist;
-        ctx.createParticle(px, py, '#00bfff', 2.2, 25);
+        // 블랙홀 빨아들이는 궤적 파티클 연출
+        if (Math.random() < 0.7) {
+          const randAngle = Math.random() * Math.PI * 2;
+          const startDist = 120 + Math.random() * 120;
+          const px = bX + Math.cos(randAngle) * startDist;
+          const py = bY + Math.sin(randAngle) * startDist;
+          ctx.createParticle(px, py, '#00bfff', 2.2, 25);
+        }
       }
 
       // 블랙홀 시간 만료 붕괴 (강력한 폭발 대미지 30 및 사방 초넉백)
       if (js.skillDurationLeft <= 0) {
         js.skillActive = false;
+        js.skillDurationLeft = 0;
 
-        ctx.createExplosion(bX, bY, '#1c0d24', 45); // 암흑 특이점 폭발
-        ctx.createExplosion(bX, bY, '#00bfff', 35);
-        ctx.addFloatingText(bX, bY - 20, '💥 블랙홀 붕괴!', '#ff007f', 2.2);
+        if (js.blackHoleX !== undefined && js.blackHoleY !== undefined) {
+          const bX = js.blackHoleX;
+          const bY = js.blackHoleY;
 
-        // 중앙 반경 250px 모든 적 피해 30 및 외곽 초넉백
-        ctx.characters.forEach((enemy: CharacterState) => {
-          if (enemy.isDead || enemy.id === js.id) return;
-          
-          const dx = enemy.x - bX;
-          const dy = enemy.y - bY;
-          const dist = Math.hypot(dx, dy);
+          ctx.createExplosion(bX, bY, '#1c0d24', 45); // 암흑 특이점 폭발
+          ctx.createExplosion(bX, bY, '#00bfff', 35);
+          ctx.addFloatingText(bX, bY - 20, '💥 블랙홀 붕괴!', '#ff007f', 2.2);
 
-          if (dist <= 250) {
-            ctx.dealDamage(js, enemy, 30, '💥 SINGULARITY!');
+          // 중앙 반경 250px 모든 적 피해 30 및 외곽 초넉백
+          ctx.characters.forEach((enemy: CharacterState) => {
+            if (enemy.isDead || enemy.id === js.id) return;
             
-            // 바깥으로 넉백 튕겨내기
-            const angle = Math.atan2(dy, dx);
-            enemy.vx = Math.cos(angle) * 28.5;
-            enemy.vy = Math.sin(angle) * 28.5;
-          }
-        });
+            const dx = enemy.x - bX;
+            const dy = enemy.y - bY;
+            const dist = Math.hypot(dx, dy);
 
-        ctx.logMessage?.(`💥 [블랙홀 붕괴] 주주 ➡️ 블랙홀 특이점 폭발! 주변 적에게 30 광역 피해 및 초강력 외곽 넉백!`, 'skill');
+            if (dist <= 250) {
+              ctx.dealDamage(js, enemy, 30, '💥 SINGULARITY!');
+              
+              // 바깥으로 넉백 튕겨내기 (넉백 속도 28.5)
+              const angle = Math.atan2(dy, dx);
+              enemy.vx = Math.cos(angle) * 28.5;
+              enemy.vy = Math.sin(angle) * 28.5;
+            }
+          });
+
+          ctx.logMessage?.(`💥 [블랙홀 붕괴] 주주 ➡️ 블랙홀 특이점 폭발! 주변 적에게 30 광역 피해 및 초강력 외곽 넉백!`, 'skill');
+        }
       }
     }
 
@@ -163,7 +172,7 @@ export const jujuConfig: CharacterConfig = {
     });
 
     // 2. 액티브: 전술 블랙홀 코어 렌더링 (주주가 소환했던 시전 좌표)
-    if (js.skillActive && js.blackHoleX !== undefined && js.blackHoleY !== undefined) {
+    if (js.blackHoleX !== undefined && js.blackHoleY !== undefined && (js.skillActive || js.skillDurationLeft > 0)) {
       canvasCtx.save();
       const bX = js.blackHoleX;
       const bY = js.blackHoleY;
