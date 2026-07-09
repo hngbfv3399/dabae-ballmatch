@@ -28,7 +28,7 @@ export const pumanConfig: CharacterConfig = {
   name: '푸만',
   maxHp: 145,
   speed: 1.25,
-  attackPower: 9,
+  attackPower: 15,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
   skillDescription: '4초 쿨타임. 뱀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 3초간 매초 2의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 스탯(공격력)이 쌓이고, 타격 시 스탯만큼 추가 대미지 및 체력 회복을 얻습니다. 5초간 식물 미섭취 및 적 미타격 시 스탯이 초기화됩니다.',
@@ -124,7 +124,7 @@ export const pumanConfig: CharacterConfig = {
         
         if (pm.pumanStacks! < 15) {
           pm.pumanStacks! += 1;
-          pm.attackPower = 9 + pm.pumanStacks!;
+          pm.attackPower = 15 + pm.pumanStacks!;
           ctx.addFloatingText(pm.x, pm.y - 50, `🌱 식물 섭취! (+${pm.pumanStacks})`, '#00ff00', 0.9);
           ctx.createParticle(plant.x, plant.y, '#39ff14', 3, 12);
         } else {
@@ -141,7 +141,7 @@ export const pumanConfig: CharacterConfig = {
       pm.resetTimer -= dt;
       if (pm.resetTimer <= 0) {
         pm.pumanStacks = 0;
-        pm.attackPower = 9; // 원래 수치로 원복
+        pm.attackPower = 15; // 원래 수치로 원복
         pm.resetTimer = 5.0;
         ctx.addFloatingText(pm.x, pm.y - 55, '💨 스탯 초기화', '#888888', 1.0);
         ctx.createExplosion(pm.x, pm.y, '#888888', 8);

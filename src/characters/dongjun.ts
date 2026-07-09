@@ -11,16 +11,16 @@ const RANK_NAMES = ['훈련병', '이병', '일병', '상병', '병장', '전역
 function getRankStats(rank: number) {
   switch (rank) {
     case 0: // 훈련병
-      return { maxHp: 100, attackPower: 6, speed: 0.8 };
+      return { maxHp: 110, attackPower: 10, speed: 0.9 };
     case 1: // 이병
-      return { maxHp: 120, attackPower: 8, speed: 1.0 };
+      return { maxHp: 130, attackPower: 13, speed: 1.1 };
     case 2: // 일병
-      return { maxHp: 140, attackPower: 10, speed: 1.2 };
+      return { maxHp: 150, attackPower: 16, speed: 1.3 };
     case 3: // 상병
-      return { maxHp: 170, attackPower: 15, speed: 1.4 };
+      return { maxHp: 180, attackPower: 20, speed: 1.5 };
     case 4: // 병장
     default:
-      return { maxHp: 200, attackPower: 20, speed: 1.6 };
+      return { maxHp: 210, attackPower: 26, speed: 1.7 };
   }
 }
 
@@ -87,9 +87,9 @@ function promoteDongjun(char: DongjunState, ctx: any) {
 export const dongjunConfig: CharacterConfig = {
   id: 'dongjun',
   name: '동준',
-  maxHp: 100, // 훈련병 시작 체력
-  speed: 0.8, // 훈련병 시작 속도
-  attackPower: 6, // 훈련병 시작 공격력
+  maxHp: 110, // 훈련병 시작 체력
+  speed: 0.9, // 훈련병 시작 속도
+  attackPower: 10, // 훈련병 시작 공격력
   baseAttackRange: 45,
   skillName: '군기 충전 및 진급',
   skillDescription: '5초마다 훈련병 ➡️ 이병 ➡️ 일병 ➡️ 상병 ➡️ 병장 계급으로 자동 진급합니다. 진급 시 3% 확률로 즉시 [전역]하여 매치를 즉시 승리합니다! 액티브 발동 시 즉시 1단계 진급(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다.',

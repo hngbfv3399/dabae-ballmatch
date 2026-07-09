@@ -18,7 +18,7 @@ export const jujuConfig: CharacterConfig = {
   name: '주주',
   maxHp: 135,
   speed: 1.25,
-  attackPower: 9,
+  attackPower: 14,
   baseAttackRange: 45,
   skillName: '전술적 특이점 블랙홀',
   skillDescription: '7초 쿨타임. 스킬 시전 시 현재 위치에 3초간 블랙홀을 소환합니다. 주변 250px 내 적들의 움직임을 원천 봉쇄(기절)하고 블랙홀 중심부로 강력하게 끌고 들어갑니다. 블랙홀 지속 중 주주는 완전 무적입니다. 만료 시 30 광역 충격파 피해와 초강력 넉백을 선사합니다. 패시브: 죽음 직전 위기(체력 5% 이하) 처할 시 1회 한정으로 최다 HP 생존자와 자리를 바꾸고 3초 무적 보호막을 얻습니다.',

@@ -21,7 +21,7 @@ export const myeongseokConfig: CharacterConfig = {
   name: '명석',
   maxHp: 145,
   speed: 1.2,
-  attackPower: 9,
+  attackPower: 14,
   baseAttackRange: 45,
   skillName: '퍼펙트 스트라이크',
   skillDescription: '6초 쿨타임. 무겁고 빠른 볼링공을 던집니다. 볼링공은 5초 동안 벽과 캐릭터 사이를 바운싱하며, 벽에 충돌 시 +4 대미지, 캐릭터 충돌 시 +6 대미지가 영구적으로 중첩됩니다.',
@@ -60,7 +60,7 @@ export const myeongseokConfig: CharacterConfig = {
       y: char.y,
       vx: Math.cos(angle) * 11.5,
       vy: Math.sin(angle) * 11.5,
-      damage: 12, // 시작 데미지
+      damage: 18, // 시작 데미지
       radius: 15,
       timeLeft: 5.0, // 5초 지속
       lastHitTargetId: '',

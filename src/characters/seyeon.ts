@@ -13,7 +13,7 @@ export const seyeonConfig: CharacterConfig = {
   name: '세연',
   maxHp: 130,
   speed: 1.3,
-  attackPower: 9,
+  attackPower: 14,
   baseAttackRange: 45,
   skillName: '매혹의 윙크',
   skillDescription: '3초 쿨타임. 가장 가까운 상대를 향해 매혹의 하트를 날려 명중시킵니다. 하트에 닿은 상대는 6초간 [매혹]되어 스킬이 봉쇄되고 공격 대상에서 세연이를 배제하며, 다른 상대를 조종당하듯 추격합니다. 매혹 기간 동안 상대와 세연이는 서로에게 가하는 피해량이 0이 됩니다.',
