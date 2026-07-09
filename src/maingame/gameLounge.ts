@@ -258,13 +258,15 @@ export class GameLounge {
 
     // 2. 캐릭터 상태 및 위치 업데이트
     const aliveCharacters = this.characters.filter((c) => !c.isDead);
+    // 분신(eunsu_clone)은 플레이어가 아니므로 승리 조건 판정에서 제외
+    const aliveRealPlayers = aliveCharacters.filter((c) => !c.id.includes('eunsu_clone'));
 
     // 승리 조건 검사 (데스 애니메이션을 위해 2초 지연 적용)
     if (!this.isGameOver) {
-      if (aliveCharacters.length <= 1) {
+      if (aliveRealPlayers.length <= 1) {
         this.isGameOver = true;
         this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
-        this.winnerCharacter = aliveCharacters[0] || null;
+        this.winnerCharacter = aliveRealPlayers[0] || null;
 
         // 전투 최종 리포트 출력
         console.log(`\n🏆🏆🏆 [전투 종료 결산 리포트] 🏆🏆🏆`);

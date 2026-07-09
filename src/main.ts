@@ -506,10 +506,12 @@ function startPracticeGame() {
 
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
-  const aliveCount = characters.filter((c) => !c.isDead).length;
+  // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
+  const aliveCount = characters.filter((c) => !c.isDead && !c.id.includes('eunsu_clone')).length;
   aliveCountEl.textContent = aliveCount.toString();
 
-  const sorted = [...characters].sort((a, b) => {
+  // 분신(eunsu_clone)은 HUD 목록에서도 제외
+  const sorted = [...characters].filter((c) => !c.id.includes('eunsu_clone')).sort((a, b) => {
     if (a.isDead && !b.isDead) return 1;
     if (!a.isDead && b.isDead) return -1;
     if (!a.isDead && !b.isDead) {
