@@ -751,17 +751,19 @@ export class GameLounge {
       }
     }
 
-    // 가한 피해량/받은 피해량 누적
+    // 가한 피해량/받은 피해량 누적 (즉사 대미지 등으로 인한 전적 인플레이션 방지를 위해 대상의 남은 체력 한도로 제한)
+    const statDamage = Math.min(finalDamage, Math.max(0, target.hp));
+
     let dmgAttacker = attacker;
     if (attacker && attacker.id.includes('eunsu_clone')) {
       const mainEunsu = this.characters.find(c => c.id === 'eunsu');
       if (mainEunsu) dmgAttacker = mainEunsu;
     }
     if (dmgAttacker && dmgAttacker.totalDamageDealt !== undefined) {
-      dmgAttacker.totalDamageDealt += finalDamage;
+      dmgAttacker.totalDamageDealt += statDamage;
     }
     if (target && target.totalDamageTaken !== undefined) {
-      target.totalDamageTaken += finalDamage;
+      target.totalDamageTaken += statDamage;
     }
 
     target.hp -= finalDamage;
