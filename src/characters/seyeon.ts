@@ -111,32 +111,13 @@ export const seyeonConfig: CharacterConfig = {
           ctx.createParticle(enemy.x, enemy.y + (Math.random() - 0.5) * 20, '#ff66b2', 3, 10);
         }
 
-        // 인공지능 조종: 세연을 제외한 가장 가까운 적 추격
-        let chaseTarget: any = null;
-        let minDist = Infinity;
-
-        ctx.characters.forEach((other) => {
-          if (other.isDead || other.id === enemy.id || other.id === 'seyeon') return;
-          const d = Math.hypot(other.x - enemy.x, other.y - enemy.y);
-          if (d < minDist) {
-            minDist = d;
-            chaseTarget = other;
-          }
-        });
-
-        if (chaseTarget) {
-          const angle = Math.atan2(chaseTarget.y - enemy.y, chaseTarget.x - enemy.x);
-          const speedVal = 3.5 * enemy.speed;
-          // 부드럽게 유도 이동 벡터 병합
-          enemy.vx = enemy.vx * 0.92 + Math.cos(angle) * speedVal * 0.08;
-          enemy.vy = enemy.vy * 0.92 + Math.sin(angle) * speedVal * 0.08;
-        } else {
-          // 세연이밖에 안 남았다면 세연이에게서 도망침
-          const angle = Math.atan2(enemy.y - char.y, enemy.x - char.x);
-          const speedVal = 3.5 * enemy.speed;
-          enemy.vx = enemy.vx * 0.92 + Math.cos(angle) * speedVal * 0.08;
-          enemy.vy = enemy.vy * 0.92 + Math.sin(angle) * speedVal * 0.08;
-        }
+        // 인공지능 조종: 매혹 대상자가 세연(char)을 향해 쫓아오도록 조종 (맹목적 사랑)
+        const angle = Math.atan2(char.y - enemy.y, char.x - enemy.x);
+        const speedVal = 3.5 * enemy.speed;
+        
+        // 부드럽게 세연 쪽으로 가속 벡터 병합
+        enemy.vx = enemy.vx * 0.92 + Math.cos(angle) * speedVal * 0.08;
+        enemy.vy = enemy.vy * 0.92 + Math.sin(angle) * speedVal * 0.08;
       }
     });
 
