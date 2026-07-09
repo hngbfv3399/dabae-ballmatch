@@ -520,6 +520,71 @@ export class GameLounge {
       }
     }
 
+    // 주주 비상 차원 스왑 패시브 (체력 5% 이하 위기 모면)
+    if (target.id === 'juju' && !(target as any).hasEmergencySwapped) {
+      const nextHp = target.hp - finalDamage;
+      if (nextHp <= target.maxHp * 0.05) {
+        // 긴급 회피 격발!
+        (target as any).hasEmergencySwapped = true;
+
+        // 가장 체력이 높은 생존자 찾기
+        let maxHp = -Infinity;
+        let swapTarget: any = null;
+        this.characters.forEach((enemy) => {
+          if (enemy.isDead || enemy.id === 'juju') return;
+          if (enemy.hp > maxHp) {
+            maxHp = enemy.hp;
+            swapTarget = enemy;
+          }
+        });
+
+        if (swapTarget) {
+          const jX = target.x;
+          const jY = target.y;
+          const tX = swapTarget.x;
+          const tY = swapTarget.y;
+
+          // 위치 교환
+          target.x = tX;
+          target.y = tY;
+          swapTarget.x = jX;
+          swapTarget.y = jY;
+
+          // 무적 보호막 가동 (3초)
+          target.isImmune = true;
+          target.immuneTimeLeft = 3.0;
+
+          // 포탈 흔적 이펙트
+          if (!(target as any).swapPortals) (target as any).swapPortals = [];
+          (target as any).swapPortals.push({ x: jX, y: jY, life: 0.8 });
+          (target as any).swapPortals.push({ x: tX, y: tY, life: 0.8 });
+
+          this.createExplosion(jX, jY, '#00bfff', 18);
+          this.createExplosion(tX, tY, '#00bfff', 18);
+          this.floatingTexts.push({
+            x: target.x,
+            y: target.y - 70,
+            text: '🛡️ 비상 차원 탈출! (무적 3초)',
+            color: '#00bfff',
+            life: 2.0
+          });
+          console.log(`🛡️ [비상 탈출] 주주가 치사 피해를 회피하고 ${swapTarget.name}와 스왑 후 3초 무적막을 얻었습니다!`);
+        } else {
+          // 남은 생존자가 본인뿐일 경우 생존 무적막만 가동
+          target.isImmune = true;
+          target.immuneTimeLeft = 3.0;
+          this.floatingTexts.push({
+            x: target.x,
+            y: target.y - 70,
+            text: '🛡️ 비상 무적! (3초)',
+            color: '#00bfff',
+            life: 2.0
+          });
+        }
+        return; // 원래 입으려던 대미지 완전 무효화!
+      }
+    }
+
     // 가한 피해량/받은 피해량 누적
     if (attacker && attacker.totalDamageDealt !== undefined) {
       attacker.totalDamageDealt += finalDamage;
