@@ -65,6 +65,7 @@ export class GameLounge {
   private isGameOver: boolean = false;
   private gameOverTimer: number = 0;
   private winnerCharacter: CharacterState | null = null;
+  private eliminationCount: number = 0;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -264,6 +265,25 @@ export class GameLounge {
         this.isGameOver = true;
         this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
         this.winnerCharacter = aliveCharacters[0] || null;
+
+        // 전투 최종 리포트 출력
+        console.log(`\n🏆🏆🏆 [전투 종료 결산 리포트] 🏆🏆🏆`);
+        if (this.winnerCharacter) {
+          console.log(`👑 최종 우승자: ${this.winnerCharacter.name}`);
+        } else {
+          console.log(`💀 무승부 (모두 사망)`);
+        }
+        console.log(`-----------------------------------------`);
+        console.log(`📊 캐릭터별 최종 전투 통계:`);
+        const stats = this.characters.map((c) => ({
+          이름: c.name,
+          상태: c.isDead ? '💀 탈락' : '👑 생존 (우승)',
+          '총 가한 대미지': c.totalDamageDealt || 0,
+          '총 피격 대미지': c.totalDamageTaken || 0,
+          '최대 체력': c.maxHp
+        }));
+        console.table(stats);
+        console.log(`=========================================\n`);
       }
     } else {
       this.gameOverTimer -= dt;
@@ -608,7 +628,13 @@ export class GameLounge {
     }
 
     target.hp -= finalDamage;
-    console.log(`⚔️ [대미지] ${attacker.name} -> ${target.name} | 최종 피해: ${finalDamage} (기본: ${amount}${customText ? `, 판정: ${customText}` : ''}) | 남은 HP: ${target.hp}/${target.maxHp}`);
+
+    // 상세 전투 로그 콘솔 출력
+    if (customText) {
+      console.log(`🔥 [스킬 피해] ${attacker.name} ➡️ ${target.name} | 피해량: ${finalDamage} (${customText}) | 대상 HP: ${target.hp}/${target.maxHp}`);
+    } else {
+      console.log(`⚔️ [기본 공격] ${attacker.name} ➡️ ${target.name} | 피해량: ${finalDamage} | 대상 HP: ${target.hp}/${target.maxHp}`);
+    }
     this.onLogMessage?.(`⚔️ [${customText || '기본공격'}] ${attacker.name} ➡️ ${target.name} | ${finalDamage} 피해 (HP: ${target.hp}/${target.maxHp})`, 'damage');
 
     this.floatingTexts.push({
@@ -629,8 +655,13 @@ export class GameLounge {
       target.isDead = true;
       target.opacity = 0.8;
       (target as any).deathAnimationTime = 1.5; // 1.5초 데스 애니메이션 타이머
-      console.log(`💀 [탈락] ${target.name}이(가) ${attacker.name}에 의해 게임에서 탈락되었습니다!`);
-      this.onLogMessage?.(`💀 [탈락] ${target.name}이(가) ${attacker.name}에 의해 탈락되었습니다!`, 'death');
+
+      this.eliminationCount++;
+      const totalCount = this.characters.length;
+      const rank = totalCount - this.eliminationCount + 1; // 1등(우승자)은 맨 마지막 생존자
+
+      console.log(`💀 [탈락] #${rank}위 탈락: ${target.name} | 처치자: ${attacker.name} (탈락 누적: ${this.eliminationCount}/${totalCount})`);
+      this.onLogMessage?.(`💀 [탈락] #${rank}위: ${target.name} (처치자: ${attacker.name})`, 'death');
 
       if (attacker && attacker.id !== target.id) {
         this.onCharacterDeath?.(target.id, attacker.id, this.characters.length);
