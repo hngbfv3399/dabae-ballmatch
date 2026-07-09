@@ -30,6 +30,10 @@ export const myeongseokConfig: CharacterConfig = {
   tier: 'B',
 
   onSkillTrigger(char: CharacterState, ctx) {
+    // 쿨타임 즉시 재가동 설정
+    char.skillActive = false;
+    char.skillDurationLeft = 0;
+
     let closestEnemy: any = null;
     let minDist = Infinity;
 
