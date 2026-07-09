@@ -71,14 +71,23 @@ function promoteDongjun(char: DongjunState, ctx: any) {
     char.speed = stats.speed;
   }
 
-  // 체력 자체는 고정이고, 계급이 바뀌면 30 일시 회복
-  const healAmount = 30;
-  char.hp = Math.min(char.maxHp, char.hp + healAmount);
+  // 병장(Rank 4)인 경우에만 체력 30 회복 (다른 계급은 회복 없음)
+  let healAmount = 0;
+  if (newRank === 4) {
+    healAmount = 30;
+    char.hp = Math.min(char.maxHp, char.hp + healAmount);
+  }
 
   const changeEmoji = newRank > prevRank ? '⬆️' : newRank < prevRank ? '⬇️' : '↔️';
-  ctx.addFloatingText(char.x, char.y - 50, `🎲 ${changeEmoji} ${rankName}! (+${healAmount} HP)`, '#4d5d3b', 1.8);
+  const healText = healAmount > 0 ? ` (+${healAmount} HP)` : '';
+  ctx.addFloatingText(char.x, char.y - 50, `🎲 ${changeEmoji} ${rankName}!${healText}`, '#4d5d3b', 1.8);
   ctx.createExplosion(char.x, char.y, '#4d5d3b', 12);
-  ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (체력 30 회복, 공격력: ${char.attackPower})`, 'skill');
+  
+  if (healAmount > 0) {
+    ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (체력 ${healAmount} 회복, 공격력: ${char.attackPower})`, 'skill');
+  } else {
+    ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (공격력: ${char.attackPower})`, 'skill');
+  }
 }
 
 export const dongjunConfig: CharacterConfig = {
@@ -89,7 +98,7 @@ export const dongjunConfig: CharacterConfig = {
   attackPower: 10, // 훈련병 시작 공격력
   baseAttackRange: 45,
   skillName: '군기 충전 및 계급 추첨',
-  skillDescription: '5초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 매번 계급이 오를 수도, 내려갈 수도 있습니다! 계급 변동 시 3% 확률로 즉시 [전역]하여 모든 적에게 9999 피해를 입히고 즉시 승리합니다! 액티브 발동 시 즉시 계급 추첨(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다. (계급 변동 시 체력 30 회복)',
+  skillDescription: '5초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 매번 계급이 오를 수도, 내려갈 수도 있습니다! 계급 변동 시 3% 확률로 즉시 [전역]하여 모든 적에게 9999 피해를 입히고 즉시 승리합니다! 액티브 발동 시 즉시 계급 추첨(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다. (병장 진급 시 체력 30 회복)',
   color: '#4d5d3b', // 밀리터리 카키그린
   skillChargeRate: 20, // 5초 쿨타임
   tier: 'B',
