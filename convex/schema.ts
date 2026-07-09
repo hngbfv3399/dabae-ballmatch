@@ -30,5 +30,5 @@ export default defineSchema({
     killerId: v.string(),    // 죽인 캐릭터 ID
     mode: v.string(),        // 플레이 인원 모드 (예: 'all', '2', '3', '4', '5', '6')
     count: v.number(),
-  }).index("by_mode_and_victim", ["mode", "victimId"]),
+  }).index("by_mode_victim_and_killer", ["mode", "victimId", "killerId"]),
 });

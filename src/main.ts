@@ -2,7 +2,8 @@ import './style.css';
 import { availableCharacters, createCharacterState } from './characterManager';
 import type { CharacterState } from './characters/character.interface';
 import { GameLounge } from './maingame/gameLounge';
-import { initPatchNotesSubscription } from './convexClient';
+import { initPatchNotesSubscription, convexClient } from './convexClient';
+import { api } from '../convex/_generated/api';
 
 // DOM Elements
 const lobbyView = document.getElementById('lobby-view') as HTMLElement;
@@ -67,18 +68,26 @@ const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C'> = {
 };
 
 // 키구조: { [mode]: { [charId]: CharacterStats } }
-function getStoredStats(): Record<string, Record<string, CharacterStats>> {
-  const data = localStorage.getItem('ballgame_stats_v2');
-  if (!data) return { all: {} };
-  try {
-    return JSON.parse(data);
-  } catch (e) {
-    return { all: {} };
-  }
-}
+let statsUnsubscribe: (() => void) | null = null;
+let countersUnsubscribe: (() => void) | null = null;
 
-function saveStats(stats: Record<string, Record<string, CharacterStats>>) {
-  localStorage.setItem('ballgame_stats_v2', JSON.stringify(stats));
+let currentGlobalStats: any[] = [];
+let currentGlobalCounters: any[] = [];
+
+function getStoredStats(): Record<string, Record<string, CharacterStats>> {
+  const record: Record<string, Record<string, CharacterStats>> = {};
+  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  record[mode] = {};
+
+  currentGlobalStats.forEach(item => {
+    record[mode][item.characterId] = {
+      wins: item.wins,
+      games: item.games,
+      damageDealt: item.damageDealt,
+      damageTaken: item.damageTaken
+    };
+  });
+  return record;
 }
 
 function calculateDynamicTiers() {
@@ -156,84 +165,58 @@ function calculateDynamicTiers() {
   });
 }
 
-function recordGameStart(participantIds: string[], playerCount: number) {
-  const stats = getStoredStats();
-  const modes = ['all', playerCount.toString()];
-
-  modes.forEach(mode => {
-    if (!stats[mode]) stats[mode] = {};
-    participantIds.forEach(id => {
-      if (!stats[mode][id]) {
-        stats[mode][id] = { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-      }
-      stats[mode][id].games += 1;
+async function recordGameStart(participantIds: string[], playerCount: number) {
+  try {
+    await convexClient.mutation(api.stats.recordGameStart, {
+      participantIds,
+      mode: playerCount.toString()
     });
-  });
-  
-  saveStats(stats);
+  } catch (err) {}
 }
 
-function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
-  const stats = getStoredStats();
-  const modes = ['all', playerCount.toString()];
-
-  modes.forEach(mode => {
-    if (!stats[mode]) stats[mode] = {};
-    
-    if (!stats[mode][winnerId]) {
-      stats[mode][winnerId] = { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-    }
-    stats[mode][winnerId].wins += 1;
-
-    allChars.forEach(char => {
-      if (!stats[mode][char.id]) {
-        stats[mode][char.id] = { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-      }
-      stats[mode][char.id].damageDealt += char.totalDamageDealt || 0;
-      stats[mode][char.id].damageTaken += char.totalDamageTaken || 0;
+async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
+  try {
+    await convexClient.mutation(api.stats.recordGameEnd, {
+      winnerId,
+      mode: playerCount.toString(),
+      allChars: allChars.map(char => ({
+        characterId: char.id,
+        damageDealt: char.totalDamageDealt || 0,
+        damageTaken: char.totalDamageTaken || 0
+      }))
     });
-  });
-
-  saveStats(stats);
-  calculateDynamicTiers();
+  } catch (err) {}
 }
 
 // 카운터 킬/데스 기록용 로직
 function getStoredCounters(): Record<string, Record<string, Record<string, number>>> {
-  const data = localStorage.getItem('ballgame_counters');
-  if (!data) return { all: {} };
-  try {
-    return JSON.parse(data);
-  } catch (e) {
-    return { all: {} };
-  }
-}
+  const record: Record<string, Record<string, Record<string, number>>> = {};
+  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  record[mode] = {};
 
-function saveCounters(counters: Record<string, Record<string, Record<string, number>>>) {
-  localStorage.setItem('ballgame_counters', JSON.stringify(counters));
-}
-
-function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
-  const counters = getStoredCounters();
-  const modes = ['all', playerCount.toString()];
-
-  modes.forEach(mode => {
-    if (!counters[mode]) counters[mode] = {};
-    if (!counters[mode][victimId]) counters[mode][victimId] = {};
-    if (!counters[mode][victimId][killerId]) counters[mode][victimId][killerId] = 0;
-    
-    counters[mode][victimId][killerId] += 1;
+  currentGlobalCounters.forEach(item => {
+    if (!record[mode][item.victimId]) {
+      record[mode][item.victimId] = {};
+    }
+    record[mode][item.victimId][item.killerId] = item.count;
   });
-
-  saveCounters(counters);
+  return record;
 }
 
-function resetTierStats() {
-  localStorage.removeItem('ballgame_stats');
-  localStorage.removeItem('ballgame_stats_v2');
-  localStorage.removeItem('ballgame_counters');
-  calculateDynamicTiers();
-  initLobby();
+async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
+  try {
+    await convexClient.mutation(api.stats.recordCharacterDeath, {
+      victimId,
+      killerId,
+      mode: playerCount.toString()
+    });
+  } catch (err) {}
+}
+
+async function resetTierStats() {
+  try {
+    await convexClient.mutation(api.stats.resetStats, {});
+  } catch (err) {}
 }
 
 // Initialize Lobby character list
@@ -594,7 +577,7 @@ modalCloseBtn.addEventListener('click', closeWinnerModal);
 randomStartBtn.addEventListener('click', startRandomGame);
 
 statsModeSelect.addEventListener('change', () => {
-  initLobby();
+  subscribeToGlobalData();
 });
 
 const resetTiersBtn = document.getElementById('reset-tiers-btn');
@@ -602,6 +585,116 @@ if (resetTiersBtn) {
   resetTiersBtn.addEventListener('click', resetTierStats);
 }
 
+function subscribeToGlobalData() {
+  if (statsUnsubscribe) statsUnsubscribe();
+  if (countersUnsubscribe) countersUnsubscribe();
+
+  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+
+  statsUnsubscribe = convexClient.onUpdate(api.stats.getStats, { mode }, (statsList) => {
+    currentGlobalStats = statsList;
+    updateLobbyUI();
+  });
+
+  countersUnsubscribe = convexClient.onUpdate(api.stats.getCounters, { mode }, (countersList) => {
+    currentGlobalCounters = countersList;
+    updateLobbyUI();
+  });
+}
+
+function updateLobbyUI() {
+  calculateDynamicTiers();
+  
+  // 티어표 채우기
+  const tiers = ['s', 'a', 'b', 'c'] as const;
+  tiers.forEach((t) => {
+    const container = document.getElementById(`tier-chars-${t}`);
+    if (container) {
+      container.innerHTML = '';
+      const tierChars = availableCharacters.filter(c => (c.tier || 'C').toLowerCase() === t);
+      tierChars.forEach(char => {
+        const chip = document.createElement('span');
+        chip.className = `tier-char-chip tier-chip-${t}`;
+        chip.style.border = `1px solid ${char.color}`;
+        chip.style.boxShadow = `0 0 6px ${char.color}40`;
+        chip.style.color = '#ffffff';
+        chip.innerHTML = `${char.name}`;
+        container.appendChild(chip);
+      });
+    }
+  });
+
+  // 캐릭터 카드들 내용 실시간 갱신 (승률, 전적 수치 등)
+  const cards = Array.from(characterListContainer.children) as HTMLElement[];
+  cards.forEach(card => {
+    const charId = card.dataset.id;
+    if (!charId) return;
+    const char = availableCharacters.find(c => c.id === charId);
+    if (!char) return;
+
+    // 티어 뱃지 갱신
+    const badge = card.querySelector('.tier-card-badge') as HTMLElement;
+    if (badge) {
+      badge.className = `tier-card-badge tier-badge-${(char.tier || 'C').toLowerCase()}`;
+      badge.textContent = char.tier || 'C';
+    }
+
+    const statsRecord = getStoredStats();
+    const mode = statsModeSelect ? statsModeSelect.value : 'all';
+    const stats = statsRecord[mode] || {};
+    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+    const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
+    
+    // 승률 및 전적 판수 갱신
+    const winRateVal = card.querySelector('.text-neon-yellow') as HTMLElement;
+    if (winRateVal) {
+      winRateVal.textContent = `${winRate.toFixed(1)}% (${s.wins}승/${s.games}판)`;
+    }
+
+    // 대미지 갱신
+    const dmgDealtVal = card.querySelector('.text-neon-green') as HTMLElement;
+    const dmgTakenVal = card.querySelector('.text-neon-red') as HTMLElement;
+    if (dmgDealtVal && dmgTakenVal) {
+      dmgDealtVal.textContent = s.damageDealt.toString();
+      dmgTakenVal.textContent = s.damageTaken.toString();
+    }
+
+    // 카운터 정보 갱신
+    const countersAll = getStoredCounters();
+    const modeCounters = countersAll[mode] || {};
+
+    const myDeathRecords = modeCounters[char.id] || {};
+    let worstKillerId = '';
+    let worstKillerCount = 0;
+    for (const [kId, count] of Object.entries(myDeathRecords)) {
+      if (count > worstKillerCount) {
+        worstKillerCount = count;
+        worstKillerId = kId;
+      }
+    }
+    const worstKillerName = worstKillerId ? (availableCharacters.find(c => c.id === worstKillerId)?.name || '없음') : '없음';
+    const worstKillerStr = worstKillerId ? `${worstKillerName} (${worstKillerCount}데스)` : '없음';
+
+    let bestVictimId = '';
+    let bestVictimCount = 0;
+    for (const [victimId, killerRecords] of Object.entries(modeCounters)) {
+      const killedByMe = killerRecords[char.id] || 0;
+      if (killedByMe > bestVictimCount) {
+        bestVictimCount = killedByMe;
+        bestVictimId = victimId;
+      }
+    }
+    const bestVictimName = bestVictimId ? (availableCharacters.find(c => c.id === bestVictimId)?.name || '없음') : '없음';
+    const bestVictimStr = bestVictimId ? `${bestVictimName} (${bestVictimCount}킬)` : '없음';
+
+    const worstKillerEl = card.querySelector('.char-history .stat-row:nth-child(3) .stat-val') as HTMLElement;
+    const bestVictimEl = card.querySelector('.char-history .stat-row:nth-child(4) .stat-val') as HTMLElement;
+    if (worstKillerEl) worstKillerEl.textContent = worstKillerStr;
+    if (bestVictimEl) bestVictimEl.textContent = bestVictimStr;
+  });
+}
+
 // Start APP
 initLobby();
+subscribeToGlobalData();
 initPatchNotesSubscription();

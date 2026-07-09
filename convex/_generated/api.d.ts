@@ -9,6 +9,7 @@
  */
 
 import type * as patchNotes from "../patchNotes.js";
+import type * as stats from "../stats.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   patchNotes: typeof patchNotes;
+  stats: typeof stats;
 }>;
 
 /**
