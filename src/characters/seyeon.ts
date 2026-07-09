@@ -1,11 +1,8 @@
 import type { CharacterConfig, CharacterState } from './character.interface';
 
-interface HeartProjectile {
-  x: number;
-  y: number;
-  target: CharacterState;
-  speed: number;
-  isHit: boolean;
+interface SeyeonState extends CharacterState {
+  charmAuraRadius?: number;
+  charmDamageTimer?: number;
 }
 
 export const seyeonConfig: CharacterConfig = {
@@ -15,156 +12,159 @@ export const seyeonConfig: CharacterConfig = {
   speed: 1.3,
   attackPower: 14,
   baseAttackRange: 45,
-  skillName: '매혹의 윙크',
-  skillDescription: '3초 쿨타임. 가장 가까운 상대를 향해 매혹의 하트를 날려 명중시킵니다. 하트에 닿은 상대는 6초간 [매혹]되어 스킬이 봉쇄되고 공격 대상에서 세연이를 배제하며, 다른 상대를 조종당하듯 추격합니다. 매혹 기간 동안 상대와 세연이는 서로에게 가하는 피해량이 0이 됩니다.',
+  skillName: '치명적인 유혹의 댄스',
+  skillDescription: '7초 쿨타임. 4초 동안 매혹의 댄스를 추며 이동 속도가 50% 증가하고 피해 면역 무적 상태가 됩니다. 주변 220px 영역에 매혹 아우라를 전개하여 범위 내 모든 적을 기절(봉쇄)시키고 세연에게로 강렬하게 끌어당깁니다. 아우라 내 적들은 매초 8의 지속 피해를 입고, 받는 모든 피해량이 50% 증폭됩니다.',
   color: '#ff66b2', // 하트 핑크
-  skillChargeRate: 33.3, // 3초 쿨타임
-  tier: 'A',
+  skillChargeRate: 14.3, // 7초 쿨타임
+  tier: 'S',
 
   onSkillTrigger(char: CharacterState, ctx) {
-    // 가장 가까운 적 조준
-    let closestEnemy: CharacterState | null = null;
-    let minDist = Infinity;
+    char.skillActive = true;
+    char.skillDurationLeft = 4.0; // 4초 유지
 
-    ctx.characters.forEach((enemy) => {
-      if (enemy.isDead || enemy.id === char.id) return;
-      const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closestEnemy = enemy;
-      }
-    });
+    // 이속 50% 증가 및 무적 부여
+    char.speed = 1.3 * 1.5; // 버프 속도 (1.95)
+    char.isImmune = true;
+    char.immuneTimeLeft = 4.0;
 
-    if (closestEnemy) {
-      char.skillActive = false;
-      char.skillDurationLeft = 0; // 즉시 충전 가능 상태로 전환
-      const projectiles = ((char as any).projectiles || []) as HeartProjectile[];
-      projectiles.push({
-        x: char.x,
-        y: char.y,
-        target: closestEnemy,
-        speed: 7.5,
-        isHit: false
-      });
-      (char as any).projectiles = projectiles;
+    const sy = char as SeyeonState;
+    sy.charmAuraRadius = 220;
+    sy.charmDamageTimer = 1.0;
 
-      ctx.addFloatingText(char.x, char.y - 50, '💖 윙크~', '#ff66b2', 1.2);
-      ctx.createExplosion(char.x, char.y, '#ff66b2', 10);
-    }
+    ctx.addFloatingText(char.x, char.y - 65, '💃 치명적 유혹의 댄스! (무적)', '#ff66b2', 2.0);
+    ctx.createExplosion(char.x, char.y, '#ff66b2', 20);
+    ctx.logMessage?.(`💃 [유혹의 댄스] 세연 ➡️ 4초간 아우라 전개, 속도 50% 증가 및 피해 무적!`, 'skill');
   },
 
   onUpdate(char: CharacterState, dt: number, ctx) {
-    const projectiles = ((char as any).projectiles || []) as HeartProjectile[];
+    const sy = char as SeyeonState;
 
-    // 1. 하트 투사체 비행 및 피격 판정
-    projectiles.forEach((proj) => {
-      if (proj.target.isDead) {
-        proj.isHit = true; // 타겟 사망 시 소멸
-        return;
+    if (char.skillActive) {
+      char.skillDurationLeft -= dt;
+
+      const auraRadius = sy.charmAuraRadius || 220;
+
+      // 1초마다 도트 대미지 틱 관리
+      if (sy.charmDamageTimer === undefined) sy.charmDamageTimer = 1.0;
+      sy.charmDamageTimer -= dt;
+      let dealTick = false;
+      if (sy.charmDamageTimer <= 0) {
+        sy.charmDamageTimer = 1.0;
+        dealTick = true;
       }
 
-      const dx = proj.target.x - proj.x;
-      const dy = proj.target.y - proj.y;
-      const dist = Math.hypot(dx, dy);
+      // 범위 내 모든 적 기절, 흡입, 대미지 틱 및 매혹 상태 부여
+      ctx.characters.forEach((enemy) => {
+        if (enemy.isDead || enemy.id === char.id) return;
 
-      if (dist < proj.target.radius + 8) {
-        // 매혹 적중!
-        proj.isHit = true;
-        
-        const target = proj.target;
-        target.isCharmed = true;
-        target.charmTimeLeft = 6.0;
-        target.skillGauge = 0; // 스킬 게이지 초기화
-        target.skillActive = false;
-        target.skillDurationLeft = 0;
+        const dx = char.x - enemy.x;
+        const dy = char.y - enemy.y;
+        const dist = Math.hypot(dx, dy);
 
-        ctx.addFloatingText(target.x, target.y - 65, '💖 CHARMED!', '#ff66b2', 2.0);
-        ctx.createExplosion(target.x, target.y, '#ff66b2', 20);
-        ctx.logMessage?.(`💖 [매혹 명중] 세연 ➡️ ${target.name} | 6초간 매혹 (서로 대미지 0, 세연 타겟 해제)`, 'skill');
-      } else {
-        // 타겟 유도 이동
-        const angle = Math.atan2(dy, dx);
-        proj.x += Math.cos(angle) * proj.speed * dt * 60;
-        proj.y += Math.sin(angle) * proj.speed * dt * 60;
+        if (dist <= auraRadius) {
+          // A. 매혹 및 기절 상태 부여 (움직임 무력화)
+          enemy.isCharmed = true;
+          enemy.isStunned = true;
+          enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
 
-        // 하트 핑크 꼬리 파티클
-        if (Math.random() < 0.3) {
-          ctx.createParticle(proj.x, proj.y, '#ff66b2', 2.5, 8);
+          // B. 관성 멈춤 및 세연 방향으로 강제 흡입
+          enemy.vx = 0;
+          enemy.vy = 0;
+          if (dist > 15) {
+            const pullSpeed = 4.5;
+            const angle = Math.atan2(dy, dx);
+            enemy.x += Math.cos(angle) * pullSpeed * (dt * 60);
+            enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
+          }
+
+          // C. 1초마다 매초 8의 피해 (피해 50% 증폭에 의해 실질 12 적용)
+          if (dealTick) {
+            ctx.dealDamage(char, enemy, 8, '💖 LOVE TICK');
+            ctx.createExplosion(enemy.x, enemy.y, '#ff66b2', 4);
+          }
+
+          // 매혹 하트 입자 방출
+          if (Math.random() < 0.2) {
+            ctx.createParticle(enemy.x, enemy.y, '#ff66b2', 2.5, 12);
+          }
         }
-      }
-    });
+      });
 
-    (char as any).projectiles = projectiles.filter((p) => !p.isHit);
-
-    // 2. 전체 매혹 상태 대상자 조종 및 타이머 업데이트
-    ctx.characters.forEach((enemy) => {
-      if (enemy.isDead || !enemy.isCharmed || enemy.charmTimeLeft === undefined) return;
-
-      enemy.charmTimeLeft -= dt;
-
-      // 매혹 도트 대미지 처리용 타이머 관리
-      if ((enemy as any).charmDamageTimer === undefined) {
-        (enemy as any).charmDamageTimer = 1.0;
-      }
-      (enemy as any).charmDamageTimer -= dt;
-
-      // 1초마다 매초 3의 도트 대미지 적용 (매혹 피해 30% 증폭으로 실질 4 피해 적용)
-      if ((enemy as any).charmDamageTimer <= 0) {
-        (enemy as any).charmDamageTimer = 1.0;
-        ctx.dealDamage(char, enemy, 3, '💖 LOVE');
-        ctx.createExplosion(enemy.x, enemy.y, '#ff66b2', 5);
+      // 세연 주변에 휘몰아치는 하트 소용돌이 파티클 연출
+      if (Math.random() < 0.6) {
+        const randAngle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * auraRadius;
+        const px = char.x + Math.cos(randAngle) * dist;
+        const py = char.y + Math.sin(randAngle) * dist;
+        ctx.createParticle(px, py, '#ff66b2', 2, 15);
       }
 
-      if (enemy.charmTimeLeft <= 0) {
-        enemy.isCharmed = false;
-        (enemy as any).charmDamageTimer = undefined;
-        ctx.addFloatingText(enemy.x, enemy.y - 45, '💔 매혹 해제', '#888888', 1.2);
-        ctx.logMessage?.(`💔 [매혹 만료] ${enemy.name}의 매혹 상태가 만료되었습니다.`, 'skill');
-      } else {
-        // 매혹 하트 파티클
-        if (Math.random() < 0.15) {
-          ctx.createParticle(enemy.x, enemy.y + (Math.random() - 0.5) * 20, '#ff66b2', 3, 10);
-        }
+      // 스킬 지속 종료 복구
+      if (char.skillDurationLeft <= 0) {
+        char.skillActive = false;
+        char.speed = 1.3; // 일반 이속 복귀
+        char.isImmune = false;
+        char.immuneTimeLeft = 0;
 
-        // 인공지능 조종: 매혹 대상자가 세연(char)을 향해 쫓아오도록 조종 (맹목적 사랑, 더욱 빠른 속도로 접근)
-        const angle = Math.atan2(char.y - enemy.y, char.x - enemy.x);
-        const speedVal = 6.2 * enemy.speed; // 추격 속도 대폭 강화
-        
-        // 반응속도를 민첩하게 하기 위해 가속 가중치를 높임
-        enemy.vx = enemy.vx * 0.82 + Math.cos(angle) * speedVal * 0.18;
-        enemy.vy = enemy.vy * 0.82 + Math.sin(angle) * speedVal * 0.18;
+        // 범위 내 모든 적 매혹 및 스턴 해제
+        ctx.characters.forEach((enemy) => {
+          if (enemy.id !== char.id) {
+            enemy.isCharmed = false;
+          }
+        });
+
+        ctx.createExplosion(char.x, char.y, '#ff66b2', 15);
+        ctx.addFloatingText(char.x, char.y - 45, '💨 댄스 종료', '#888888', 1.2);
+        ctx.logMessage?.(`💃 [유혹의 댄스 만료] 세연 ➡️ 일반 상태 복귀 및 주변 매혹 해제`, 'skill');
       }
-    });
-
-    // 3. 세연의 스킬 상태 제어 (쿨타임이 즉시 돌도록 처리 완료)
-    char.skillActive = false;
-    char.skillDurationLeft = 0;
+    }
   },
 
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
-    const projectiles = ((char as any).projectiles || []) as HeartProjectile[];
+    const sy = char as SeyeonState;
 
-    // 1. 하트 비주얼 그리기
-    projectiles.forEach((proj) => {
+    // 1. 매혹의 댄스 아우라 영역 렌더링
+    if (char.skillActive) {
+      const radius = sy.charmAuraRadius || 220;
       canvasCtx.save();
-      canvasCtx.fillStyle = '#ff66b2';
-      canvasCtx.shadowBlur = 10;
-      canvasCtx.shadowColor = '#ff66b2';
       
-      // 하트 그리기 폰트 활용
-      canvasCtx.font = '18px sans-serif';
-      canvasCtx.textAlign = 'center';
-      canvasCtx.textBaseline = 'middle';
-      canvasCtx.fillText('💖', proj.x, proj.y);
-      canvasCtx.restore();
-    });
+      // 분홍색 그라데이션 영역 표시
+      const grad = canvasCtx.createRadialGradient(char.x, char.y, currentRadius, char.x, char.y, radius);
+      grad.addColorStop(0, 'rgba(255, 102, 178, 0.25)');
+      grad.addColorStop(0.5, 'rgba(255, 102, 178, 0.1)');
+      grad.addColorStop(1, 'rgba(255, 102, 178, 0)');
+      
+      canvasCtx.fillStyle = grad;
+      canvasCtx.beginPath();
+      canvasCtx.arc(char.x, char.y, radius, 0, Math.PI * 2);
+      canvasCtx.fill();
 
-    // 2. 머리 위 하트 장식
+      // 외부 경계선 브러싱
+      canvasCtx.strokeStyle = 'rgba(255, 102, 178, 0.45)';
+      canvasCtx.lineWidth = 1.5;
+      canvasCtx.setLineDash([4, 4]);
+      canvasCtx.beginPath();
+      canvasCtx.arc(char.x, char.y, radius, 0, Math.PI * 2);
+      canvasCtx.stroke();
+
+      canvasCtx.restore();
+    }
+
+    // 2. 머리 위 장식 하트 연출 (스킬 켜졌을 땐 큰 춤추는 하트)
     canvasCtx.save();
     canvasCtx.fillStyle = '#ff66b2';
-    canvasCtx.font = '10px Outfit, sans-serif';
-    canvasCtx.textAlign = 'center';
-    canvasCtx.fillText('💝', char.x, char.y - currentRadius - 6);
+    canvasCtx.shadowBlur = 8;
+    canvasCtx.shadowColor = '#ff66b2';
+    
+    if (char.skillActive) {
+      canvasCtx.font = '16px sans-serif';
+      const bounce = Math.sin(Date.now() / 80) * 4;
+      canvasCtx.fillText('💃💝', char.x - 12, char.y - currentRadius - 12 + bounce);
+    } else {
+      canvasCtx.font = '10px Outfit, sans-serif';
+      canvasCtx.textAlign = 'center';
+      canvasCtx.fillText('💝', char.x, char.y - currentRadius - 6);
+    }
     canvasCtx.restore();
   }
 };

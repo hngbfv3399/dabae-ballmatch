@@ -303,6 +303,30 @@ export class GameLounge {
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
 
+      // 2-C. 기절 지속 시간 차감 및 속도 복원 (신규 캐릭터 포함 공통 엔진화)
+      if (char.isStunned && char.stunTimeLeft !== undefined && char.stunTimeLeft > 0) {
+        char.stunTimeLeft -= dt;
+        if (char.stunTimeLeft <= 0) {
+          char.isStunned = false;
+          char.stunTimeLeft = 0;
+
+          // 기절 해제 즉시 속도 복구 및 비행 시작
+          const randomAngle = Math.random() * Math.PI * 2;
+          const baseSpeed = 3.5 * char.speed;
+          char.vx = Math.cos(randomAngle) * baseSpeed;
+          char.vy = Math.sin(randomAngle) * baseSpeed;
+
+          this.floatingTexts.push({
+            x: char.x,
+            y: char.y - 45,
+            text: '🏋️ 기절 해제 (운동 끝)',
+            color: '#00ffcc',
+            life: 1.2
+          });
+          console.log(`🧼 [기절 해제] ${char.name}의 기절이 만료되어 비행을 재개합니다.`);
+        }
+      }
+
       // 2-B. 타이핑 정지 상태 체크하여 물리 연산 건너뛰기 (기절 중에는 물리 비행 이동은 허용하되 공격/스킬만 차단)
       if (char.isTyping) {
         return; // 코딩 정지 중에는 이동/공격 불가
@@ -353,7 +377,7 @@ export class GameLounge {
         if (now - anyChar.lastGaugeLogTime >= 1000) {
           anyChar.lastGaugeLogTime = now;
           const isCharging = !char.skillActive && !char.isStunned && !char.nayutaControlled;
-          console.log(`⏱️ [충전 로그] ${char.name} | 게이지: ${char.skillGauge.toFixed(1)}/100 | 충전여부: ${isCharging ? '🟢 충전중' : '🔴 정지'}`);
+          console.log(`⏱️ [충전 로그] ${char.name} | 게이지: ${char.skillGauge.toFixed(1)}/100 | 충전여부: ${isCharging ? '🟢 충전중' : '🔴 정지'} (skillActive: ${char.skillActive}, isStunned: ${char.isStunned}, nayutaControlled: ${char.nayutaControlled})`);
         }
       }
 
@@ -511,9 +535,9 @@ export class GameLounge {
 
     let finalDamage = amount;
 
-    // 매혹 당한 대상은 받는 대미지 30% 증폭 (세연 매혹 취약)
+    // 매혹 당한 대상은 받는 대미지 50% 증폭 (세연 매혹 취약)
     if (target.isCharmed) {
-      finalDamage = Math.round(finalDamage * 1.3);
+      finalDamage = Math.round(finalDamage * 1.5);
     }
 
     // 지호 버프 상태일 때 공격력 2.2배 적용

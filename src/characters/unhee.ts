@@ -119,27 +119,36 @@ export const unheeConfig: CharacterConfig = {
   onCollisionWithTarget(_char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead || opponent.id.includes('clone')) return;
 
-    // 패시브: 상대방 접촉 시 35% 확률로 1.5초간 강제 쇠질 (기절)
-    if (Math.random() < 0.35) {
-      opponent.isStunned = true;
-      opponent.stunTimeLeft = 1.5;
-      opponent.vx = 0;
-      opponent.vy = 0;
+    // 패시브: 상대방 접촉 시 35% 확률로 1.5초간 강제 쇠질 (기절) (타겟별 4.0초 내부 재사용 대기시간 적용)
+    const now = Date.now();
+    const oppAny = opponent as any;
+    if (oppAny.lastUnheeStunTime === undefined) {
+      oppAny.lastUnheeStunTime = 0;
+    }
 
-      ctx.addFloatingText(opponent.x, opponent.y - 50, '🏋️ 강제 쇠질! (1.5초)', '#ff8c00', 1.6);
-      
-      // 땀방울 파티클 생성
-      for (let i = 0; i < 5; i++) {
-        ctx.createParticle(
-          opponent.x + (Math.random() - 0.5) * 15,
-          opponent.y - 15,
-          '#00ddff',
-          2 + Math.random() * 2,
-          10
-        );
+    if (now - oppAny.lastUnheeStunTime >= 4000) {
+      if (Math.random() < 0.35) {
+        oppAny.lastUnheeStunTime = now;
+        opponent.isStunned = true;
+        opponent.stunTimeLeft = 1.5;
+        opponent.vx = 0;
+        opponent.vy = 0;
+
+        ctx.addFloatingText(opponent.x, opponent.y - 50, '🏋️ 강제 쇠질! (1.5초)', '#ff8c00', 1.6);
+        
+        // 땀방울 파티클 생성
+        for (let i = 0; i < 5; i++) {
+          ctx.createParticle(
+            opponent.x + (Math.random() - 0.5) * 15,
+            opponent.y - 15,
+            '#00ddff',
+            2 + Math.random() * 2,
+            10
+          );
+        }
+
+        ctx.logMessage?.(`🏋️ [강제 쇠질] 운희 ➡️ ${opponent.name}에게 1.5초간 강제 운동 부여! (이동 불가)`, 'damage');
       }
-
-      ctx.logMessage?.(`🏋️ [강제 쇠질] 운희 ➡️ ${opponent.name}에게 1.5초간 강제 운동 부여! (이동 불가)`, 'damage');
     }
   },
 
