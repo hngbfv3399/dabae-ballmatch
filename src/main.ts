@@ -43,6 +43,16 @@ const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonEl
 const selectedIds: Set<string> = new Set();
 let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
+let isTierTestMode = false;
+let tierTestTargetId = '';
+let tierTestOpponents: string[] = [];
+let tierTestOpponentIndex = 0;
+let tierTestWins = 0;
+let tierTestLosses = 0;
+let tierTestDraws = 0;
+let tierTestLogs: string[] = [];
+let oneOnOneTiersUnsubscribe: (() => void) | null = null;
+let currentOneOnOneTiers: Record<string, 'S' | 'A' | 'B' | 'C'> = {};
 
 // 아바타 HTML 렌더러 (이모지 대체)
 function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
@@ -182,7 +192,7 @@ function calculateDynamicTiers() {
 }
 
 async function recordGameStart(participantIds: string[], playerCount: number) {
-  if (isPracticeMode) return;
+  if (isPracticeMode || isTierTestMode) return;
   try {
     await convexClient.mutation(api.stats.recordGameStart, {
       participantIds,
@@ -192,7 +202,7 @@ async function recordGameStart(participantIds: string[], playerCount: number) {
 }
 
 async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
-  if (isPracticeMode) return;
+  if (isPracticeMode || isTierTestMode) return;
   const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
   const realChars = allChars.filter(char => !char.id.includes('clone'));
 
@@ -225,7 +235,7 @@ function getStoredCounters(): Record<string, Record<string, Record<string, numbe
 }
 
 async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
-  if (isPracticeMode) return;
+  if (isPracticeMode || isTierTestMode) return;
   if (victimId.includes('clone') || killerId.includes('clone')) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
@@ -314,8 +324,9 @@ function initLobby() {
     card.className = 'character-card card';
     card.dataset.id = char.id;
 
+    const oneOnOneTier = currentOneOnOneTiers[char.id] || DEFAULT_TIERS[char.id] || 'C';
     card.innerHTML = `
-      <div class="tier-card-badge tier-badge-${(char.tier || 'C').toLowerCase()}">${char.tier || 'C'}</div>
+      <div class="tier-card-badge tier-badge-${oneOnOneTier.toLowerCase()}">${oneOnOneTier}</div>
       ${getAvatarHTML(char.name, char.image)}
       <div class="char-name">${char.name}</div>
       <div class="char-stats">
@@ -391,6 +402,18 @@ function updateStartButtonState() {
     } else {
       practiceStartBtn.disabled = true;
       practiceStartBtn.classList.remove('active');
+    }
+  }
+
+  // 티어 판별 버튼 활성화 (단 1개만 선택 필요)
+  const tierTestStartBtn = document.getElementById('tier-test-start-btn') as HTMLButtonElement;
+  if (tierTestStartBtn) {
+    if (selectedIds.size === 1) {
+      tierTestStartBtn.disabled = false;
+      tierTestStartBtn.classList.add('active');
+    } else {
+      tierTestStartBtn.disabled = true;
+      tierTestStartBtn.classList.remove('active');
     }
   }
 }
@@ -504,6 +527,135 @@ function startPracticeGame() {
   gameLounge.init(initialStates, speedMultiplier);
 }
 
+// Start Tier Test Game (Tier Test Mode)
+function startTierTestGame() {
+  if (selectedIds.size !== 1) return;
+
+  isTierTestMode = true;
+  tierTestTargetId = Array.from(selectedIds)[0];
+
+  // Get all other characters as opponents
+  tierTestOpponents = availableCharacters
+    .filter((char) => char.id !== tierTestTargetId)
+    .map((char) => char.id);
+
+  tierTestOpponentIndex = 0;
+  tierTestWins = 0;
+  tierTestLosses = 0;
+  tierTestDraws = 0;
+  tierTestLogs = [];
+
+  lobbyView.classList.add('hidden');
+  gameView.classList.remove('hidden');
+
+  // Force speed multiplier to 2.0x (기본 2배속)
+  gameSpeedSelect.value = '2';
+
+  startTierTestRound();
+}
+
+function startTierTestRound() {
+  if (!isTierTestMode) return;
+
+  const targetConfig = availableCharacters.find((char) => char.id === tierTestTargetId);
+  const oppId = tierTestOpponents[tierTestOpponentIndex];
+  const oppConfig = availableCharacters.find((char) => char.id === oppId);
+
+  if (!targetConfig || !oppConfig) return;
+
+  // Let's create the character states. Target is index 0, Opponent is index 1.
+  const allConfigs = [targetConfig, oppConfig];
+  const total = allConfigs.length;
+  const initialStates = allConfigs.map((config, index) => 
+    createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height)
+  );
+
+  totalCountEl.textContent = total.toString();
+  aliveCountEl.textContent = total.toString();
+
+  // Reset battle logs
+  if (battleLogList) {
+    battleLogList.innerHTML = `<div style="color: #ffd700;">🏆 [티어 판별 라운드 ${tierTestOpponentIndex + 1}/${tierTestOpponents.length}] ${targetConfig.name} vs ${oppConfig.name} 시작!</div>`;
+  }
+  
+  const speedMultiplier = 2.0; // Force 2x speed
+  if (logSimSpeed) {
+    logSimSpeed.textContent = `2.0x 배속 (티어 판별전)`;
+  }
+
+  if (!gameLounge) {
+    gameLounge = new GameLounge(
+      gameCanvas,
+      updateHUD,
+      showWinner,
+      updateCountdown,
+      recordCharacterDeath,
+      appendBattleLog
+    );
+  }
+
+  gameLounge.init(initialStates, speedMultiplier);
+}
+
+function showTierTestResult() {
+  gameStatusText.textContent = '티어 판별 완료';
+  if (gameLounge) {
+    gameLounge.stop();
+  }
+
+  // Determine tier based on wins out of 12 opponents:
+  // 11-12 wins: S
+  // 8-10 wins: A
+  // 5-7 wins: B
+  // 0-4 wins: C
+  let finalTier: 'S' | 'A' | 'B' | 'C' = 'C';
+  if (tierTestWins >= 11) finalTier = 'S';
+  else if (tierTestWins >= 8) finalTier = 'A';
+  else if (tierTestWins >= 5) finalTier = 'B';
+  else finalTier = 'C';
+
+  const targetChar = availableCharacters.find((char) => char.id === tierTestTargetId);
+  if (!targetChar) return;
+
+  // Save 1v1 tier determination to Convex database
+  try {
+    convexClient.mutation(api.stats.updateOneOnOneTier, {
+      characterId: targetChar.id,
+      tier: finalTier,
+    });
+  } catch (err) {}
+
+  const resultInfoEl = document.getElementById('tier-test-result-info');
+  if (resultInfoEl) {
+    resultInfoEl.innerHTML = `
+      <div class="win-avatar">
+        ${getAvatarHTML(targetChar.name, targetChar.image)}
+      </div>
+      <div class="win-name" style="color: ${targetChar.color}">${targetChar.name}</div>
+      <div style="font-size: 1.2rem; font-weight: bold; margin-top: 0.5rem; text-shadow: 0 0 10px rgba(255,255,255,0.2);">
+        전적: <span class="text-neon-green" style="font-weight: 700;">${tierTestWins}승</span> / <span style="color: #a0a0c0; font-weight: 700;">${tierTestDraws}무</span> / <span class="text-neon-red" style="font-weight: 700;">${tierTestLosses}패</span>
+      </div>
+      <div style="margin-top: 1rem; text-align: center;">
+        <span style="font-size: 0.9rem; color: var(--text-secondary);">판정된 1대1 티어</span>
+        <div class="tier-card-badge tier-badge-${finalTier.toLowerCase()}" style="font-size: 3rem; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin: 0.5rem auto; border-radius: 50%; border: 2px solid ${targetChar.color}; box-shadow: 0 0 15px ${targetChar.color};">
+          ${finalTier}
+        </div>
+      </div>
+      <div style="width: 100%; margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+        <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; text-align: left;">⚔️ 라운드별 대결 결과</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: left; font-size: 0.85rem; max-height: 180px; overflow-y: auto; padding-right: 0.2rem;">
+          ${tierTestLogs.map(log => `<div style="background: rgba(255,255,255,0.02); padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">${log}</div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  const modal = document.getElementById('tier-test-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
   // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
@@ -565,10 +717,24 @@ function updateCountdown(seconds: number) {
   if (seconds > 0) {
     countdownOverlay.classList.remove('hidden');
     countdownNumber.textContent = seconds.toString();
-    gameStatusText.textContent = '전투 준비 중...';
+    if (isTierTestMode) {
+      const oppId = tierTestOpponents[tierTestOpponentIndex];
+      const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
+      const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
+      gameStatusText.textContent = `티어 판별: ${targetName} vs ${oppName} (${tierTestOpponentIndex + 1}/${tierTestOpponents.length})`;
+    } else {
+      gameStatusText.textContent = '전투 준비 중...';
+    }
   } else {
     countdownOverlay.classList.add('hidden');
-    gameStatusText.textContent = 'BATTLE!';
+    if (isTierTestMode) {
+      const oppId = tierTestOpponents[tierTestOpponentIndex];
+      const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
+      const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
+      gameStatusText.textContent = `${targetName} vs ${oppName} (BATTLE!)`;
+    } else {
+      gameStatusText.textContent = 'BATTLE!';
+    }
   }
 }
 
@@ -602,29 +768,76 @@ function appendBattleLog(msg: string, type: string) {
 }
 
 // Game End & Show Winner
-function showWinner(winner: CharacterState, allChars: CharacterState[]) {
+function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = '게임 종료';
   
-  // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
-  recordGameEnd(winner.id, allChars, allChars.length);
+  if (winner) {
+    // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
+    recordGameEnd(winner.id, allChars, allChars.length);
+  }
 
-  winnerInfo.innerHTML = `
-    <div class="win-avatar">
-      ${getAvatarHTML(winner.name, winner.image)}
-    </div>
-    <div class="win-name" style="color: ${winner.color}">${winner.name}</div>
-    <div class="win-desc">마지막까지 생존하여 최종 승리하였습니다!</div>
-    <div class="char-stats" style="margin-top: 1.5rem; width: 100%;">
-      <div class="stat-row">
-        <span>남은 체력 (HP)</span>
-        <span class="stat-val" style="color: #39ff14;">${winner.hp} / ${winner.maxHp}</span>
+  if (isTierTestMode) {
+    const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
+    const oppId = tierTestOpponents[tierTestOpponentIndex];
+    const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
+
+    if (winner) {
+      const isWin = winner.id === tierTestTargetId;
+      if (isWin) {
+        tierTestWins++;
+        tierTestLogs.push(`<span class="text-neon-green">vs ${oppName}: 승리</span>`);
+        appendBattleLog(`🏆 [라운드 종료] ${targetName}이 ${oppName}을 이겼습니다!`, 'skill');
+      } else {
+        tierTestLosses++;
+        tierTestLogs.push(`<span class="text-neon-red">vs ${oppName}: 패배</span>`);
+        appendBattleLog(`💀 [라운드 종료] ${targetName}이 ${oppName}에게 패배했습니다.`, 'death');
+      }
+    } else {
+      // 무승부 (시간 초과 또는 러브샷)
+      tierTestDraws++;
+      tierTestLogs.push(`<span style="color: #a0a0c0;">vs ${oppName}: 무승부</span>`);
+      appendBattleLog(`⚖️ [라운드 종료] ${targetName} vs ${oppName} 무승부 처리되었습니다.`, 'default');
+    }
+
+    tierTestOpponentIndex++;
+    if (tierTestOpponentIndex < tierTestOpponents.length) {
+      gameStatusText.textContent = `라운드 종료! 다음 라운드로 전환합니다...`;
+      setTimeout(() => {
+        if (isTierTestMode) {
+          startTierTestRound();
+        }
+      }, 2000);
+    } else {
+      showTierTestResult();
+    }
+    return;
+  }
+
+  if (winner) {
+    winnerInfo.innerHTML = `
+      <div class="win-avatar">
+        ${getAvatarHTML(winner.name, winner.image)}
       </div>
-      <div class="stat-row">
-        <span>고유 스킬</span>
-        <span class="stat-val" style="color: #ffd700;">${winner.skillName}</span>
+      <div class="win-name" style="color: ${winner.color}">${winner.name}</div>
+      <div class="win-desc">마지막까지 생존하여 최종 승리하였습니다!</div>
+      <div class="char-stats" style="margin-top: 1.5rem; width: 100%;">
+        <div class="stat-row">
+          <span>남은 체력 (HP)</span>
+          <span class="stat-val" style="color: #39ff14;">${winner.hp} / ${winner.maxHp}</span>
+        </div>
+        <div class="stat-row">
+          <span>고유 스킬</span>
+          <span class="stat-val" style="color: #ffd700;">${winner.skillName}</span>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  } else {
+    winnerInfo.innerHTML = `
+      <div class="winner-trophy" style="font-size: 5rem; margin-bottom: 1rem; text-align: center;">⚖️</div>
+      <div class="win-name" style="color: #ffffff; text-align: center; font-size: 2rem; font-weight: 800; font-family: 'Orbit', sans-serif;">무승부</div>
+      <div class="win-desc" style="text-align: center; color: var(--text-secondary); margin-top: 0.5rem;">생존자가 없어 승리자가 존재하지 않습니다!</div>
+    `;
+  }
 
   winnerModal.classList.remove('hidden');
 }
@@ -637,6 +850,7 @@ function closeWinnerModal() {
 
 function goBackToLobby() {
   isPracticeMode = false;
+  isTierTestMode = false;
   if (gameLounge) {
     gameLounge.stop();
   }
@@ -686,6 +900,22 @@ if (practiceStartBtn) {
   practiceStartBtn.addEventListener('click', startPracticeGame);
 }
 
+const tierTestStartBtn = document.getElementById('tier-test-start-btn');
+if (tierTestStartBtn) {
+  tierTestStartBtn.addEventListener('click', startTierTestGame);
+}
+
+const tierTestCloseBtn = document.getElementById('tier-test-close-btn');
+if (tierTestCloseBtn) {
+  tierTestCloseBtn.addEventListener('click', () => {
+    const modal = document.getElementById('tier-test-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    goBackToLobby();
+  });
+}
+
 statsModeSelect.addEventListener('change', () => {
   subscribeToGlobalData();
 });
@@ -729,6 +959,15 @@ function subscribeToGlobalData() {
 
   damageRankingUnsubscribe = convexClient.onUpdate(api.stats.getDamageRanking, { mode }, (rankingList) => {
     currentGlobalDamageRanking = rankingList;
+    updateLobbyUI();
+  });
+
+  if (oneOnOneTiersUnsubscribe) oneOnOneTiersUnsubscribe();
+  oneOnOneTiersUnsubscribe = convexClient.onUpdate(api.stats.getOneOnOneTiers, {}, (tiersList) => {
+    currentOneOnOneTiers = {};
+    tiersList.forEach((item: any) => {
+      currentOneOnOneTiers[item.characterId] = item.tier as 'S' | 'A' | 'B' | 'C';
+    });
     updateLobbyUI();
   });
 }
@@ -808,11 +1047,12 @@ function updateLobbyUI() {
     const char = availableCharacters.find(c => c.id === charId);
     if (!char) return;
 
-    // 티어 뱃지 갱신
+    // 티어 뱃지 갱신 (1대1 판별 테스트 티어 적용)
+    const oneOnOneTier = currentOneOnOneTiers[char.id] || DEFAULT_TIERS[char.id] || 'C';
     const badge = card.querySelector('.tier-card-badge') as HTMLElement;
     if (badge) {
-      badge.className = `tier-card-badge tier-badge-${(char.tier || 'C').toLowerCase()}`;
-      badge.textContent = char.tier || 'C';
+      badge.className = `tier-card-badge tier-badge-${oneOnOneTier.toLowerCase()}`;
+      badge.textContent = oneOnOneTier;
     }
 
     const statsRecord = getStoredStats();

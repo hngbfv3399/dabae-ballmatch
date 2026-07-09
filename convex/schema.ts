@@ -31,4 +31,11 @@ export default defineSchema({
     mode: v.string(),        // 플레이 인원 모드 (예: 'all', '2', '3', '4', '5', '6')
     count: v.number(),
   }).index("by_mode_victim_and_killer", ["mode", "victimId", "killerId"]),
+
+  // 1대1 판정 티어 기록 테이블
+  oneOnOneTiers: defineTable({
+    characterId: v.string(), // 캐릭터 고유 ID
+    tier: v.string(),        // 판정된 티어 ('S' | 'A' | 'B' | 'C')
+    updatedAt: v.number(),   // 업데이트 시점
+  }).index("by_char", ["characterId"]),
 });

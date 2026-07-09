@@ -60,6 +60,7 @@ export class GameLounge {
   private animationFrameId: number | null = null;
   private lastTime: number = 0;
   private simulationSpeed: number = 1.0;
+  private roundTimer: number = 60.0;
   
   // 게임 오버 애니메이션 지연을 위한 변수들
   private isGameOver: boolean = false;
@@ -75,7 +76,7 @@ export class GameLounge {
 
   // 이벤트 콜백
   private onUpdateHUD: (chars: CharacterState[]) => void;
-  private onGameEnd: (winner: CharacterState, allChars: CharacterState[]) => void;
+  private onGameEnd: (winner: CharacterState | null, allChars: CharacterState[]) => void;
   private onCountdown: (seconds: number) => void;
   private onCharacterDeath?: (victimId: string, killerId: string, playerCount: number) => void;
   private onLogMessage?: (msg: string, type: string) => void;
@@ -83,7 +84,7 @@ export class GameLounge {
   constructor(
     canvas: HTMLCanvasElement,
     onUpdateHUD: (chars: CharacterState[]) => void,
-    onGameEnd: (winner: CharacterState, allChars: CharacterState[]) => void,
+    onGameEnd: (winner: CharacterState | null, allChars: CharacterState[]) => void,
     onCountdown: (seconds: number) => void,
     onCharacterDeath?: (victimId: string, killerId: string, playerCount: number) => void,
     onLogMessage?: (msg: string, type: string) => void
@@ -145,6 +146,7 @@ export class GameLounge {
     this.isGameOver = false;
     this.gameOverTimer = 0;
     this.winnerCharacter = null;
+    this.roundTimer = 60.0;
 
     // 캐릭터 내부의 함수 객체(훅)들은 JSON.parse(JSON.stringify()) 과정에서 손실되므로,
     // 원본 selectedCharacters 리스트에서 함수들을 다시 찾아와 연결 복원
@@ -261,6 +263,54 @@ export class GameLounge {
     // 분신(eunsu_clone)은 플레이어가 아니므로 승리 조건 판정에서 제외
     const aliveRealPlayers = aliveCharacters.filter((c) => !c.id.includes('eunsu_clone'));
 
+    // 60초 타이머 (1대1 매치인 경우 작동)
+    const startingRealPlayersCount = this.characters.filter(c => !c.id.includes('eunsu_clone')).length;
+    const is1v1 = startingRealPlayersCount === 2;
+
+    if (this.isPrepared && !this.isGameOver && is1v1) {
+      this.roundTimer -= dt;
+      if (this.roundTimer <= 0) {
+        this.roundTimer = 0;
+        this.isGameOver = true;
+        this.gameOverTimer = 2.0;
+
+        // 판정: 체력 낮은 캐릭터 사망
+        if (aliveRealPlayers.length === 2) {
+          const c1 = aliveRealPlayers[0];
+          const c2 = aliveRealPlayers[1];
+          if (c1.hp > c2.hp) {
+            c2.hp = 0;
+            c2.isDead = true;
+            c2.opacity = 0.8;
+            (c2 as any).deathAnimationTime = 1.5;
+            this.winnerCharacter = c1;
+            this.onLogMessage?.(`⏱️ [시간초과] 체력이 더 많은 ${c1.name}(HP: ${c1.hp})이 승리하였습니다!`, 'skill');
+          } else if (c2.hp > c1.hp) {
+            c1.hp = 0;
+            c1.isDead = true;
+            c1.opacity = 0.8;
+            (c1 as any).deathAnimationTime = 1.5;
+            this.winnerCharacter = c2;
+            this.onLogMessage?.(`⏱️ [시간초과] 체력이 더 많은 ${c2.name}(HP: ${c2.hp})이 승리하였습니다!`, 'skill');
+          } else {
+            // 체력 동일 -> 무승부 (둘 다 사망 처리)
+            c1.hp = 0;
+            c1.isDead = true;
+            c1.opacity = 0.8;
+            (c1 as any).deathAnimationTime = 1.5;
+
+            c2.hp = 0;
+            c2.isDead = true;
+            c2.opacity = 0.8;
+            (c2 as any).deathAnimationTime = 1.5;
+
+            this.winnerCharacter = null;
+            this.onLogMessage?.(`⏱️ [시간초과] 체력이 동일하여 무승부 처리되었습니다!`, 'default');
+          }
+        }
+      }
+    }
+
     // 승리 조건 검사 (데스 애니메이션을 위해 2초 지연 적용)
     if (!this.isGameOver) {
       if (aliveRealPlayers.length <= 1) {
@@ -274,6 +324,7 @@ export class GameLounge {
           console.log(`👑 최종 우승자: ${this.winnerCharacter.name}`);
         } else {
           console.log(`💀 무승부 (모두 사망)`);
+          this.onLogMessage?.(`⚔️ [전투 종료] 양측 동시 사망으로 인해 무승부(러브샷) 처리되었습니다!`, 'default');
         }
         console.log(`-----------------------------------------`);
         console.log(`📊 캐릭터별 최종 전투 통계:`);
@@ -292,9 +343,7 @@ export class GameLounge {
       this.simulationSpeed = 0.3; // 슬로우 모션
       if (this.gameOverTimer <= 0) {
         this.stop();
-        if (this.winnerCharacter) {
-          this.onGameEnd(this.winnerCharacter, this.characters);
-        }
+        this.onGameEnd(this.winnerCharacter, this.characters);
         return;
       }
     }
@@ -866,6 +915,22 @@ export class GameLounge {
     this.ctx.strokeStyle = 'rgba(127, 0, 255, 0.2)';
     this.ctx.lineWidth = 6;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // 60초 타이머 그리기 (1대1 매치인 경우 작동)
+    const startingRealPlayersCount = this.characters.filter(c => !c.id.includes('eunsu_clone')).length;
+    const is1v1 = startingRealPlayersCount === 2;
+
+    if (this.isPrepared && !this.isGameOver && is1v1) {
+      this.ctx.save();
+      this.ctx.fillStyle = this.roundTimer <= 10.0 ? '#ff3366' : '#ffffff';
+      this.ctx.shadowBlur = 15;
+      this.ctx.shadowColor = this.roundTimer <= 10.0 ? '#ff3366' : 'rgba(255, 255, 255, 0.4)';
+      this.ctx.font = 'bold 24px "Orbit", sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText(`${Math.ceil(this.roundTimer)}s`, this.canvas.width / 2, 20);
+      this.ctx.restore();
+    }
 
     // 2. 캐릭터 렌더링
     this.characters.forEach((char) => {

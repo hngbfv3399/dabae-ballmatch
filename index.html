@@ -134,6 +134,17 @@
               </button>
             </div>
 
+            <!-- 1대1 티어 판별 카드 -->
+            <div class="tier-test-match card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">🏆 1대1 티어 판별</h3>
+              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.45;">
+                선택한 <b>단 한 명의 캐릭터</b>가 나머지 모든 캐릭터들과 순차적으로 1대1 대결(라운드제)을 펼쳐 최종 1대1 티어를 판별합니다. (기본 2배속 진행)
+              </p>
+              <button id="tier-test-start-btn" class="btn btn-secondary" disabled style="width: 100%; background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%); color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); border: none; font-size: 0.95rem; font-weight: 700; height: 42px; transition: all 0.3s ease;">
+                <span>티어 판별 시작!</span>
+              </button>
+            </div>
+
             <button id="start-btn" class="btn btn-primary" disabled>
               <span>게임 시작하기</span>
             </button>
@@ -193,6 +204,18 @@
             <!-- 승리자 정보가 표시됨 -->
           </div>
           <button id="modal-close-btn" class="btn btn-primary">로비로 돌아가기</button>
+        </div>
+      </div>
+
+      <!-- 티어 판별 결과 모달 -->
+      <div id="tier-test-modal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 500px; max-height: 90vh; display: flex; flex-direction: column;">
+          <div class="winner-trophy">🏆</div>
+          <h2 class="winner-title" style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--neon-yellow);">티어 판별 결과</h2>
+          <div id="tier-test-result-info" class="winner-info-card" style="flex: 1; overflow-y: auto; width: 100%; padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <!-- JS에서 동적으로 채워짐 -->
+          </div>
+          <button id="tier-test-close-btn" class="btn btn-primary" style="width: 100%;">로비로 돌아가기</button>
         </div>
       </div>
 

@@ -11,16 +11,16 @@ const RANK_NAMES = ['훈련병', '이병', '일병', '상병', '병장', '전역
 function getRankStats(rank: number) {
   switch (rank) {
     case 0: // 훈련병
-      return { maxHp: 110, attackPower: 10, speed: 0.9 };
+      return { attackPower: 10, speed: 0.9 };
     case 1: // 이병
-      return { maxHp: 130, attackPower: 13, speed: 1.1 };
+      return { attackPower: 13, speed: 1.1 };
     case 2: // 일병
-      return { maxHp: 150, attackPower: 16, speed: 1.3 };
+      return { attackPower: 16, speed: 1.3 };
     case 3: // 상병
-      return { maxHp: 180, attackPower: 20, speed: 1.5 };
+      return { attackPower: 20, speed: 1.5 };
     case 4: // 병장
     default:
-      return { maxHp: 210, attackPower: 26, speed: 1.7 };
+      return { attackPower: 26, speed: 1.7 };
   }
 }
 
@@ -62,15 +62,6 @@ function promoteDongjun(char: DongjunState, ctx: any) {
   const stats = getRankStats(newRank);
 
   // 스탯 적용
-  const oldMaxHp = char.maxHp;
-  char.maxHp = stats.maxHp;
-  const hpDiff = char.maxHp - oldMaxHp;
-  // 체력이 최대체력보다 많으면 잘라내고, 증가하면 HP도 올려줌
-  if (hpDiff > 0) {
-    char.hp = Math.min(char.maxHp, char.hp + hpDiff);
-  } else {
-    char.hp = Math.min(char.hp, char.maxHp);
-  }
   char.attackPower = stats.attackPower;
 
   // 스킬 이속 버프 중이라면 보정 유지
@@ -80,21 +71,25 @@ function promoteDongjun(char: DongjunState, ctx: any) {
     char.speed = stats.speed;
   }
 
+  // 체력 자체는 고정이고, 계급이 바뀌면 30 일시 회복
+  const healAmount = 30;
+  char.hp = Math.min(char.maxHp, char.hp + healAmount);
+
   const changeEmoji = newRank > prevRank ? '⬆️' : newRank < prevRank ? '⬇️' : '↔️';
-  ctx.addFloatingText(char.x, char.y - 50, `🎲 ${changeEmoji} ${rankName}!`, '#4d5d3b', 1.8);
+  ctx.addFloatingText(char.x, char.y - 50, `🎲 ${changeEmoji} ${rankName}! (+${healAmount} HP)`, '#4d5d3b', 1.8);
   ctx.createExplosion(char.x, char.y, '#4d5d3b', 12);
-  ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (체력: ${char.maxHp}, 공격력: ${char.attackPower})`, 'skill');
+  ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (체력 30 회복, 공격력: ${char.attackPower})`, 'skill');
 }
 
 export const dongjunConfig: CharacterConfig = {
   id: 'dongjun',
   name: '동준',
-  maxHp: 110, // 훈련병 시작 체력
+  maxHp: 150, // 고정 최대 체력
   speed: 0.9, // 훈련병 시작 속도
   attackPower: 10, // 훈련병 시작 공격력
   baseAttackRange: 45,
   skillName: '군기 충전 및 계급 추첨',
-  skillDescription: '5초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 매번 계급이 오를 수도, 내려갈 수도 있습니다! 계급 변동 시 3% 확률로 즉시 [전역]하여 모든 적에게 9999 피해를 입히고 즉시 승리합니다! 액티브 발동 시 즉시 계급 추첨(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다.',
+  skillDescription: '5초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 매번 계급이 오를 수도, 내려갈 수도 있습니다! 계급 변동 시 3% 확률로 즉시 [전역]하여 모든 적에게 9999 피해를 입히고 즉시 승리합니다! 액티브 발동 시 즉시 계급 추첨(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다. (계급 변동 시 체력 30 회복)',
   color: '#4d5d3b', // 밀리터리 카키그린
   skillChargeRate: 20, // 5초 쿨타임
   tier: 'B',

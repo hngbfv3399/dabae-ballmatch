@@ -195,3 +195,38 @@ export const getDamageRanking = query({
     return ranking;
   },
 });
+
+// 8. Get all 1v1 tier test results
+export const getOneOnOneTiers = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("oneOnOneTiers").collect();
+  },
+});
+
+// 9. Update 1v1 tier test result for a character
+export const updateOneOnOneTier = mutation({
+  args: {
+    characterId: v.string(),
+    tier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("oneOnOneTiers")
+      .withIndex("by_char", (q) => q.eq("characterId", args.characterId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        tier: args.tier,
+        updatedAt: Date.now(),
+      });
+    } else {
+      await ctx.db.insert("oneOnOneTiers", {
+        characterId: args.characterId,
+        tier: args.tier,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
