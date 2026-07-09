@@ -62,4 +62,6 @@ export interface CharacterState extends CharacterConfig {
   isPoisoned?: boolean; // 푸만 독성 상태 여부
   poisonTimeLeft?: number; // 독성 남은 시간 (초)
   poisonDamageTimer?: number; // 독성 대미지 틱 타이머 (초)
+  isImmune?: boolean; // 주주 피해 무적 보호막 여부
+  immuneTimeLeft?: number; // 무적 보호막 남은 시간 (초)
 }

@@ -442,6 +442,12 @@ export class GameLounge {
   private dealDamage(attacker: CharacterState, target: CharacterState, amount: number, customText?: string) {
     if (target.isDead) return;
 
+    // 무적 상태 시 대미지 무시 (주주 보호막 등)
+    if (target.isImmune) {
+      console.log(`🛡️ [피해 무적] ${target.name}이 무적 상태이므로 피해를 받지 않습니다.`);
+      return;
+    }
+
     // 수 정밀 저격 은신/무적 상태 시 대미지 무시
     if (target.isSuInvisible) {
       console.log(`🛡️ [은신 면역] ${target.name}이 은신 상태이므로 피해를 받지 않습니다.`);
