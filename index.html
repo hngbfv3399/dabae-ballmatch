@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>캐릭터 볼게임 시뮬레이터</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbit&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <!-- 로비 화면 (캐릭터 선택) -->
+      <section id="lobby-view" class="view">
+        <header class="lobby-header" style="position: relative;">
+          <div style="position: absolute; top: 0; right: 0;">
+            <button id="patch-notes-trigger-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; height: auto;">
+              📋 패치노트 <span id="lobby-version-badge" style="font-size: 0.75rem; color: var(--neon-yellow); font-weight: 700; margin-left: 0.2rem;">v0.0.0</span>
+            </button>
+          </div>
+          <h1>BALL BATTLE</h1>
+          <p class="subtitle">담빵 볼게임 시뮬레이터</p>
+        </header>
+
+        <main class="lobby-main">
+          <div class="selection-container">
+            <h2 class="section-title">전투에 참여할 캐릭터 선택 (최소 2개 이상)</h2>
+            <div id="character-list" class="character-grid">
+              <!-- JS에서 동적으로 생성됨 -->
+            </div>
+          </div>
+
+          <div class="lobby-controls">
+            <!-- 캐릭터 티어표 -->
+            <div class="tier-list-card card">
+              <div class="tier-header-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <h3 style="margin: 0;">🏆 실시간 티어표</h3>
+                  <span id="total-sim-games" style="font-size: 0.8rem; color: var(--neon-yellow); background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); padding: 0.15rem 0.5rem; border-radius: 12px; font-weight: 700;">0판</span>
+                </div>
+                <button id="reset-tiers-btn" class="btn-text-action">전적 초기화</button>
+              </div>
+              <div id="tier-list-notice" class="hidden" style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #ffd700; line-height: 1.5; border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px; background: rgba(255, 215, 0, 0.05); margin-bottom: 0.5rem;">
+                <!-- JS에서 동적 문구 세팅 -->
+              </div>
+              <div class="tier-rows" id="tier-rows-wrapper">
+                <div class="tier-row tier-s">
+                  <span class="tier-badge">S</span>
+                  <div class="tier-chars" id="tier-chars-s"></div>
+                </div>
+                <div class="tier-row tier-a">
+                  <span class="tier-badge">A</span>
+                  <div class="tier-chars" id="tier-chars-a"></div>
+                </div>
+                <div class="tier-row tier-b">
+                  <span class="tier-badge">B</span>
+                  <div class="tier-chars" id="tier-chars-b"></div>
+                </div>
+                <div class="tier-row tier-c">
+                  <span class="tier-badge">C</span>
+                  <div class="tier-chars" id="tier-chars-c"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="game-settings card">
+              <h3>게임 설정</h3>
+              <div class="setting-item">
+                <label for="prep-time">준비 대기 시간: </label>
+                <span id="prep-time-val">3초</span>
+              </div>
+              <div class="setting-item">
+                <label for="game-speed">시뮬레이션 속도: </label>
+                <select id="game-speed">
+                  <option value="1">1.0x (보통)</option>
+                  <option value="1.5">1.5x (빠름)</option>
+                  <option value="2">2.0x (매우 빠름)</option>
+                </select>
+              </div>
+              <div class="setting-item" style="margin-top: 0.6rem;">
+                <label for="stats-mode-select">전적/카운터 기준: </label>
+                <select id="stats-mode-select" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
+                  <option value="all" selected>전체 매치</option>
+                  <option value="2">2인전</option>
+                  <option value="3">3인전</option>
+                  <option value="4">4인전</option>
+                  <option value="5">5인전</option>
+                  <option value="6">6인전</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 랜덤전 카드 -->
+            <div class="random-match card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">🎲 랜덤전</h3>
+              <div class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <label for="random-player-count" style="font-size: 0.9rem; color: var(--text-secondary);">참가 인원: </label>
+                <select id="random-player-count" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
+                  <option value="1">1인전</option>
+                  <option value="2" selected>2인전</option>
+                  <option value="3">3인전</option>
+                  <option value="4">4인전</option>
+                  <option value="5">5인전</option>
+                  <option value="6">6인전</option>
+                </select>
+              </div>
+              <button id="random-start-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, #7f00ff 0%, #ff007f 100%); color: #fff; box-shadow: 0 0 10px rgba(127, 0, 255, 0.4); border: none; font-size: 0.95rem; font-weight: 700; height: 42px;">
+                <span>랜덤전 시작!</span>
+              </button>
+            </div>
+
+            <button id="start-btn" class="btn btn-primary" disabled>
+              <span>게임 시작하기</span>
+            </button>
+          </div>
+        </main>
+      </section>
+
+      <!-- 게임 화면 -->
+      <section id="game-view" class="view hidden">
+        <header class="game-header">
+          <button id="back-to-lobby-btn" class="btn btn-secondary">← 로비로</button>
+          <div id="game-status-banner" class="status-banner">
+            <span id="game-status-text">준비 중...</span>
+          </div>
+          <div class="alive-counter">
+            생존: <span id="alive-count">0</span> / <span id="total-count">0</span>
+          </div>
+        </header>
+
+        <main class="game-main">
+          <!-- 렌더링 영역 (maingame) -->
+          <div id="maingame" class="game-lounge-wrapper">
+            <canvas id="game-canvas" width="800" height="600"></canvas>
+            <!-- 3초 카운트다운 오버레이 -->
+            <div id="countdown-overlay" class="countdown-overlay hidden">
+              <span id="countdown-number">3</span>
+            </div>
+          </div>
+
+          <!-- 실시간 HUD 정보 -->
+          <aside id="hud" class="hud-sidebar card">
+             <h3>실시간 순위 / 상태</h3>
+             <div id="hud-list" class="hud-list" style="margin-bottom: 0.8rem;">
+               <!-- JS에서 동적으로 갱신됨 -->
+             </div>
+             
+             <!-- 실시간 전투 로그 영역 -->
+             <div class="battle-log-container" style="display: flex; flex-direction: column; flex: 1.5; border-top: 1px dashed var(--border-color); padding-top: 0.8rem; overflow: hidden; min-height: 180px;">
+               <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; border-bottom: none; padding-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+                 <span>📜 실시간 전투 로그</span>
+                 <span id="log-sim-speed" style="font-size: 0.75rem; color: var(--neon-yellow); font-weight: normal;">1.0x 배속</span>
+               </h3>
+               <div id="battle-log-list" style="flex: 1; background: rgba(0, 0, 0, 0.45); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem; font-family: monospace; font-size: 0.72rem; overflow-y: auto; color: #d0d0d0; line-height: 1.5; display: flex; flex-direction: column; gap: 4px;">
+                 <div style="color: #888888;">⚔️ 시뮬레이션 준비 완료</div>
+               </div>
+             </div>
+          </aside>
+        </main>
+      </section>
+
+      <!-- 승리자 모달 -->
+      <div id="winner-modal" class="modal-overlay hidden">
+        <div class="modal-content card">
+          <div class="winner-trophy">🏆</div>
+          <h2 class="winner-title">VICTORY!</h2>
+          <div id="winner-info" class="winner-info-card">
+            <!-- 승리자 정보가 표시됨 -->
+          </div>
+          <button id="modal-close-btn" class="btn btn-primary">로비로 돌아가기</button>
+        </div>
+      </div>
+
+      <!-- 패치노트 모달 -->
+      <div id="patch-modal" class="modal-overlay hidden">
+        <div class="modal-content card patch-modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
+          <div class="patch-header">
+            <span class="patch-badge">PATCH HISTORY</span>
+            <h2 id="patch-history-title" style="font-size: 1.3rem; margin: 0; color: #fff; font-family: 'Orbit', sans-serif;">전체 패치 내역</h2>
+          </div>
+          <div id="patch-history-list" style="flex: 1; overflow-y: auto; margin: 1rem 0; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- JS에서 동적으로 패치 내역이 중첩되어 채워집니다 -->
+          </div>
+          <div class="patch-footer">
+            <button id="patch-close-btn" class="btn btn-primary">확인했습니다</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
