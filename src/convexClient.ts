@@ -2,9 +2,6 @@ import { ConvexClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 
 const CONVEX_URL = import.meta.env.VITE_CONVEX_URL;
-if (!CONVEX_URL) {
-  console.error("VITE_CONVEX_URL is not defined in environment variables. Make sure .env.local exists.");
-}
 
 export const convexClient = new ConvexClient(CONVEX_URL || "");
 
