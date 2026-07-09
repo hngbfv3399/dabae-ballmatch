@@ -102,6 +102,8 @@ export const dongjunConfig: CharacterConfig = {
   color: '#4d5d3b', // 밀리터리 카키그린
   skillChargeRate: 20, // 5초 쿨타임
   tier: 'B',
+  role: 'Specialist',
+  detailedDescription: '동준은 무작위 군대 계급 상승과 \'즉시 전역\'이라는 일확천금 기믹을 쥐고 있는 변수 창출형 스페셜리스트 캐릭터입니다. 매 5초(혹은 스킬 발동)마다 훈련병부터 병장까지 랜덤하게 진급하거나 강등되어 실시간으로 스탯이 널뛰며, 진급 발생 시 극악의 확률(3%)로 즉시 [전역]하여 맵 전체에 9999 광역 폭발 피해를 주어 전투를 즉각 강제 승리로 이끄는 로또형 로망을 담당합니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     const dj = char as DongjunState;

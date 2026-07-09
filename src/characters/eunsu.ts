@@ -12,6 +12,8 @@ export const eunsuConfig: CharacterConfig = {
   color: '#ff007f', // 딥 마젠타
   skillChargeRate: 10, // 10초 쿨타임
   tier: 'A',
+  role: 'Summoner',
+  detailedDescription: '은수는 다수의 분신을 실시간으로 생산하여 전장을 대혼란에 빠뜨리는 소환형 포지션의 캐릭터입니다. 70% 확률로 본체 사양의 약화 버전인 도플갱어 분신을 연속으로 생성해 대전 상대들의 공격 표적을 어지럽히며, 본체는 안전하게 숨은 채 분신들의 누적 타격과 기절 유도를 통해 교란 전술을 펼칩니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 쿨타임 즉시 재가동 설정
@@ -43,6 +45,8 @@ export const eunsuConfig: CharacterConfig = {
       skillDescription: '소환된 은수의 복제품입니다.',
       color: '#ff007f',
       skillChargeRate: 0,
+      role: 'Summoner',
+      detailedDescription: '은수가 소환한 복제 분신체입니다.',
       
       // 상태 데이터
       x: char.x + Math.cos(angle) * spawnDist,

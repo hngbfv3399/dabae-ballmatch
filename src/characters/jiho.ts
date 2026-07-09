@@ -1,5 +1,27 @@
 import type { CharacterConfig, CharacterState } from './character.interface';
 
+const SKILL_CONSTANTS = {
+  COOLDOWN: 5,
+  BUG_CHANCE: 0.4,
+  BUG_DURATION: 3.0,
+  BUG_SPEED_DEBUFF: 30, // 30% 속도 감소
+  CRASH_CHANCE: 0.5,
+  CRASH_DMG: 20,
+  CRASH_STUN_DURATION: 1.0,
+  CRASH_SPLASH_RADIUS: 120,
+  CRASH_SPLASH_DMG: 15,
+  TYPING_DURATION: 2.0,
+  COMPILE_SUCCESS_CHANCE: 0.65,
+  COMPILE_SUCCESS_SPLASH_RADIUS: 150,
+  COMPILE_SUCCESS_SPLASH_DMG: 25,
+  COMPILE_BUFF_DURATION: 5.0,
+  COMPILE_HEAL_PCT: 30, // 30% 회복
+  COMPILE_SPEED_MULTIPLIER: 2.0,
+  COMPILE_ATK_MULTIPLIER: 2.2,
+  COMPILE_FAIL_STUN_DURATION: 2.0,
+  COMPILE_FAIL_SELF_DMG_MULTIPLIER: 1.5,
+};
+
 export const jihoConfig: CharacterConfig = {
   id: 'jiho',
   name: '지호',
@@ -8,34 +30,36 @@ export const jihoConfig: CharacterConfig = {
   attackPower: 10,
   baseAttackRange: 45,
   skillName: '코드 컴파일 및 실행',
-  skillDescription: '5초 쿨타임. 기본 공격 시 40% 확률로 3초간 [버그] 디버프(이속 30% 감소)를 걸며, 디버프 적용 시 50% 확률로 [런타임 에러](20 피해 + 1초 기절 및 주변 120px 적들에게 15 광역 피해)를 입힙니다. 스킬 성공 시 주변에 25의 광역 피해와 넉백을 주고 버프를 얻으며, 실패 시 기절합니다.',
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 기본 공격 시 ${SKILL_CONSTANTS.BUG_CHANCE * 100}% 확률로 ${SKILL_CONSTANTS.BUG_DURATION}초간 [버그] 디버프(이속 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)를 걸며, 디버프 적용 시 ${SKILL_CONSTANTS.CRASH_CHANCE * 100}% 확률로 [런타임 에러](${SKILL_CONSTANTS.CRASH_DMG} 피해 + ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절 및 주변 ${SKILL_CONSTANTS.CRASH_SPLASH_RADIUS}px 적들에게 ${SKILL_CONSTANTS.CRASH_SPLASH_DMG} 광역 피해)를 입힙니다. 스킬 성공 시 주변에 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG}의 광역 피해와 넉백을 주고 버프를 얻으며, 실패 시 기절합니다.`,
   color: '#00ffcc',       // 터미널 그린
-  skillChargeRate: 20,
+  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'A',
+  role: 'Specialist',
+  detailedDescription: `지호는 확률적 디버프와 컴파일 연쇄 효과를 이용하는 테크니컬한 변수형 캐릭터입니다. 기본 공격 시 일정 확률로 상대방에게 치명적인 [버그] 디버프(이동 속도 저하)를 걸고, 디버프가 적용된 적을 재타격해 ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절과 광역 스플래시 피해를 동반하는 [런타임 에러]를 컴파일하여 예기치 못한 전술적 혼란을 야기합니다.`,
 
   // [1] 기본 공격 시 훅 (디버프 및 확률적 대미지, 스턴, 광역 딜)
   onBasicAttack(char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead) return;
 
     // 40% 확률로 버그 디버프 부여
-    if (Math.random() < 0.4) {
+    if (Math.random() < SKILL_CONSTANTS.BUG_CHANCE) {
       const opp = opponent as any;
 
       if (!opp.jihoDebuffTimeLeft || opp.jihoDebuffTimeLeft <= 0) {
         opp.jihoDebuffOriginalSpeed = opponent.speed;
-        opponent.speed = opponent.speed * 0.7; // 30% 속도 감소
-        console.log(`🐛 [디버프 부여] 지호 -> ${opponent.name} | [버그] 부여 (3초간 이동 속도 30% 감소)`);
-        ctx.logMessage?.(`🐛 [디버프 부여] 지호 ➡️ ${opponent.name} | [버그] 디버프 (3초간 이속 30% 감소)`, 'damage');
+        opponent.speed = opponent.speed * (1 - SKILL_CONSTANTS.BUG_SPEED_DEBUFF / 100); // 속도 감소
+        console.log(`🐛 [디버프 부여] 지호 -> ${opponent.name} | [버그] 부여 (${SKILL_CONSTANTS.BUG_DURATION}초간 이동 속도 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)`);
+        ctx.logMessage?.(`🐛 [디버프 부여] 지호 ➡️ ${opponent.name} | [버그] 디버프 (${SKILL_CONSTANTS.BUG_DURATION}초간 이속 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)`, 'damage');
       }
-      opp.jihoDebuffTimeLeft = 3.0; // 3초 지속
+      opp.jihoDebuffTimeLeft = SKILL_CONSTANTS.BUG_DURATION; // 지속 시간
 
-      // 디버프 부여 시 50% 확률로 런타임 에러 (추가 피해 + 1초 스턴 + 주변 120px 광역 피해)
-      if (Math.random() < 0.5) {
+      // 디버프 부여 시 50% 확률로 런타임 에러
+      if (Math.random() < SKILL_CONSTANTS.CRASH_CHANCE) {
         console.log(`💥 [디버프 격발] 지호 -> ${opponent.name} | [런타임 에러] 연쇄 충돌 발생!`);
-        ctx.logMessage?.(`💥 [런타임 에러 격발] 지호 ➡️ ${opponent.name} | 연쇄 런타임 에러 (20 피해, 1초 기절)`, 'damage');
-        ctx.dealDamage(char, opponent, 20, '💻 CRASH & STUN!');
+        ctx.logMessage?.(`💥 [런타임 에러 격발] 지호 ➡️ ${opponent.name} | 연쇄 런타임 에러 (${SKILL_CONSTANTS.CRASH_DMG} 피해, ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절)`, 'damage');
+        ctx.dealDamage(char, opponent, SKILL_CONSTANTS.CRASH_DMG, '💻 CRASH & STUN!');
         opponent.isStunned = true;
-        opponent.stunTimeLeft = 1.0;
+        opponent.stunTimeLeft = SKILL_CONSTANTS.CRASH_STUN_DURATION;
         opponent.vx = 0;
         opponent.vy = 0;
         ctx.createExplosion(opponent.x, opponent.y, '#ff3366', 15);
@@ -44,8 +68,8 @@ export const jihoConfig: CharacterConfig = {
         ctx.characters.forEach((enemy) => {
           if (enemy.isDead || enemy.id === char.id || enemy.id === opponent.id) return;
           const dist = Math.hypot(enemy.x - opponent.x, enemy.y - opponent.y);
-          if (dist <= 120) {
-            ctx.dealDamage(char, enemy, 15, '⚡ AOE ERROR!');
+          if (dist <= SKILL_CONSTANTS.CRASH_SPLASH_RADIUS) {
+            ctx.dealDamage(char, enemy, SKILL_CONSTANTS.CRASH_SPLASH_DMG, '⚡ AOE ERROR!');
             ctx.createExplosion(enemy.x, enemy.y, '#ff3366', 6);
             
             // 넉백 벡터
@@ -67,7 +91,7 @@ export const jihoConfig: CharacterConfig = {
   onSkillTrigger(char: CharacterState) {
     char.skillActive = false; // 대기 코딩 단계이므로 액티브 버프는 아직 아님
     char.isTyping = true;
-    char.typingTimeLeft = 2.0;
+    char.typingTimeLeft = SKILL_CONSTANTS.TYPING_DURATION;
     char.vx = 0;
     char.vy = 0;
   },
@@ -118,18 +142,18 @@ export const jihoConfig: CharacterConfig = {
         char.vx = Math.cos(randomAngle) * baseSpeed;
         char.vy = Math.sin(randomAngle) * baseSpeed;
 
-        // 성공 여부 결정 (성공 65%, 실패 35%)
-        const isSuccess = Math.random() < 0.65;
+        // 성공 여부 결정
+        const isSuccess = Math.random() < SKILL_CONSTANTS.COMPILE_SUCCESS_CHANCE;
 
         if (isSuccess) {
-          console.log(`💻 [컴파일 성공] 지호 컴파일 성공! 주변 150px 광역 시스템 폭발 피해 가동 및 5초 버프`);
-          ctx.logMessage?.(`💻 [컴파일 성공] 지호 ➡️ 성공! (주변 광역 25 피해, HP 30% 회복, 5초간 이속 2배 & 공격력 2.2배)`, 'skill');
-          // 컴파일 성공: 주변 150px 적들에게 컴파일 광역 시스템 폭발 피해 (25 피해)
+          console.log(`💻 [컴파일 성공] 지호 컴파일 성공! 주변 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_RADIUS}px 광역 시스템 폭발 피해 가동 및 ${SKILL_CONSTANTS.COMPILE_BUFF_DURATION}초 버프`);
+          ctx.logMessage?.(`💻 [컴파일 성공] 지호 ➡️ 성공! (주변 광역 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG} 피해, HP ${SKILL_CONSTANTS.COMPILE_HEAL_PCT}% 회복, ${SKILL_CONSTANTS.COMPILE_BUFF_DURATION}초간 이속 ${SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER}배 & 공격력 ${SKILL_CONSTANTS.COMPILE_ATK_MULTIPLIER}배)`, 'skill');
+          // 컴파일 성공: 주변 광역 시스템 폭발 피해
           ctx.characters.forEach((enemy) => {
             if (enemy.isDead || enemy.id === char.id) return;
             const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
-            if (dist <= 150) {
-              ctx.dealDamage(char, enemy, 25, '💻 SYSTEM BLAST!');
+            if (dist <= SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_RADIUS) {
+              ctx.dealDamage(char, enemy, SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG, '💻 SYSTEM BLAST!');
               ctx.createExplosion(enemy.x, enemy.y, '#00ffcc', 8);
               
               // 넉백
@@ -139,16 +163,16 @@ export const jihoConfig: CharacterConfig = {
             }
           });
 
-          // 5초간 버프 획득 및 30% 회복
+          // 버프 획득 및 회복
           const wasActive = char.skillActive;
           char.skillActive = true;
-          char.skillDurationLeft = 5.0;
+          char.skillDurationLeft = SKILL_CONSTANTS.COMPILE_BUFF_DURATION;
 
           ctx.addFloatingText(char.x, char.y - 45, '💻 [SUCCESS] 컴파일 완료!', '#00ffcc', 1.8);
           ctx.createExplosion(char.x, char.y, '#00ffcc', 20);
 
-          // 체력 30% 즉시 치유
-          const healAmount = Math.round(char.maxHp * 0.3);
+          // 체력 치유
+          const healAmount = Math.round(char.maxHp * (SKILL_CONSTANTS.COMPILE_HEAL_PCT / 100));
           char.hp = Math.min(char.maxHp, char.hp + healAmount);
           ctx.addFloatingText(char.x, char.y - 25, `+${healAmount} HEAL`, '#39ff14', 1.5);
 
@@ -163,39 +187,36 @@ export const jihoConfig: CharacterConfig = {
             );
           }
 
-          // 이동 속도 2.0배 증폭 (이미 버프가 켜져 있으면 또 곱하지 않음)
+          // 이동 속도 증폭
           if (!wasActive) {
-            char.vx *= 2.0;
-            char.vy *= 2.0;
+            char.vx *= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
+            char.vy *= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
           }
         } else {
-          console.log(`⚠️ [컴파일 실패] 지호 컴파일 실패! 2초 기절 및 자해 피해 발생`);
-          ctx.logMessage?.(`⚠️ [컴파일 실패] 지호 ➡️ 실패! 자해 15 피해 및 2초간 기절`, 'skill');
-          // 컴파일 실패: 자신 역디버프 (2초 기절 + 자해 피해)
+          console.log(`⚠️ [컴파일 실패] 지호 컴파일 실패! ${SKILL_CONSTANTS.COMPILE_FAIL_STUN_DURATION}초 기절 및 자해 피해 발생`);
+          ctx.logMessage?.(`⚠️ [컴파일 실패] 지호 ➡️ 실패! 자해 및 ${SKILL_CONSTANTS.COMPILE_FAIL_STUN_DURATION}초간 기절`, 'skill');
           ctx.addFloatingText(char.x, char.y - 45, '⚠️ [ERROR] 컴파일 실패! (역디버프)', '#ff3366', 1.8);
           ctx.createExplosion(char.x, char.y, '#ff3366', 25);
 
           char.isStunned = true;
-          char.stunTimeLeft = 2.0;
+          char.stunTimeLeft = SKILL_CONSTANTS.COMPILE_FAIL_STUN_DURATION;
           char.vx = 0;
           char.vy = 0;
 
-          const selfDamage = Math.round(char.attackPower * 1.5);
+          const selfDamage = Math.round(char.attackPower * SKILL_CONSTANTS.COMPILE_FAIL_SELF_DMG_MULTIPLIER);
           ctx.dealDamage(char, char, selfDamage, 'RUNTIME ERROR!');
         }
       }
       return;
     }
 
-    // 2-B. 기절 중 타이머 처리 (공통 기절 처리가 게임 라운지에서 도나 여기서 수동 처리도 가능)
-    // 기절 수동 제어
+    // 2-B. 기절 중 타이머 처리
     if (char.isStunned) {
       char.stunTimeLeft -= dt;
       char.vx = 0;
       char.vy = 0;
       if (char.stunTimeLeft <= 0) {
         char.isStunned = false;
-        // 기절 풀렸을 때 다시 리스타트
         const randomAngle = Math.random() * Math.PI * 2;
         const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
@@ -210,8 +231,8 @@ export const jihoConfig: CharacterConfig = {
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
         // 속도 원상복구
-        char.vx /= 2.0;
-        char.vy /= 2.0;
+        char.vx /= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
+        char.vy /= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
       }
     }
   },
@@ -228,7 +249,7 @@ export const jihoConfig: CharacterConfig = {
       
       const barW = 40;
       const barH = 5;
-      const progress = (2.0 - char.typingTimeLeft) / 2.0;
+      const progress = (SKILL_CONSTANTS.TYPING_DURATION - char.typingTimeLeft) / SKILL_CONSTANTS.TYPING_DURATION;
       canvasCtx.fillStyle = 'rgba(255,255,255,0.1)';
       canvasCtx.fillRect(char.x - barW / 2, char.y - currentRadius - 18, barW, barH);
       canvasCtx.fillStyle = '#00ffcc';

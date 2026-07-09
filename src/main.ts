@@ -28,11 +28,13 @@ const totalSimGamesEl = document.getElementById('total-sim-games') as HTMLElemen
 const battleLogList = document.getElementById('battle-log-list') as HTMLElement;
 const logSimSpeed = document.getElementById('log-sim-speed') as HTMLElement;
 
-const tabWinrateBtn = document.getElementById('tab-winrate-btn') as HTMLButtonElement;
-const tabDamageBtn = document.getElementById('tab-damage-btn') as HTMLButtonElement;
+const openStatsBtn = document.getElementById('open-stats-btn') as HTMLButtonElement;
+const closeStatsBtn = document.getElementById('close-stats-btn') as HTMLButtonElement;
+const statsCenterModal = document.getElementById('stats-center-modal') as HTMLElement;
 const damageRankingWrapper = document.getElementById('damage-ranking-wrapper') as HTMLElement;
-let currentStatsTab: 'winrate' | 'damage' = 'winrate';
+const emptyRoleNotice = document.getElementById('empty-role-notice') as HTMLElement;
 let lobbyTotalGames = 0;
+let currentRoleFilter = 'all';
 
 // Winner Modal Elements
 const winnerModal = document.getElementById('winner-modal') as HTMLElement;
@@ -43,16 +45,6 @@ const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonEl
 const selectedIds: Set<string> = new Set();
 let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
-let isTierTestMode = false;
-let tierTestTargetId = '';
-let tierTestOpponents: string[] = [];
-let tierTestOpponentIndex = 0;
-let tierTestWins = 0;
-let tierTestLosses = 0;
-let tierTestDraws = 0;
-let tierTestLogs: string[] = [];
-let oneOnOneTiersUnsubscribe: (() => void) | null = null;
-let currentOneOnOneTiers: Record<string, 'S' | 'A' | 'B' | 'C'> = {};
 
 // 아바타 HTML 렌더러 (이모지 대체)
 function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
@@ -72,22 +64,24 @@ interface CharacterStats {
   games: number;
   damageDealt: number;
   damageTaken: number;
+  rankSum?: number;
+  mvpCount?: number;
 }
 
-const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C'> = {
+const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'> = {
   chanhwi: 'S',
-  jiho: 'A',
-  chanik: 'A',
-  nayuta: 'B',
-  unhee: 'B',
-  doyun: 'C',
-  su: 'C',
-  dongjun: 'B',
+  juju: 'S',
   seyeon: 'A',
-  puman: 'B',
   eunsu: 'A',
-  myeongseok: 'B',
-  juju: 'S'
+  jiho: 'A',
+  chanik: 'B',
+  dongjun: 'B',
+  myeongseok: 'C',
+  puman: 'C',
+  unhee: 'D',
+  nayuta: 'D',
+  doyun: 'E',
+  su: 'F'
 };
 
 // 키구조: { [mode]: { [charId]: CharacterStats } }
@@ -109,7 +103,9 @@ function getStoredStats(): Record<string, Record<string, CharacterStats>> {
       wins: item.wins,
       games: item.games,
       damageDealt: item.damageDealt,
-      damageTaken: item.damageTaken
+      damageTaken: item.damageTaken,
+      rankSum: item.rankSum,
+      mvpCount: item.mvpCount
     };
   });
   return record;
@@ -139,7 +135,7 @@ function calculateDynamicTiers() {
   if (totalGames < 10) {
     // 10판 미만인 경우: 기본 티어로 복귀 및 안내 노출
     availableCharacters.forEach(char => {
-      char.tier = DEFAULT_TIERS[char.id] || 'C';
+      char.tier = DEFAULT_TIERS[char.id] || 'F';
     });
 
     if (tierListNotice && tierRowsWrapper) {
@@ -167,22 +163,25 @@ function calculateDynamicTiers() {
     if (a.winRate !== b.winRate) {
       return b.winRate - a.winRate;
     }
-    const tierOrder = { S: 4, A: 3, B: 2, C: 1 };
-    const tierA = DEFAULT_TIERS[a.id] || 'C';
-    const tierB = DEFAULT_TIERS[b.id] || 'C';
+    const tierOrder = { S: 7, A: 6, B: 5, C: 4, D: 3, E: 2, F: 1 };
+    const tierA = DEFAULT_TIERS[a.id] || 'F';
+    const tierB = DEFAULT_TIERS[b.id] || 'F';
     if (tierOrder[tierA] !== tierOrder[tierB]) {
       return tierOrder[tierB] - tierOrder[tierA];
     }
     return a.id.localeCompare(b.id);
   });
 
-  // 1위: S, 2~3위: A, 4위: B, 5~7위: C
+  // 13개 캐릭터 분포: 1위 S, 2~3위 A, 4~5위 B, 6~7위 C, 8~9위 D, 10~11위 E, 12~13위 F
   charWinRates.forEach((item, index) => {
-    let tier: 'S' | 'A' | 'B' | 'C' = 'C';
+    let tier: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' = 'F';
     if (index === 0) tier = 'S';
-    else if (index === 1 || index === 2) tier = 'A';
-    else if (index === 3) tier = 'B';
-    else tier = 'C';
+    else if (index <= 2) tier = 'A';
+    else if (index <= 4) tier = 'B';
+    else if (index <= 6) tier = 'C';
+    else if (index <= 8) tier = 'D';
+    else if (index <= 10) tier = 'E';
+    else tier = 'F';
 
     const charConfig = availableCharacters.find(c => c.id === item.id);
     if (charConfig) {
@@ -192,7 +191,7 @@ function calculateDynamicTiers() {
 }
 
 async function recordGameStart(participantIds: string[], playerCount: number) {
-  if (isPracticeMode || isTierTestMode) return;
+  if (isPracticeMode) return;
   try {
     await convexClient.mutation(api.stats.recordGameStart, {
       participantIds,
@@ -202,7 +201,7 @@ async function recordGameStart(participantIds: string[], playerCount: number) {
 }
 
 async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
-  if (isPracticeMode || isTierTestMode) return;
+  if (isPracticeMode) return;
   const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
   const realChars = allChars.filter(char => !char.id.includes('clone'));
 
@@ -213,7 +212,9 @@ async function recordGameEnd(winnerId: string, allChars: CharacterState[], playe
       allChars: realChars.map(char => ({
         characterId: char.id,
         damageDealt: char.totalDamageDealt || 0,
-        damageTaken: char.totalDamageTaken || 0
+        damageTaken: char.totalDamageTaken || 0,
+        rank: (char as any).rank || 1,
+        isMvp: !!(char as any).isMvp
       }))
     });
   } catch (err) {}
@@ -235,7 +236,7 @@ function getStoredCounters(): Record<string, Record<string, Record<string, numbe
 }
 
 async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
-  if (isPracticeMode || isTierTestMode) return;
+  if (isPracticeMode) return;
   if (victimId.includes('clone') || killerId.includes('clone')) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
@@ -252,43 +253,95 @@ async function resetTierStats() {
   } catch (err) {}
 }
 
-// Initialize Lobby character list
-function initLobby() {
-  calculateDynamicTiers(); // 로비 갱신 시 실시간 계산
-  characterListContainer.innerHTML = '';
-  selectedIds.clear();
-  updateStartButtonState();
+function renderTierList() {
+  const statsAll = getStoredStats();
+  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const stats = statsAll[mode] || {};
 
-  // 티어표 채우기
-  const tiers = ['s', 'a', 'b', 'c'] as const;
+  const tiers = ['s', 'a', 'b', 'c', 'd', 'e', 'f'] as const;
   tiers.forEach((t) => {
     const container = document.getElementById(`tier-chars-${t}`);
     if (container) {
       container.innerHTML = '';
-      const tierChars = availableCharacters.filter(c => (c.tier || 'C').toLowerCase() === t);
-      tierChars.forEach(char => {
-        const chip = document.createElement('span');
-        chip.className = `tier-char-chip tier-chip-${t}`;
-        chip.style.border = `1px solid ${char.color}`;
-        chip.style.boxShadow = `0 0 6px ${char.color}40`;
-        chip.style.color = '#ffffff';
-        chip.innerHTML = `${char.name}`;
+      const tierChars = availableCharacters.filter(c => (c.tier || 'F').toLowerCase() === t);
+      
+      // Sort inside the tier: win rate descending
+      const sortedTierChars = [...tierChars].sort((a, b) => {
+        const sA = stats[a.id] || { wins: 0, games: 0 };
+        const sB = stats[b.id] || { wins: 0, games: 0 };
+        const wrA = sA.games > 0 ? sA.wins / sA.games : -1;
+        const wrB = sB.games > 0 ? sB.wins / sB.games : -1;
+        return wrB - wrA;
+      });
+
+      sortedTierChars.forEach(char => {
+        const s = stats[char.id] || { wins: 0, games: 0 };
+        const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
+        const winRateText = s.games > 0 ? `${winRate.toFixed(0)}%` : '0%';
+        
+        const chip = document.createElement('div');
+        chip.className = `tier-char-chip-premium tier-chip-${t}`;
+        chip.style.border = `1px solid ${char.color}40`;
+        chip.style.boxShadow = `0 0 6px ${char.color}15`;
+        chip.innerHTML = `
+          <div class="tier-char-avatar">
+            ${getAvatarHTML(char.name, char.image, 'tier-avatar-img')}
+          </div>
+          <div class="tier-char-info">
+            <span class="tier-char-name" style="color: ${char.color};">${char.name}</span>
+            <span class="tier-char-winrate">${winRateText} <span style="font-size: 0.65rem; opacity: 0.65;">(${s.games}판)</span></span>
+          </div>
+        `;
         container.appendChild(chip);
       });
     }
   });
+}
 
-  availableCharacters.forEach((char) => {
+// Initialize Lobby character list
+function initLobby(preserveSelections = false) {
+  calculateDynamicTiers(); // 로비 갱신 시 실시간 계산
+  characterListContainer.innerHTML = '';
+  if (!preserveSelections) {
+    selectedIds.clear();
+  }
+  updateStartButtonState();
+
+  // 티어표 채우기
+  renderTierList();
+
+  // 역할군 필터 적용
+  const filteredChars = availableCharacters.filter(
+    (char) => currentRoleFilter === 'all' || char.role === currentRoleFilter
+  );
+
+  // 공석 안내 처리
+  if (filteredChars.length === 0) {
+    if (emptyRoleNotice) {
+      emptyRoleNotice.classList.remove('hidden');
+      emptyRoleNotice.style.display = 'flex';
+    }
+  } else {
+    if (emptyRoleNotice) {
+      emptyRoleNotice.classList.add('hidden');
+      emptyRoleNotice.style.display = 'none';
+    }
+  }
+
+  filteredChars.forEach((char) => {
     const statsAll = getStoredStats();
     const mode = statsModeSelect ? statsModeSelect.value : 'all';
     const stats = statsAll[mode] || {};
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0, rankSum: 0, mvpCount: 0 };
     const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
     const winRateStr = `${winRate.toFixed(1)}%`;
     const games = s.games;
     const wins = s.wins;
     const dmgDealt = s.damageDealt;
     const dmgTaken = s.damageTaken;
+    const rankSum = s.rankSum || 0;
+    const mvpCount = s.mvpCount || 0;
+    const avgRank = games > 0 ? (rankSum / games).toFixed(1) : '-';
 
     // 카운터 데이터 가공 (현재 선택된 모드 기준)
     const countersAll = getStoredCounters();
@@ -322,11 +375,15 @@ function initLobby() {
 
     const card = document.createElement('div');
     card.className = 'character-card card';
+    if (selectedIds.has(char.id)) {
+      card.classList.add('selected');
+    }
     card.dataset.id = char.id;
 
-    const oneOnOneTier = currentOneOnOneTiers[char.id] || DEFAULT_TIERS[char.id] || 'C';
+    const currentTier = char.tier || 'C';
     card.innerHTML = `
-      <div class="tier-card-badge tier-badge-${oneOnOneTier.toLowerCase()}">${oneOnOneTier}</div>
+      <div class="tier-card-badge tier-badge-${currentTier.toLowerCase()}">${currentTier}</div>
+      <button class="char-detail-trigger-btn" data-id="${char.id}" title="상세 설명 보기" style="position: absolute; top: 12px; left: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(6px); color: rgba(255, 255, 255, 0.85); font-size: 0.72rem; padding: 3px 8px; border-radius: 12px; cursor: pointer; z-index: 10; font-family: 'Orbit', sans-serif; transition: all 0.2s;">ℹ️ 정보</button>
       ${getAvatarHTML(char.name, char.image)}
       <div class="char-name">${char.name}</div>
       <div class="char-stats">
@@ -350,6 +407,10 @@ function initLobby() {
           <span class="stat-val text-neon-yellow">${winRateStr} (${wins}승/${games}판)</span>
         </div>
         <div class="stat-row">
+          <span>평균 등수 / MVP 횟수</span>
+          <span class="stat-val"><span class="text-neon-cyan avg-rank-val">${avgRank}위</span> / <span class="text-neon-yellow mvp-count-val">${mvpCount}회</span></span>
+        </div>
+        <div class="stat-row">
           <span>준 피해 / 받은 피해</span>
           <span class="stat-val"><span class="text-neon-green">${dmgDealt}</span> / <span class="text-neon-red">${dmgTaken}</span></span>
         </div>
@@ -362,11 +423,16 @@ function initLobby() {
           <span class="stat-val text-neon-green" style="font-weight: 700;">${bestVictimStr}</span>
         </div>
       </div>
-      <div class="char-skill-info">
-        <div class="char-skill-title">✨ ${char.skillName}</div>
-        <div class="char-skill-desc">${char.skillDescription}</div>
-      </div>
     `;
+
+    // 상세 정보 버튼 이벤트 리스너 바인딩
+    const detailBtn = card.querySelector('.char-detail-trigger-btn');
+    if (detailBtn) {
+      detailBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 카드 선택 차단
+        openCharacterDetail(char.id);
+      });
+    }
 
     card.addEventListener('click', () => {
       if (selectedIds.has(char.id)) {
@@ -402,18 +468,6 @@ function updateStartButtonState() {
     } else {
       practiceStartBtn.disabled = true;
       practiceStartBtn.classList.remove('active');
-    }
-  }
-
-  // 티어 판별 버튼 활성화 (단 1개만 선택 필요)
-  const tierTestStartBtn = document.getElementById('tier-test-start-btn') as HTMLButtonElement;
-  if (tierTestStartBtn) {
-    if (selectedIds.size === 1) {
-      tierTestStartBtn.disabled = false;
-      tierTestStartBtn.classList.add('active');
-    } else {
-      tierTestStartBtn.disabled = true;
-      tierTestStartBtn.classList.remove('active');
     }
   }
 }
@@ -483,6 +537,8 @@ function startPracticeGame() {
     skillDescription: '대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.',
     color: '#7f8c8d',
     skillChargeRate: 0,
+    role: 'Supporter' as const,
+    detailedDescription: '대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.',
     onUpdate(char: CharacterState) {
       char.hp = char.maxHp;
       // 속도가 일정 이하로 느려지면 지속해서 표류하도록 속도 보충
@@ -527,134 +583,7 @@ function startPracticeGame() {
   gameLounge.init(initialStates, speedMultiplier);
 }
 
-// Start Tier Test Game (Tier Test Mode)
-function startTierTestGame() {
-  if (selectedIds.size !== 1) return;
 
-  isTierTestMode = true;
-  tierTestTargetId = Array.from(selectedIds)[0];
-
-  // Get all other characters as opponents
-  tierTestOpponents = availableCharacters
-    .filter((char) => char.id !== tierTestTargetId)
-    .map((char) => char.id);
-
-  tierTestOpponentIndex = 0;
-  tierTestWins = 0;
-  tierTestLosses = 0;
-  tierTestDraws = 0;
-  tierTestLogs = [];
-
-  lobbyView.classList.add('hidden');
-  gameView.classList.remove('hidden');
-
-  // Force speed multiplier to 2.0x (기본 2배속)
-  gameSpeedSelect.value = '2';
-
-  startTierTestRound();
-}
-
-function startTierTestRound() {
-  if (!isTierTestMode) return;
-
-  const targetConfig = availableCharacters.find((char) => char.id === tierTestTargetId);
-  const oppId = tierTestOpponents[tierTestOpponentIndex];
-  const oppConfig = availableCharacters.find((char) => char.id === oppId);
-
-  if (!targetConfig || !oppConfig) return;
-
-  // Let's create the character states. Target is index 0, Opponent is index 1.
-  const allConfigs = [targetConfig, oppConfig];
-  const total = allConfigs.length;
-  const initialStates = allConfigs.map((config, index) => 
-    createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height)
-  );
-
-  totalCountEl.textContent = total.toString();
-  aliveCountEl.textContent = total.toString();
-
-  // Reset battle logs
-  if (battleLogList) {
-    battleLogList.innerHTML = `<div style="color: #ffd700;">🏆 [티어 판별 라운드 ${tierTestOpponentIndex + 1}/${tierTestOpponents.length}] ${targetConfig.name} vs ${oppConfig.name} 시작!</div>`;
-  }
-  
-  const speedMultiplier = 2.0; // Force 2x speed
-  if (logSimSpeed) {
-    logSimSpeed.textContent = `2.0x 배속 (티어 판별전)`;
-  }
-
-  if (!gameLounge) {
-    gameLounge = new GameLounge(
-      gameCanvas,
-      updateHUD,
-      showWinner,
-      updateCountdown,
-      recordCharacterDeath,
-      appendBattleLog
-    );
-  }
-
-  gameLounge.init(initialStates, speedMultiplier);
-}
-
-function showTierTestResult() {
-  gameStatusText.textContent = '티어 판별 완료';
-  if (gameLounge) {
-    gameLounge.stop();
-  }
-
-  // Determine tier based on wins out of 12 opponents:
-  // 11-12 wins: S
-  // 8-10 wins: A
-  // 5-7 wins: B
-  // 0-4 wins: C
-  let finalTier: 'S' | 'A' | 'B' | 'C' = 'C';
-  if (tierTestWins >= 11) finalTier = 'S';
-  else if (tierTestWins >= 8) finalTier = 'A';
-  else if (tierTestWins >= 5) finalTier = 'B';
-  else finalTier = 'C';
-
-  const targetChar = availableCharacters.find((char) => char.id === tierTestTargetId);
-  if (!targetChar) return;
-
-  // Save 1v1 tier determination to Convex database
-  try {
-    convexClient.mutation(api.stats.updateOneOnOneTier, {
-      characterId: targetChar.id,
-      tier: finalTier,
-    });
-  } catch (err) {}
-
-  const resultInfoEl = document.getElementById('tier-test-result-info');
-  if (resultInfoEl) {
-    resultInfoEl.innerHTML = `
-      <div class="win-avatar">
-        ${getAvatarHTML(targetChar.name, targetChar.image)}
-      </div>
-      <div class="win-name" style="color: ${targetChar.color}">${targetChar.name}</div>
-      <div style="font-size: 1.2rem; font-weight: bold; margin-top: 0.5rem; text-shadow: 0 0 10px rgba(255,255,255,0.2);">
-        전적: <span class="text-neon-green" style="font-weight: 700;">${tierTestWins}승</span> / <span style="color: #a0a0c0; font-weight: 700;">${tierTestDraws}무</span> / <span class="text-neon-red" style="font-weight: 700;">${tierTestLosses}패</span>
-      </div>
-      <div style="margin-top: 1rem; text-align: center;">
-        <span style="font-size: 0.9rem; color: var(--text-secondary);">판정된 1대1 티어</span>
-        <div class="tier-card-badge tier-badge-${finalTier.toLowerCase()}" style="font-size: 3rem; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin: 0.5rem auto; border-radius: 50%; border: 2px solid ${targetChar.color}; box-shadow: 0 0 15px ${targetChar.color};">
-          ${finalTier}
-        </div>
-      </div>
-      <div style="width: 100%; margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
-        <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; text-align: left;">⚔️ 라운드별 대결 결과</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: left; font-size: 0.85rem; max-height: 180px; overflow-y: auto; padding-right: 0.2rem;">
-          ${tierTestLogs.map(log => `<div style="background: rgba(255,255,255,0.02); padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">${log}</div>`).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  const modal = document.getElementById('tier-test-modal');
-  if (modal) {
-    modal.classList.remove('hidden');
-  }
-}
 
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
@@ -717,24 +646,10 @@ function updateCountdown(seconds: number) {
   if (seconds > 0) {
     countdownOverlay.classList.remove('hidden');
     countdownNumber.textContent = seconds.toString();
-    if (isTierTestMode) {
-      const oppId = tierTestOpponents[tierTestOpponentIndex];
-      const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
-      const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
-      gameStatusText.textContent = `티어 판별: ${targetName} vs ${oppName} (${tierTestOpponentIndex + 1}/${tierTestOpponents.length})`;
-    } else {
-      gameStatusText.textContent = '전투 준비 중...';
-    }
+    gameStatusText.textContent = '전투 준비 중...';
   } else {
     countdownOverlay.classList.add('hidden');
-    if (isTierTestMode) {
-      const oppId = tierTestOpponents[tierTestOpponentIndex];
-      const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
-      const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
-      gameStatusText.textContent = `${targetName} vs ${oppName} (BATTLE!)`;
-    } else {
-      gameStatusText.textContent = 'BATTLE!';
-    }
+    gameStatusText.textContent = 'BATTLE!';
   }
 }
 
@@ -771,74 +686,99 @@ function appendBattleLog(msg: string, type: string) {
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = '게임 종료';
   
-  if (winner) {
-    // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
-    recordGameEnd(winner.id, allChars, allChars.length);
-  }
+  // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
+  recordGameEnd(winner ? winner.id : "draw", allChars, allChars.length);
 
-  if (isTierTestMode) {
-    const targetName = availableCharacters.find(c => c.id === tierTestTargetId)?.name || '';
-    const oppId = tierTestOpponents[tierTestOpponentIndex];
-    const oppName = availableCharacters.find(c => c.id === oppId)?.name || '';
 
-    if (winner) {
-      const isWin = winner.id === tierTestTargetId;
-      if (isWin) {
-        tierTestWins++;
-        tierTestLogs.push(`<span class="text-neon-green">vs ${oppName}: 승리</span>`);
-        appendBattleLog(`🏆 [라운드 종료] ${targetName}이 ${oppName}을 이겼습니다!`, 'skill');
-      } else {
-        tierTestLosses++;
-        tierTestLogs.push(`<span class="text-neon-red">vs ${oppName}: 패배</span>`);
-        appendBattleLog(`💀 [라운드 종료] ${targetName}이 ${oppName}에게 패배했습니다.`, 'death');
-      }
-    } else {
-      // 무승부 (시간 초과 또는 러브샷)
-      tierTestDraws++;
-      tierTestLogs.push(`<span style="color: #a0a0c0;">vs ${oppName}: 무승부</span>`);
-      appendBattleLog(`⚖️ [라운드 종료] ${targetName} vs ${oppName} 무승부 처리되었습니다.`, 'default');
+
+  if (isPracticeMode) {
+    const player = allChars.find(c => c.id !== 'dummy' && !c.id.includes('clone'));
+    if (player) {
+      winnerInfo.innerHTML = `
+        <div class="win-avatar">
+          ${getAvatarHTML(player.name, player.image)}
+        </div>
+        <div class="win-name" style="color: ${player.color}">${player.name}</div>
+        <div class="win-desc">연습 시뮬레이션이 종료되었습니다.</div>
+        <div class="char-stats" style="margin-top: 1.5rem; width: 100%;">
+          <div class="stat-row">
+            <span>가한 총 대미지</span>
+            <span class="stat-val" style="color: var(--neon-cyan);">${player.totalDamageDealt || 0}</span>
+          </div>
+        </div>
+      `;
     }
-
-    tierTestOpponentIndex++;
-    if (tierTestOpponentIndex < tierTestOpponents.length) {
-      gameStatusText.textContent = `라운드 종료! 다음 라운드로 전환합니다...`;
-      setTimeout(() => {
-        if (isTierTestMode) {
-          startTierTestRound();
-        }
-      }, 2000);
-    } else {
-      showTierTestResult();
-    }
+    winnerModal.classList.remove('hidden');
     return;
   }
 
-  if (winner) {
-    winnerInfo.innerHTML = `
-      <div class="win-avatar">
-        ${getAvatarHTML(winner.name, winner.image)}
-      </div>
-      <div class="win-name" style="color: ${winner.color}">${winner.name}</div>
-      <div class="win-desc">마지막까지 생존하여 최종 승리하였습니다!</div>
-      <div class="char-stats" style="margin-top: 1.5rem; width: 100%;">
-        <div class="stat-row">
-          <span>남은 체력 (HP)</span>
-          <span class="stat-val" style="color: #39ff14;">${winner.hp} / ${winner.maxHp}</span>
-        </div>
-        <div class="stat-row">
-          <span>고유 스킬</span>
-          <span class="stat-val" style="color: #ffd700;">${winner.skillName}</span>
-        </div>
-      </div>
-    `;
-  } else {
-    winnerInfo.innerHTML = `
-      <div class="winner-trophy" style="font-size: 5rem; margin-bottom: 1rem; text-align: center;">⚖️</div>
-      <div class="win-name" style="color: #ffffff; text-align: center; font-size: 2rem; font-weight: 800; font-family: 'Orbit', sans-serif;">무승부</div>
-      <div class="win-desc" style="text-align: center; color: var(--text-secondary); margin-top: 0.5rem;">생존자가 없어 승리자가 존재하지 않습니다!</div>
-    `;
-  }
+  const realChars = allChars.filter(char => !char.id.includes('clone') && char.id !== 'dummy');
+  const mvp = realChars.find(c => (c as any).isMvp) || winner || realChars[0];
+  const sorted = [...realChars].sort((a, b) => ((a as any).rank || 99) - ((b as any).rank || 99));
 
+  // Build MVP card HTML
+  const mvpScore = (mvp as any).mvpScore ? Math.round((mvp as any).mvpScore) : 0;
+  const mvpKills = (mvp as any).kills || 0;
+  const mvpDmg = mvp.totalDamageDealt || 0;
+  
+  let html = `
+    <!-- MVP Spotlight Section -->
+    <div class="mvp-spotlight-card" style="width: 100%; border: 1px solid ${mvp.color}40; box-shadow: 0 0 15px ${mvp.color}20;">
+      <div class="mvp-badge" style="background: ${mvp.color}; color: #000; box-shadow: 0 0 10px ${mvp.color}80;">🎖️ MATCH MVP</div>
+      <div class="mvp-avatar-container">
+        ${getAvatarHTML(mvp.name, mvp.image, 'mvp-avatar')}
+      </div>
+      <div class="mvp-name" style="color: ${mvp.color}">${mvp.name}</div>
+      <div class="mvp-stats-grid">
+        <div class="mvp-stat-box">
+          <div class="mvp-stat-label">⚔️ 처치</div>
+          <div class="mvp-stat-val">${mvpKills}</div>
+        </div>
+        <div class="mvp-stat-box">
+          <div class="mvp-stat-label">🔥 가한 대미지</div>
+          <div class="mvp-stat-val">${mvpDmg}</div>
+        </div>
+        <div class="mvp-stat-box">
+          <div class="mvp-stat-label">⭐ MVP 점수</div>
+          <div class="mvp-stat-val" style="color: var(--neon-yellow);">${mvpScore}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rankings Section -->
+    <div class="standings-container">
+      <div class="standings-header">🏆 최종 순위 결과</div>
+      <div class="standings-list">
+        ${sorted.map((char, index) => {
+          const rank = (char as any).rank || (index + 1);
+          const isWinner = rank === 1;
+          const rankBadgeClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : 'rank-normal';
+          const kills = (char as any).kills || 0;
+          const damage = char.totalDamageDealt || 0;
+          const hpStatus = char.isDead ? '<span style="color: #ff3366;">탈락</span>' : `<span style="color: #39ff14;">${char.hp} HP</span>`;
+
+          return `
+            <div class="standing-item ${isWinner ? 'winner-item' : ''}">
+              <div class="standing-rank-badge ${rankBadgeClass}">${rank}</div>
+              <div class="standing-avatar">
+                ${getAvatarHTML(char.name, char.image, 'standing-avatar-img')}
+              </div>
+              <div class="standing-name-col">
+                <span class="standing-name" style="color: ${char.color}">${char.name}</span>
+                <span class="standing-hp-status">${hpStatus}</span>
+              </div>
+              <div class="standing-stat-col">
+                <span class="standing-stat-label">K/D</span>
+                <span class="standing-stat-val">${kills}킬 / ${damage}딜</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  winnerInfo.innerHTML = html;
   winnerModal.classList.remove('hidden');
 }
 
@@ -850,7 +790,6 @@ function closeWinnerModal() {
 
 function goBackToLobby() {
   isPracticeMode = false;
-  isTierTestMode = false;
   if (gameLounge) {
     gameLounge.stop();
   }
@@ -900,21 +839,7 @@ if (practiceStartBtn) {
   practiceStartBtn.addEventListener('click', startPracticeGame);
 }
 
-const tierTestStartBtn = document.getElementById('tier-test-start-btn');
-if (tierTestStartBtn) {
-  tierTestStartBtn.addEventListener('click', startTierTestGame);
-}
 
-const tierTestCloseBtn = document.getElementById('tier-test-close-btn');
-if (tierTestCloseBtn) {
-  tierTestCloseBtn.addEventListener('click', () => {
-    const modal = document.getElementById('tier-test-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-    goBackToLobby();
-  });
-}
 
 statsModeSelect.addEventListener('change', () => {
   subscribeToGlobalData();
@@ -925,18 +850,16 @@ if (resetTiersBtn) {
   resetTiersBtn.addEventListener('click', resetTierStats);
 }
 
-if (tabWinrateBtn && tabDamageBtn) {
-  tabWinrateBtn.addEventListener('click', () => {
-    currentStatsTab = 'winrate';
-    tabWinrateBtn.classList.add('active');
-    tabDamageBtn.classList.remove('active');
-    updateLobbyUI();
+if (openStatsBtn && statsCenterModal) {
+  openStatsBtn.addEventListener('click', () => {
+    statsCenterModal.classList.remove('hidden');
+    renderTierList();
   });
-  tabDamageBtn.addEventListener('click', () => {
-    currentStatsTab = 'damage';
-    tabDamageBtn.classList.add('active');
-    tabWinrateBtn.classList.remove('active');
-    updateLobbyUI();
+}
+
+if (closeStatsBtn && statsCenterModal) {
+  closeStatsBtn.addEventListener('click', () => {
+    statsCenterModal.classList.add('hidden');
   });
 }
 
@@ -961,38 +884,13 @@ function subscribeToGlobalData() {
     currentGlobalDamageRanking = rankingList;
     updateLobbyUI();
   });
-
-  if (oneOnOneTiersUnsubscribe) oneOnOneTiersUnsubscribe();
-  oneOnOneTiersUnsubscribe = convexClient.onUpdate(api.stats.getOneOnOneTiers, {}, (tiersList) => {
-    currentOneOnOneTiers = {};
-    tiersList.forEach((item: any) => {
-      currentOneOnOneTiers[item.characterId] = item.tier as 'S' | 'A' | 'B' | 'C';
-    });
-    updateLobbyUI();
-  });
 }
 
 function updateLobbyUI() {
   calculateDynamicTiers();
   
   // 티어표 채우기
-  const tiers = ['s', 'a', 'b', 'c'] as const;
-  tiers.forEach((t) => {
-    const container = document.getElementById(`tier-chars-${t}`);
-    if (container) {
-      container.innerHTML = '';
-      const tierChars = availableCharacters.filter(c => (c.tier || 'C').toLowerCase() === t);
-      tierChars.forEach(char => {
-        const chip = document.createElement('span');
-        chip.className = `tier-char-chip tier-chip-${t}`;
-        chip.style.border = `1px solid ${char.color}`;
-        chip.style.boxShadow = `0 0 6px ${char.color}40`;
-        chip.style.color = '#ffffff';
-        chip.innerHTML = `${char.name}`;
-        container.appendChild(chip);
-      });
-    }
-  });
+  renderTierList();
 
   // 평균 가한 피해량 랭킹 채우기 (Convex 서버에서 계산 및 정렬 완료된 데이터를 직접 렌더링)
   if (damageRankingWrapper) {
@@ -1023,20 +921,13 @@ function updateLobbyUI() {
     });
   }
 
-  // 탭 토글 및 뷰 스왑
-  if (currentStatsTab === 'winrate') {
-    if (lobbyTotalGames < 10) {
-      if (tierListNotice) tierListNotice.classList.remove('hidden');
-      if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
-    } else {
-      if (tierListNotice) tierListNotice.classList.add('hidden');
-      if (tierRowsWrapper) tierRowsWrapper.classList.remove('hidden');
-    }
-    if (damageRankingWrapper) damageRankingWrapper.classList.add('hidden');
+  // 티어표 가시성 토글
+  if (lobbyTotalGames < 10) {
+    if (tierListNotice) tierListNotice.classList.remove('hidden');
+    if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
   } else {
     if (tierListNotice) tierListNotice.classList.add('hidden');
-    if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
-    if (damageRankingWrapper) damageRankingWrapper.classList.remove('hidden');
+    if (tierRowsWrapper) tierRowsWrapper.classList.remove('hidden');
   }
 
   // 캐릭터 카드들 내용 실시간 갱신 (승률, 전적 수치 등)
@@ -1047,24 +938,37 @@ function updateLobbyUI() {
     const char = availableCharacters.find(c => c.id === charId);
     if (!char) return;
 
-    // 티어 뱃지 갱신 (1대1 판별 테스트 티어 적용)
-    const oneOnOneTier = currentOneOnOneTiers[char.id] || DEFAULT_TIERS[char.id] || 'C';
+    // 티어 뱃지 갱신
+    const currentTier = char.tier || 'C';
     const badge = card.querySelector('.tier-card-badge') as HTMLElement;
     if (badge) {
-      badge.className = `tier-card-badge tier-badge-${oneOnOneTier.toLowerCase()}`;
-      badge.textContent = oneOnOneTier;
+      badge.className = `tier-card-badge tier-badge-${currentTier.toLowerCase()}`;
+      badge.textContent = currentTier;
     }
 
     const statsRecord = getStoredStats();
     const mode = statsModeSelect ? statsModeSelect.value : 'all';
     const stats = statsRecord[mode] || {};
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0, rankSum: 0, mvpCount: 0 };
     const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
     
     // 승률 및 전적 판수 갱신
     const winRateVal = card.querySelector('.text-neon-yellow') as HTMLElement;
     if (winRateVal) {
       winRateVal.textContent = `${winRate.toFixed(1)}% (${s.wins}승/${s.games}판)`;
+    }
+
+    const rankSum = s.rankSum || 0;
+    const mvpCount = s.mvpCount || 0;
+    const avgRank = s.games > 0 ? (rankSum / s.games).toFixed(1) : '-';
+
+    const avgRankVal = card.querySelector('.avg-rank-val') as HTMLElement;
+    if (avgRankVal) {
+      avgRankVal.textContent = `${avgRank}위`;
+    }
+    const mvpCountVal = card.querySelector('.mvp-count-val') as HTMLElement;
+    if (mvpCountVal) {
+      mvpCountVal.textContent = `${mvpCount}회`;
     }
 
     // 대미지 및 카운터 정보 갱신
@@ -1108,6 +1012,118 @@ function updateLobbyUI() {
     // 4. Worst Killer (2nd red)
     if (redEls[1]) redEls[1].textContent = worstKillerStr;
   });
+}
+
+// ==========================================
+// 캐릭터 상세 모달 및 역할군 필터 이벤트 핸들링
+// ==========================================
+const detailCloseBtn = document.getElementById('detail-close-btn');
+const charDetailModal = document.getElementById('char-detail-modal');
+
+if (detailCloseBtn && charDetailModal) {
+  detailCloseBtn.addEventListener('click', () => {
+    charDetailModal.classList.add('hidden');
+  });
+
+  // 모달 영역 외 바깥 클릭 시 닫기
+  charDetailModal.addEventListener('click', (e) => {
+    if (e.target === charDetailModal) {
+      charDetailModal.classList.add('hidden');
+    }
+  });
+}
+
+// 역할군 필터 탭 바인딩
+const roleTabs = document.querySelectorAll('.role-tab');
+roleTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    roleTabs.forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentRoleFilter = tab.getAttribute('data-role') || 'all';
+    initLobby(true); // 선택 상태 보존
+  });
+});
+
+function openCharacterDetail(charId: string) {
+  const char = availableCharacters.find((c) => c.id === charId);
+  if (!char) return;
+
+  if (!charDetailModal) return;
+
+  // 이름 주입
+  const nameEl = document.getElementById('detail-char-name');
+  if (nameEl) nameEl.textContent = char.name;
+
+  // 역할군 배지 주입
+  const roleEl = document.getElementById('detail-char-role-badge');
+  if (roleEl) {
+    const roleMap: Record<string, { label: string; color: string }> = {
+      Nuker: { label: '🔥 누커', color: '#ff3366' },
+      Sniper: { label: '🎯 저격수', color: '#ff2d55' },
+      Speedster: { label: '⚡ 기동형', color: '#ffd700' },
+      Guardian: { label: '🛡️ 수호형', color: '#33cc66' },
+      Juggernaut: { label: '🦖 돌격형', color: '#ff8c00' },
+      Disabler: { label: '🌀 제어형', color: '#00bfff' },
+      Summoner: { label: '🌪️ 소환형', color: '#ff007f' },
+      Specialist: { label: '🎰 변수형', color: '#9933ff' },
+      Supporter: { label: '🧪 지원형', color: '#888888' },
+    };
+    const roleInfo = roleMap[char.role] || { label: char.role, color: '#888888' };
+    roleEl.textContent = roleInfo.label;
+    roleEl.style.backgroundColor = `${roleInfo.color}25`;
+    roleEl.style.border = `1px solid ${roleInfo.color}80`;
+    roleEl.style.color = roleInfo.color;
+  }
+
+  // 아바타 렌더링
+  const avatarContainer = document.getElementById('detail-char-avatar-container');
+  if (avatarContainer) {
+    avatarContainer.innerHTML = getAvatarHTML(char.name, char.image, 'detail-avatar-img');
+    const avatarEl = avatarContainer.firstElementChild as HTMLElement;
+    if (avatarEl) {
+      avatarEl.style.width = '70px';
+      avatarEl.style.height = '70px';
+      avatarEl.style.border = `2px solid ${char.color}`;
+      avatarEl.style.boxShadow = `0 0 12px ${char.color}50`;
+      if (avatarEl.classList.contains('avatar-text')) {
+        avatarEl.style.background = `radial-gradient(circle, ${char.color}35 0%, rgba(0,0,0,0.6) 100%)`;
+      }
+    }
+  }
+
+  // 상세 설명 주입
+  const descEl = document.getElementById('detail-char-desc');
+  if (descEl) descEl.textContent = char.detailedDescription;
+
+  // 스탯 게이지 채우기
+  const hpPercent = Math.min(100, (char.maxHp / 200) * 100);
+  const hpBar = document.getElementById('detail-stat-bar-hp');
+  if (hpBar) hpBar.style.width = `${hpPercent}%`;
+  const hpVal = document.getElementById('detail-stat-val-hp');
+  if (hpVal) hpVal.textContent = char.maxHp.toString();
+
+  const atkPercent = Math.min(100, (char.attackPower / 30) * 100);
+  const atkBar = document.getElementById('detail-stat-bar-atk');
+  if (atkBar) atkBar.style.width = `${atkPercent}%`;
+  const atkVal = document.getElementById('detail-stat-val-atk');
+  if (atkVal) atkVal.textContent = char.attackPower.toString();
+
+  const speedPercent = Math.min(100, (char.speed / 2.0) * 100);
+  const speedBar = document.getElementById('detail-stat-bar-speed');
+  if (speedBar) speedBar.style.width = `${speedPercent}%`;
+  const speedVal = document.getElementById('detail-stat-val-speed');
+  if (speedVal) speedVal.textContent = `${char.speed.toFixed(1)}x`;
+
+  // 스킬 정보
+  const skillNameEl = document.getElementById('detail-skill-name');
+  if (skillNameEl) {
+    skillNameEl.textContent = char.skillName;
+    skillNameEl.style.color = char.color;
+  }
+  const skillDescEl = document.getElementById('detail-skill-desc');
+  if (skillDescEl) skillDescEl.textContent = char.skillDescription;
+
+  charDetailModal.classList.remove('hidden');
 }
 
 // Start APP

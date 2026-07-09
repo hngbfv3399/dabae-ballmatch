@@ -52,6 +52,8 @@ export const recordGameStart = mutation({
             games: 1,
             damageDealt: 0,
             damageTaken: 0,
+            rankSum: 0,
+            mvpCount: 0,
           });
         }
       }
@@ -69,36 +71,43 @@ export const recordGameEnd = mutation({
         characterId: v.string(),
         damageDealt: v.number(),
         damageTaken: v.number(),
+        rank: v.number(),
+        isMvp: v.boolean(),
       })
     ),
   },
   handler: async (ctx, args) => {
     const modes = ["all", args.mode];
     for (const mode of modes) {
-      // Increment win for winner
-      const winnerStats = await ctx.db
-        .query("globalStats")
-        .withIndex("by_mode_and_char", (q) =>
-          q.eq("mode", mode).eq("characterId", args.winnerId)
-        )
-        .unique();
+      // Increment win for winner (if valid character)
+      const hasWinner = args.winnerId && args.winnerId !== "draw";
+      if (hasWinner) {
+        const winnerStats = await ctx.db
+          .query("globalStats")
+          .withIndex("by_mode_and_char", (q) =>
+            q.eq("mode", mode).eq("characterId", args.winnerId)
+          )
+          .unique();
 
-      if (winnerStats) {
-        await ctx.db.patch(winnerStats._id, {
-          wins: winnerStats.wins + 1,
-        });
-      } else {
-        await ctx.db.insert("globalStats", {
-          characterId: args.winnerId,
-          mode,
-          wins: 1,
-          games: 1,
-          damageDealt: 0,
-          damageTaken: 0,
-        });
+        if (winnerStats) {
+          await ctx.db.patch(winnerStats._id, {
+            wins: winnerStats.wins + 1,
+          });
+        } else {
+          await ctx.db.insert("globalStats", {
+            characterId: args.winnerId,
+            mode,
+            wins: 1,
+            games: 1,
+            damageDealt: 0,
+            damageTaken: 0,
+            rankSum: 0,
+            mvpCount: 0,
+          });
+        }
       }
 
-      // Add damages for all participants
+      // Add damages, rank, and MVP count for all participants
       for (const char of args.allChars) {
         const charStats = await ctx.db
           .query("globalStats")
@@ -107,10 +116,15 @@ export const recordGameEnd = mutation({
           )
           .unique();
 
+        const addedRankSum = char.rank;
+        const addedMvpCount = char.isMvp ? 1 : 0;
+
         if (charStats) {
           await ctx.db.patch(charStats._id, {
             damageDealt: charStats.damageDealt + char.damageDealt,
             damageTaken: charStats.damageTaken + char.damageTaken,
+            rankSum: (charStats.rankSum ?? 0) + addedRankSum,
+            mvpCount: (charStats.mvpCount ?? 0) + addedMvpCount,
           });
         } else {
           await ctx.db.insert("globalStats", {
@@ -120,6 +134,8 @@ export const recordGameEnd = mutation({
             games: 1,
             damageDealt: char.damageDealt,
             damageTaken: char.damageTaken,
+            rankSum: addedRankSum,
+            mvpCount: addedMvpCount,
           });
         }
       }

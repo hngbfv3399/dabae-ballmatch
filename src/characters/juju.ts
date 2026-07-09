@@ -25,6 +25,8 @@ export const jujuConfig: CharacterConfig = {
   color: '#00bfff', // 홀로그램 하늘색
   skillChargeRate: 14.3, // 7초 쿨타임
   tier: 'S',
+  role: 'Disabler',
+  detailedDescription: '주주는 다수를 일거에 무력화하는 무적 영역 전개 능력을 가진 제어형 특수 포지션 캐릭터입니다. 스킬 작동 시 3초 동안 자신은 완전 무적(Invulnerable) 상태가 되며 적들을 기절시킨 채 한 지점으로 빨아들이는 블랙홀을 배치합니다. 소멸 시 강력한 충격파를 주고 튕겨내며, 빈사 상태 돌입 시 전장에 가장 건강한 적과 자리를 바꾸고 3초 보호막을 받는 강력한 생존 패시브도 탑재하고 있습니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;

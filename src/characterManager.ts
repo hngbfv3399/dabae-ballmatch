@@ -40,7 +40,7 @@ export function createCharacterState(
   canvasWidth: number,
   canvasHeight: number
 ): CharacterState {
-  const radius = 30; // 캐릭터 구체 반지름
+  const radius = 35; // 캐릭터 구체 반지름
 
   // 겹치지 않게 원형 배치
   const centerX = canvasWidth / 2;

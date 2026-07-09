@@ -67,6 +67,7 @@ export class GameLounge {
   private gameOverTimer: number = 0;
   private winnerCharacter: CharacterState | null = null;
   private eliminationCount: number = 0;
+  private eliminationOrder: string[] = [];
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -147,10 +148,16 @@ export class GameLounge {
     this.gameOverTimer = 0;
     this.winnerCharacter = null;
     this.roundTimer = 60.0;
+    this.eliminationOrder = [];
+    this.eliminationCount = 0;
 
     // 캐릭터 내부의 함수 객체(훅)들은 JSON.parse(JSON.stringify()) 과정에서 손실되므로,
     // 원본 selectedCharacters 리스트에서 함수들을 다시 찾아와 연결 복원
     this.characters.forEach((char) => {
+      (char as any).kills = 0;
+      (char as any).rank = 0;
+      (char as any).isMvp = false;
+
       const orig = selectedCharacters.find((c) => c.id === char.id);
       if (orig) {
         char.onSkillTrigger = orig.onSkillTrigger;
@@ -263,11 +270,10 @@ export class GameLounge {
     // 분신(eunsu_clone)은 플레이어가 아니므로 승리 조건 판정에서 제외
     const aliveRealPlayers = aliveCharacters.filter((c) => !c.id.includes('eunsu_clone'));
 
-    // 60초 타이머 (1대1 매치인 경우 작동)
-    const startingRealPlayersCount = this.characters.filter(c => !c.id.includes('eunsu_clone')).length;
-    const is1v1 = startingRealPlayersCount === 2;
+    // 60초 타이머 (연습모드 제외하고 항상 작동)
+    const isPractice = this.characters.some(c => c.id === 'dummy');
 
-    if (this.isPrepared && !this.isGameOver && is1v1) {
+    if (this.isPrepared && !this.isGameOver && !isPractice) {
       this.roundTimer -= dt;
       if (this.roundTimer <= 0) {
         this.roundTimer = 0;
@@ -275,38 +281,35 @@ export class GameLounge {
         this.gameOverTimer = 2.0;
 
         // 판정: 체력 낮은 캐릭터 사망
-        if (aliveRealPlayers.length === 2) {
-          const c1 = aliveRealPlayers[0];
-          const c2 = aliveRealPlayers[1];
-          if (c1.hp > c2.hp) {
-            c2.hp = 0;
-            c2.isDead = true;
-            c2.opacity = 0.8;
-            (c2 as any).deathAnimationTime = 1.5;
-            this.winnerCharacter = c1;
-            this.onLogMessage?.(`⏱️ [시간초과] 체력이 더 많은 ${c1.name}(HP: ${c1.hp})이 승리하였습니다!`, 'skill');
-          } else if (c2.hp > c1.hp) {
-            c1.hp = 0;
-            c1.isDead = true;
-            c1.opacity = 0.8;
-            (c1 as any).deathAnimationTime = 1.5;
-            this.winnerCharacter = c2;
-            this.onLogMessage?.(`⏱️ [시간초과] 체력이 더 많은 ${c2.name}(HP: ${c2.hp})이 승리하였습니다!`, 'skill');
+        const sortedAlive = [...aliveRealPlayers].sort((a, b) => b.hp - a.hp);
+        if (sortedAlive.length > 0) {
+          const topHp = sortedAlive[0].hp;
+          const topPlayers = sortedAlive.filter(p => p.hp === topHp);
+
+          if (topPlayers.length === 1) {
+            this.winnerCharacter = topPlayers[0];
+            this.onLogMessage?.(`⏱️ [시간초과] 체력이 가장 많은 ${this.winnerCharacter.name}(HP: ${this.winnerCharacter.hp})이 승리하였습니다!`, 'skill');
           } else {
-            // 체력 동일 -> 무승부 (둘 다 사망 처리)
-            c1.hp = 0;
-            c1.isDead = true;
-            c1.opacity = 0.8;
-            (c1 as any).deathAnimationTime = 1.5;
-
-            c2.hp = 0;
-            c2.isDead = true;
-            c2.opacity = 0.8;
-            (c2 as any).deathAnimationTime = 1.5;
-
             this.winnerCharacter = null;
-            this.onLogMessage?.(`⏱️ [시간초과] 체력이 동일하여 무승부 처리되었습니다!`, 'default');
+            const names = topPlayers.map(p => p.name).join(', ');
+            this.onLogMessage?.(`⏱️ [시간초과] 체력이 동일한 캐릭터들(${names}, HP: ${topHp})로 인해 무승부 처리되었습니다!`, 'default');
           }
+
+          // 우승자(만약 있다면)를 제외한 모든 플레이어를 처치 처리하여 eliminationOrder에 등록
+          aliveRealPlayers.forEach(char => {
+            if (char !== this.winnerCharacter) {
+              char.hp = 0;
+              char.isDead = true;
+              char.opacity = 0.8;
+              (char as any).deathAnimationTime = 1.5;
+              if (!this.eliminationOrder.includes(char.id)) {
+                this.eliminationOrder.push(char.id);
+              }
+            }
+          });
+        } else {
+          this.winnerCharacter = null;
+          this.onLogMessage?.(`⏱️ [시간초과] 생존자가 없어 무승부 처리되었습니다!`, 'default');
         }
       }
     }
@@ -318,31 +321,85 @@ export class GameLounge {
         this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
         this.winnerCharacter = aliveRealPlayers[0] || null;
 
-        // 전투 최종 리포트 출력
-        console.log(`\n🏆🏆🏆 [전투 종료 결산 리포트] 🏆🏆🏆`);
-        if (this.winnerCharacter) {
-          console.log(`👑 최종 우승자: ${this.winnerCharacter.name}`);
-        } else {
-          console.log(`💀 무승부 (모두 사망)`);
+        if (!this.winnerCharacter) {
           this.onLogMessage?.(`⚔️ [전투 종료] 양측 동시 사망으로 인해 무승부(러브샷) 처리되었습니다!`, 'default');
         }
-        console.log(`-----------------------------------------`);
-        console.log(`📊 캐릭터별 최종 전투 통계:`);
-        const stats = this.characters.map((c) => ({
-          이름: c.name,
-          상태: c.isDead ? '💀 탈락' : '👑 생존 (우승)',
-          '총 가한 대미지': c.totalDamageDealt || 0,
-          '총 피격 대미지': c.totalDamageTaken || 0,
-          '최대 체력': c.maxHp
-        }));
-        console.table(stats);
-        console.log(`=========================================\n`);
       }
     } else {
       this.gameOverTimer -= dt;
       this.simulationSpeed = 0.3; // 슬로우 모션
       if (this.gameOverTimer <= 0) {
         this.stop();
+
+        const realChars = this.characters.filter(c => !c.id.includes('eunsu_clone') && c.id !== 'dummy');
+
+        // 1. 순위(Rank) 계산: 생존자 우선 (체력 내림차순, 피해량 내림차순) -> 탈락자 우선 (늦게 탈락된 순서대로 높은 등수)
+        const alive = realChars.filter(c => !c.isDead).sort((a, b) => {
+          if (b.hp !== a.hp) return b.hp - a.hp;
+          return (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0);
+        });
+
+        const deadIds = [...this.eliminationOrder].reverse();
+        const dead = realChars.filter(c => c.isDead).sort((a, b) => {
+          const idxA = deadIds.indexOf(a.id);
+          const idxB = deadIds.indexOf(b.id);
+          const valA = idxA === -1 ? 9999 : idxA;
+          const valB = idxB === -1 ? 9999 : idxB;
+          return valA - valB;
+        });
+
+        const rankedChars = [...alive, ...dead];
+        rankedChars.forEach((char, index) => {
+          (char as any).rank = index + 1;
+        });
+
+        // 2. MVP 점수 계산 및 MVP 선정: damage + kills * 150 + (생존여부 ? 100 : 0)
+        let mvpChar: CharacterState | null = null;
+        let maxScore = -Infinity;
+
+        realChars.forEach(char => {
+          const damage = char.totalDamageDealt || 0;
+          const kills = (char as any).kills || 0;
+          const survived = !char.isDead ? 100 : 0;
+          const score = damage + (kills * 150) + survived;
+          (char as any).mvpScore = score;
+
+          if (score > maxScore) {
+            maxScore = score;
+            mvpChar = char;
+          }
+        });
+
+        realChars.forEach(char => {
+          (char as any).isMvp = (mvpChar !== null && char.id === mvpChar.id);
+        });
+
+        // 전투력 분석 리포트 출력 (순위, MVP, 가한 대미지, 킬수 등)
+        console.log(`\n🏆🏆🏆 [전투 종료 결산 리포트] 🏆🏆🏆`);
+        if (mvpChar) {
+          console.log(`🎖️ MATCH MVP: ${(mvpChar as any).name} (MVP 점수: ${Math.round((mvpChar as any).mvpScore || 0)})`);
+        }
+        if (this.winnerCharacter) {
+          console.log(`👑 최종 우승자: ${this.winnerCharacter.name}`);
+        } else {
+          console.log(`💀 무승부 (생존자 없음)`);
+        }
+        console.log(`-----------------------------------------`);
+        console.log(`📊 캐릭터별 최종 순위 및 통계 (전투력 분석):`);
+        const stats = realChars.map((c) => ({
+          순위: `${(c as any).rank}위`,
+          이름: c.name,
+          상태: c.isDead ? '💀 탈락' : '👑 생존',
+          처치수: `${(c as any).kills || 0}킬`,
+          '가한 대미지': c.totalDamageDealt || 0,
+          '피격 대미지': c.totalDamageTaken || 0,
+          '최대 체력': c.maxHp,
+          'MVP 점수': Math.round((c as any).mvpScore || 0),
+          'MVP 여부': (c as any).isMvp ? '🎖️ MVP' : ''
+        })).sort((a, b) => parseInt(a.순위) - parseInt(b.순위));
+        console.table(stats);
+        console.log(`=========================================\n`);
+
         this.onGameEnd(this.winnerCharacter, this.characters);
         return;
       }
@@ -695,8 +752,13 @@ export class GameLounge {
     }
 
     // 가한 피해량/받은 피해량 누적
-    if (attacker && attacker.totalDamageDealt !== undefined) {
-      attacker.totalDamageDealt += finalDamage;
+    let dmgAttacker = attacker;
+    if (attacker && attacker.id.includes('eunsu_clone')) {
+      const mainEunsu = this.characters.find(c => c.id === 'eunsu');
+      if (mainEunsu) dmgAttacker = mainEunsu;
+    }
+    if (dmgAttacker && dmgAttacker.totalDamageDealt !== undefined) {
+      dmgAttacker.totalDamageDealt += finalDamage;
     }
     if (target && target.totalDamageTaken !== undefined) {
       target.totalDamageTaken += finalDamage;
@@ -732,11 +794,28 @@ export class GameLounge {
       (target as any).deathAnimationTime = 1.5; // 1.5초 데스 애니메이션 타이머
 
       this.eliminationCount++;
-      const totalCount = this.characters.length;
-      const rank = totalCount - this.eliminationCount + 1; // 1등(우승자)은 맨 마지막 생존자
+      const totalRealCount = this.characters.filter(c => !c.id.includes('eunsu_clone') && c.id !== 'dummy').length;
 
-      console.log(`💀 [탈락] #${rank}위 탈락: ${target.name} | 처치자: ${attacker.name} (탈락 누적: ${this.eliminationCount}/${totalCount})`);
-      this.onLogMessage?.(`💀 [탈락] #${rank}위: ${target.name} (처치자: ${attacker.name})`, 'death');
+      // 실물 캐릭터인 경우 탈락 순서 및 처치 기록 누적
+      if (!target.id.includes('eunsu_clone') && target.id !== 'dummy') {
+        if (!this.eliminationOrder.includes(target.id)) {
+          this.eliminationOrder.push(target.id);
+        }
+
+        if (attacker && attacker.id !== target.id) {
+          let killAttacker = attacker;
+          if (attacker.id.includes('eunsu_clone')) {
+            const mainEunsu = this.characters.find(c => c.id === 'eunsu');
+            if (mainEunsu) killAttacker = mainEunsu;
+          }
+          (killAttacker as any).kills = ((killAttacker as any).kills || 0) + 1;
+        }
+      }
+
+      const currentRank = totalRealCount - this.eliminationOrder.length + 1;
+
+      console.log(`💀 [탈락] #${currentRank}위 탈락: ${target.name} | 처치자: ${attacker.name} (탈락 누적: ${this.eliminationCount}/${this.characters.length})`);
+      this.onLogMessage?.(`💀 [탈락] #${currentRank}위: ${target.name} (처치자: ${attacker.name})`, 'death');
 
       if (attacker && attacker.id !== target.id) {
         this.onCharacterDeath?.(target.id, attacker.id, this.characters.length);
@@ -916,11 +995,10 @@ export class GameLounge {
     this.ctx.lineWidth = 6;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 60초 타이머 그리기 (1대1 매치인 경우 작동)
-    const startingRealPlayersCount = this.characters.filter(c => !c.id.includes('eunsu_clone')).length;
-    const is1v1 = startingRealPlayersCount === 2;
+    // 60초 타이머 그리기 (연습모드 제외하고 항상 작동)
+    const isPractice = this.characters.some(c => c.id === 'dummy');
 
-    if (this.isPrepared && !this.isGameOver && is1v1) {
+    if (this.isPrepared && !this.isGameOver && !isPractice) {
       this.ctx.save();
       this.ctx.fillStyle = this.roundTimer <= 10.0 ? '#ff3366' : '#ffffff';
       this.ctx.shadowBlur = 15;

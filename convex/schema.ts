@@ -22,6 +22,8 @@ export default defineSchema({
     games: v.number(),
     damageDealt: v.number(),
     damageTaken: v.number(),
+    rankSum: v.optional(v.number()), // 누적 순위 합
+    mvpCount: v.optional(v.number()), // 누적 MVP 횟수
   }).index("by_mode_and_char", ["mode", "characterId"]),
 
   // 글로벌 캐릭터 상성(카운터) 통계

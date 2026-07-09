@@ -19,7 +19,9 @@ export interface CharacterConfig {
   skillDescription: string;
   color: string;          // 렌더링 시 캐릭터 대표 색상
   skillChargeRate: number;// 초당 오르는 스킬 게이지 (기본 증가량)
-  tier?: 'S' | 'A' | 'B' | 'C'; // 캐릭터 밸런스 등급
+  tier?: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'; // 캐릭터 밸런스 등급
+  role: 'Nuker' | 'Sniper' | 'Speedster' | 'Guardian' | 'Juggernaut' | 'Disabler' | 'Summoner' | 'Specialist' | 'Supporter'; // 캐릭터 역할군
+  detailedDescription: string; // 상세 플레이 스타일 설명
 
   // 고유 로직 라이프사이클 훅
   onSkillTrigger?: (char: CharacterState, ctx: CharacterBehaviorContext) => void;

@@ -12,6 +12,8 @@ export const chanhwiConfig: CharacterConfig = {
   color: '#8a2be2', // 보라색
   skillChargeRate: 16.67,
   tier: 'S',
+  role: 'Nuker',
+  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 전장의 모든 캐릭터에게 거리 비례 파멸적인 체력 고정 대미지(외곽일수록 피해 급증)를 가해 사방 벽으로 거칠게 튕겨내는 가공할 화력을 지니고 있습니다.',
 
   // [1] 스킬 최초 시동 시 훅
   onSkillTrigger(char: CharacterState) {

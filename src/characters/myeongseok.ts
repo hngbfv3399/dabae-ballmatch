@@ -28,6 +28,8 @@ export const myeongseokConfig: CharacterConfig = {
   color: '#4a154b', // 무거운 가지색 / 퍼플
   skillChargeRate: 16.6, // 6초 쿨타임
   tier: 'B',
+  role: 'Juggernaut',
+  detailedDescription: '명석은 벽과 적을 튕길 때마다 무한히 파괴력이 증가하는 볼링공을 던지는 돌격형 전사 캐릭터입니다. 스킬 발동 시 필드에 무겁고 빠른 볼링공을 투척하며, 이 볼링공은 벽에 부딪힐 때마다 공격력 +4, 캐릭터에 부딪힐 때마다 공격력 +6씩 누적으로 가산되어 난전이 길어질수록 피해량이 걷잡을 수 없이 치솟는 스택형 딜링 능력을 보유하고 있습니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 쿨타임 즉시 재가동 설정

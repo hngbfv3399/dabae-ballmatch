@@ -35,6 +35,8 @@ export const pumanConfig: CharacterConfig = {
   color: '#008000', // 포레스트 그린
   skillChargeRate: 25.0, // 4초 쿨타임
   tier: 'B',
+  role: 'Juggernaut',
+  detailedDescription: '푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 무한하게 몸집을 불리는 성장형 돌격형 전사 캐릭터입니다. 뱀의 맹독 투사체를 날려 적에게 지속 독 대미지를 유발함과 동시에, 식물 섭취 시마다 중첩되는 물리적 스펙 보너스를 적 타격 시 추가 공격력 및 흡혈 회복 효과로 변환하여 끈질긴 장기 소모전에서 극강의 저력을 발휘합니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 액티브 사용 즉시 스킬 쿨타임 재충전 시작하도록 제어

@@ -25,56 +25,44 @@
         </header>
 
         <main class="lobby-main">
-          <div class="selection-container">
-            <h2 class="section-title">전투에 참여할 캐릭터 선택 (최소 2개 이상)</h2>
+          <div class="character-selection card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+              <h2 style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800;">⚔️ 캐릭터 선택</h2>
+              <button id="select-all-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">전체 선택</button>
+            </div>
+
+            <!-- 역할군 필터 탭 바 -->
+            <div class="role-filter-bar" style="display: flex; gap: 0.45rem; margin-bottom: 1.5rem; flex-wrap: wrap; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 0.6rem 0.8rem; box-sizing: border-box;">
+              <button class="role-tab active" data-role="all">전체</button>
+              <button class="role-tab" data-role="Nuker">🔥 누커</button>
+              <button class="role-tab" data-role="Sniper">🎯 저격수</button>
+              <button class="role-tab" data-role="Speedster">⚡ 기동형</button>
+              <button class="role-tab" data-role="Guardian">🛡️ 수호형</button>
+              <button class="role-tab" data-role="Juggernaut">🦖 돌격형</button>
+              <button class="role-tab" data-role="Disabler">🌀 제어형</button>
+              <button class="role-tab" data-role="Summoner">🌪️ 소환형</button>
+              <button class="role-tab" data-role="Specialist">🎰 변수형</button>
+              <button class="role-tab" data-role="Supporter">🧪 지원형</button>
+            </div>
+            
             <div id="character-list" class="character-grid">
               <!-- JS에서 동적으로 생성됨 -->
+            </div>
+
+            <!-- 특정 역할군 공석 안내 -->
+            <div id="empty-role-notice" class="hidden" style="padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); font-size: 0.95rem; border: 1px dashed rgba(255,255,255,0.08); border-radius: 8px; background: rgba(0,0,0,0.1); margin-top: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; box-sizing: border-box;">
+              <span style="font-size: 2.2rem;">🧪</span>
+              <div style="font-weight: 700; color: #fff; font-family: 'Orbit', sans-serif;">이 포지션의 캐릭터는 아직 없습니다</div>
+              <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 0.2rem;">추후 새로운 담빵 캐릭터 업데이트를 기다려주세요!</div>
             </div>
           </div>
 
           <div class="lobby-controls">
-            <!-- 캐릭터 티어표 -->
-            <div class="tier-list-card card">
-              <div class="tier-header-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <h3 style="margin: 0;">🏆 실시간 티어표</h3>
-                  <span id="total-sim-games" style="font-size: 0.8rem; color: var(--neon-yellow); background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); padding: 0.15rem 0.5rem; border-radius: 12px; font-weight: 700;">0판</span>
-                </div>
-                <button id="reset-tiers-btn" class="btn-text-action">전적 초기화</button>
-              </div>
-              
-              <!-- 탭 토글 버튼들 -->
-              <div class="stats-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem;">
-                <button id="tab-winrate-btn" class="tab-btn active" style="flex: 1; background: none; border: none; padding: 0.4rem; font-size: 0.82rem; color: #ffd700; font-weight: 700; cursor: pointer; border-radius: 6px; transition: all 0.2s;">🏆 실시간 티어 (승률)</button>
-                <button id="tab-damage-btn" class="tab-btn" style="flex: 1; background: none; border: none; padding: 0.4rem; font-size: 0.82rem; color: rgba(255,255,255,0.4); font-weight: 700; cursor: pointer; border-radius: 6px; transition: all 0.2s;">⚔️ 평균 가한 피해량</button>
-              </div>
-
-              <div id="tier-list-notice" class="hidden" style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #ffd700; line-height: 1.5; border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px; background: rgba(255, 215, 0, 0.05); margin-bottom: 0.5rem;">
-                <!-- JS에서 동적 문구 세팅 -->
-              </div>
-              <div class="tier-rows" id="tier-rows-wrapper">
-                <div class="tier-row tier-s">
-                  <span class="tier-badge">S</span>
-                  <div class="tier-chars" id="tier-chars-s"></div>
-                </div>
-                <div class="tier-row tier-a">
-                  <span class="tier-badge">A</span>
-                  <div class="tier-chars" id="tier-chars-a"></div>
-                </div>
-                <div class="tier-row tier-b">
-                  <span class="tier-badge">B</span>
-                  <div class="tier-chars" id="tier-chars-b"></div>
-                </div>
-                <div class="tier-row tier-c">
-                  <span class="tier-badge">C</span>
-                  <div class="tier-chars" id="tier-chars-c"></div>
-                </div>
-              </div>
-
-              <!-- 평균 가한 피해량 랭킹 (신규 컨테이너) -->
-              <div id="damage-ranking-wrapper" class="hidden" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 250px; overflow-y: auto; padding-right: 0.3rem;">
-                <!-- JS에서 동적으로 렌더링됨 -->
-              </div>
+            <!-- 실시간 전적 및 티어 통계 센터 버튼 -->
+            <div class="card" style="padding: 1rem; margin-bottom: 0.8rem; border-color: rgba(255, 215, 0, 0.15); box-shadow: 0 0 15px rgba(255, 215, 0, 0.03);">
+              <button id="open-stats-btn" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.04) 100%); border: 1px solid rgba(255, 215, 0, 0.3); color: #ffd700; font-weight: 700; padding: 0.8rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">
+                <span>📊 실시간 전적 및 티어 통계</span>
+              </button>
             </div>
 
             <div class="game-settings card">
@@ -131,17 +119,6 @@
               </p>
               <button id="practice-start-btn" class="btn btn-secondary" disabled style="width: 100%; background: linear-gradient(135deg, #00bfff 0%, #2ecc71 100%); color: #fff; box-shadow: 0 0 10px rgba(0, 191, 255, 0.3); border: none; font-size: 0.95rem; font-weight: 700; height: 42px; transition: all 0.3s ease;">
                 <span>연습모드 시작!</span>
-              </button>
-            </div>
-
-            <!-- 1대1 티어 판별 카드 -->
-            <div class="tier-test-match card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
-              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">🏆 1대1 티어 판별</h3>
-              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.45;">
-                선택한 <b>단 한 명의 캐릭터</b>가 나머지 모든 캐릭터들과 순차적으로 1대1 대결(라운드제)을 펼쳐 최종 1대1 티어를 판별합니다. (기본 2배속 진행)
-              </p>
-              <button id="tier-test-start-btn" class="btn btn-secondary" disabled style="width: 100%; background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%); color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); border: none; font-size: 0.95rem; font-weight: 700; height: 42px; transition: all 0.3s ease;">
-                <span>티어 판별 시작!</span>
               </button>
             </div>
 
@@ -207,18 +184,6 @@
         </div>
       </div>
 
-      <!-- 티어 판별 결과 모달 -->
-      <div id="tier-test-modal" class="modal-overlay hidden">
-        <div class="modal-content card" style="max-width: 500px; max-height: 90vh; display: flex; flex-direction: column;">
-          <div class="winner-trophy">🏆</div>
-          <h2 class="winner-title" style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--neon-yellow);">티어 판별 결과</h2>
-          <div id="tier-test-result-info" class="winner-info-card" style="flex: 1; overflow-y: auto; width: 100%; padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-            <!-- JS에서 동적으로 채워짐 -->
-          </div>
-          <button id="tier-test-close-btn" class="btn btn-primary" style="width: 100%;">로비로 돌아가기</button>
-        </div>
-      </div>
-
       <!-- 패치노트 모달 -->
       <div id="patch-modal" class="modal-overlay hidden">
         <div class="modal-content card patch-modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
@@ -234,6 +199,147 @@
           </div>
         </div>
       </div>
+
+      <!-- 실시간 전적 및 통계 센터 모달 -->
+      <div id="stats-center-modal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 950px; width: 90%; max-height: 85vh; padding: 2rem; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(255, 215, 0, 0.25); box-shadow: 0 0 40px rgba(255, 215, 0, 0.1);">
+          <!-- 모달 헤더 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.8rem;">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+              <span style="font-size: 1.8rem;">📊</span>
+              <h2 style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800; color: #fff;">실시간 전적 및 티어 통계 센터</h2>
+              <span id="total-sim-games" style="font-size: 0.82rem; color: var(--neon-yellow); background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 700;">0판</span>
+            </div>
+            <div style="display: flex; gap: 0.8rem; align-items: center;">
+              <button id="reset-tiers-btn" class="btn-text-action" style="font-size: 0.85rem; padding: 0.3rem 0.7rem;">전적 초기화</button>
+              <button id="close-stats-btn" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.4rem 1rem; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;">✕ 닫기</button>
+            </div>
+          </div>
+
+          <!-- 모달 바디 (2단 그리드 구성) -->
+          <div class="stats-center-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; width: 100%; overflow: hidden; flex: 1; text-align: left;">
+            
+            <!-- 왼쪽: S~F 실시간 티어표 -->
+            <div style="display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 1.2rem;">
+              <h3 style="margin-top: 0; margin-bottom: 1rem; font-family: 'Orbit', sans-serif; color: #ffd700; display: flex; align-items: center; gap: 0.4rem;">
+                <span>🏆</span> 실시간 티어표 (승률 기준)
+              </h3>
+              <div id="tier-list-notice" class="hidden" style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #ffd700; line-height: 1.5; border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px; background: rgba(255, 215, 0, 0.05); margin-bottom: 0.5rem;"></div>
+              <div class="tier-rows" id="tier-rows-wrapper" style="overflow-y: auto; flex: 1; padding-right: 0.4rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                <div class="tier-row tier-s">
+                  <span class="tier-badge">S</span>
+                  <div class="tier-chars" id="tier-chars-s"></div>
+                </div>
+                <div class="tier-row tier-a">
+                  <span class="tier-badge">A</span>
+                  <div class="tier-chars" id="tier-chars-a"></div>
+                </div>
+                <div class="tier-row tier-b">
+                  <span class="tier-badge">B</span>
+                  <div class="tier-chars" id="tier-chars-b"></div>
+                </div>
+                <div class="tier-row tier-c">
+                  <span class="tier-badge">C</span>
+                  <div class="tier-chars" id="tier-chars-c"></div>
+                </div>
+                <div class="tier-row tier-d">
+                  <span class="tier-badge">D</span>
+                  <div class="tier-chars" id="tier-chars-d"></div>
+                </div>
+                <div class="tier-row tier-e">
+                  <span class="tier-badge">E</span>
+                  <div class="tier-chars" id="tier-chars-e"></div>
+                </div>
+                <div class="tier-row tier-f">
+                  <span class="tier-badge">F</span>
+                  <div class="tier-chars" id="tier-chars-f"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 오른쪽: 평균 가한 피해량 리더보드 -->
+            <div style="display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 1.2rem;">
+              <h3 style="margin-top: 0; margin-bottom: 1rem; font-family: 'Orbit', sans-serif; color: #ff3366; display: flex; align-items: center; gap: 0.4rem;">
+                <span>⚔️</span> 평균 가한 피해량 랭킹
+              </h3>
+              <div id="damage-ranking-wrapper" style="overflow-y: auto; flex: 1; padding-right: 0.4rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                <!-- JS에서 동적으로 렌더링됨 -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- 캐릭터 상세 설명 모달 -->
+      <div id="char-detail-modal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 580px; width: 90%; max-height: 85vh; padding: 2rem; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 0 35px rgba(255, 255, 255, 0.05); text-align: left;">
+          <!-- 모달 헤더 (이름, 역할군) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.8rem;">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+              <h2 id="detail-char-name" style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800; font-size: 1.8rem; color: #fff;">캐릭터명</h2>
+              <span id="detail-char-role-badge" style="font-size: 0.78rem; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-family: 'Orbit', sans-serif;">역할군</span>
+            </div>
+            <button id="detail-close-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.8rem; cursor: pointer;">✕ 닫기</button>
+          </div>
+
+          <!-- 모달 바디 (스크롤 가능한 콘텐츠) -->
+          <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.2rem; text-align: left; padding-right: 0.3rem;">
+            <!-- 프로필 & 설명 -->
+            <div style="display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem;">
+              <div id="detail-char-avatar-container" style="flex-shrink: 0;"></div>
+              <div id="detail-char-desc" style="flex: 1; min-width: 200px; font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary);">
+                상세 설명글이 들어갑니다.
+              </div>
+            </div>
+
+            <!-- 스탯 그래프 부문 -->
+            <div>
+              <h3 style="margin-top: 0; margin-bottom: 0.8rem; font-family: 'Orbit', sans-serif; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.3rem;">📊 시뮬레이션 기본 능력치</h3>
+              <div class="detail-stats-grid" style="display: flex; flex-direction: column; gap: 0.7rem; background: rgba(0, 0, 0, 0.15); border-radius: 10px; padding: 1rem; border: 1px solid rgba(255,255,255,0.02);">
+                <!-- HP -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">체력 (HP)</span>
+                  <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                    <div id="detail-stat-bar-hp" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ff4d4d 0%, #ff8080 100%); transition: width 0.3s ease-out;"></div>
+                  </div>
+                  <span id="detail-stat-val-hp" style="font-size: 0.85rem; font-family: monospace; width: 35px; text-align: right; color: #fff;">0</span>
+                </div>
+                <!-- ATK -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">공격력 (ATK)</span>
+                  <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                    <div id="detail-stat-bar-atk" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ff9f43 0%, #ffb976 100%); transition: width 0.3s ease-out;"></div>
+                  </div>
+                  <span id="detail-stat-val-atk" style="font-size: 0.85rem; font-family: monospace; width: 35px; text-align: right; color: #fff;">0</span>
+                </div>
+                <!-- SPEED -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">속도 (SPD)</span>
+                  <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                    <div id="detail-stat-bar-speed" style="height: 100%; width: 0%; background: linear-gradient(90deg, #2ed573 0%, #7bed9f 100%); transition: width 0.3s ease-out;"></div>
+                  </div>
+                  <span id="detail-stat-val-speed" style="font-size: 0.85rem; font-family: monospace; width: 35px; text-align: right; color: #fff;">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 스킬 정보 부문 -->
+            <div>
+              <h3 style="margin-top: 0; margin-bottom: 0.8rem; font-family: 'Orbit', sans-serif; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.3rem;">⚡ 보유 고유 기술</h3>
+              <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong id="detail-skill-name" style="font-size: 1rem; color: var(--neon-yellow); font-family: 'Orbit', sans-serif;">스킬명</strong>
+                </div>
+                <div id="detail-skill-desc" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-primary); margin-top: 0.3rem;">
+                  스킬 설명글이 들어갑니다.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

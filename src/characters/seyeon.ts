@@ -17,6 +17,8 @@ export const seyeonConfig: CharacterConfig = {
   color: '#ff66b2', // 하트 핑크
   skillChargeRate: 14.3, // 7초 쿨타임
   tier: 'S',
+  role: 'Guardian',
+  detailedDescription: '세연은 완전 피해 면역과 광역 매혹 어그로를 통해 난전을 종식시키는 결전형 수호형 캐릭터입니다. 스킬 발동 시 4초간 공격 면역 무적 버프와 고속 이동 효과를 얻어 댄스를 시작하며, 주변의 넓은 아우라 반경 내의 모든 적들을 기절시킨 채 자신에게로 강하게 빨아들이고 피해량을 50% 증폭시켜 아군의 킬 찬스를 완벽하게 열어줍니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
