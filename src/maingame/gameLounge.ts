@@ -520,10 +520,10 @@ export class GameLounge {
       }
     }
 
-    // 주주 비상 차원 스왑 패시브 (체력 5% 이하 위기 모면)
+    // 주주 비상 차원 스왑 패시브 (체력 10% 이하 위기 모면)
     if (target.id === 'juju' && !(target as any).hasEmergencySwapped) {
       const nextHp = target.hp - finalDamage;
-      if (nextHp <= target.maxHp * 0.05) {
+      if (nextHp <= target.maxHp * 0.10) {
         // 긴급 회피 격발!
         (target as any).hasEmergencySwapped = true;
 
