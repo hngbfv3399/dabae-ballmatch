@@ -728,6 +728,27 @@ export class GameLounge {
         });
       }
 
+      // 은수 본체 사망 시 모든 분신도 함께 즉사 처리
+      if (target.id === 'eunsu') {
+        this.characters.forEach((clone) => {
+          if (!clone.isDead && clone.id.includes('eunsu_clone')) {
+            clone.hp = 0;
+            clone.isDead = true;
+            clone.opacity = 0.8;
+            (clone as any).deathAnimationTime = 1.5;
+            this.createExplosion(clone.x, clone.y, '#ff007f', 20);
+            this.floatingTexts.push({
+              x: clone.x,
+              y: clone.y - 10,
+              text: '분신 소멸',
+              color: '#ff007f',
+              life: 1.5
+            });
+            console.log(`👥 [분신 소멸] 은수 본체 사망으로 인해 분신(${clone.id})이 제거되었습니다.`);
+          }
+        });
+      }
+
       this.createExplosion(target.x, target.y, '#ffffff', 40);
       this.createExplosion(target.x, target.y, target.color, 30);
       this.floatingTexts.push({

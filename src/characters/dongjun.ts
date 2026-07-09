@@ -24,7 +24,7 @@ function getRankStats(rank: number) {
   }
 }
 
-// 진급 수행 함수
+// 계급 배정 함수 (랜덤)
 function promoteDongjun(char: DongjunState, ctx: any) {
   if (char.isDead) return;
 
@@ -44,7 +44,7 @@ function promoteDongjun(char: DongjunState, ctx: any) {
     
     ctx.logMessage?.(`🎖️ [만기 전역] 동준 ➡️ 대한민국 육군 만기 전역 승리! (모든 적에게 치명적 피해)`, 'skill');
 
-    // 맵의 모든 적에게 즉시 처단 대미지 적용
+    // 동준을 제외한 모든 캐릭터에게 9999 즉사 피해
     ctx.characters.forEach((other: CharacterState) => {
       if (!other.isDead && other.id !== char.id) {
         ctx.dealDamage(char, other, 9999, '🎖️ 전역 신고');
@@ -54,34 +54,36 @@ function promoteDongjun(char: DongjunState, ctx: any) {
     return;
   }
 
-  // 일반 진급 (병장 미만인 경우만)
-  if (char.currentRank < 4) {
-    char.currentRank += 1;
-    const rankName = RANK_NAMES[char.currentRank];
-    const stats = getRankStats(char.currentRank);
+  // 랜덤 계급 배정 (0: 훈련병 ~ 4: 병장)
+  const newRank = Math.floor(Math.random() * 5); // 0~4 랜덤
+  const prevRank = char.currentRank;
+  char.currentRank = newRank;
+  const rankName = RANK_NAMES[newRank];
+  const stats = getRankStats(newRank);
 
-    // 스탯 적용
-    const oldMaxHp = char.maxHp;
-    char.maxHp = stats.maxHp;
-    // 체력 증가분 만큼 회복 및 최대체력 갱신
-    const hpDiff = char.maxHp - oldMaxHp;
+  // 스탯 적용
+  const oldMaxHp = char.maxHp;
+  char.maxHp = stats.maxHp;
+  const hpDiff = char.maxHp - oldMaxHp;
+  // 체력이 최대체력보다 많으면 잘라내고, 증가하면 HP도 올려줌
+  if (hpDiff > 0) {
     char.hp = Math.min(char.maxHp, char.hp + hpDiff);
-    char.attackPower = stats.attackPower;
-    
-    // 만약 스킬 버프가 이미 적용 중이라면 기본 스피드만 올려주고 보정은 유지
-    if (char.dongjunSkillSpeedApplied) {
-      char.speed = stats.speed * 1.3;
-    } else {
-      char.speed = stats.speed;
-    }
-
-    ctx.addFloatingText(char.x, char.y - 50, `🎖️ [진급] ${rankName}!`, '#4d5d3b', 1.8);
-    ctx.createExplosion(char.x, char.y, '#4d5d3b', 12);
-    ctx.logMessage?.(`🎖️ [진급] 동준 ➡️ ${rankName} 진급! (최대체력: ${char.maxHp}, 공격력: ${char.attackPower})`, 'skill');
   } else {
-    // 이미 병장인데 전역을 실패한 경우
-    ctx.addFloatingText(char.x, char.y - 50, '🪖 전역 대기 중...', '#aaaaaa', 1.0);
+    char.hp = Math.min(char.hp, char.maxHp);
   }
+  char.attackPower = stats.attackPower;
+
+  // 스킬 이속 버프 중이라면 보정 유지
+  if (char.dongjunSkillSpeedApplied) {
+    char.speed = stats.speed * 1.3;
+  } else {
+    char.speed = stats.speed;
+  }
+
+  const changeEmoji = newRank > prevRank ? '⬆️' : newRank < prevRank ? '⬇️' : '↔️';
+  ctx.addFloatingText(char.x, char.y - 50, `🎲 ${changeEmoji} ${rankName}!`, '#4d5d3b', 1.8);
+  ctx.createExplosion(char.x, char.y, '#4d5d3b', 12);
+  ctx.logMessage?.(`🎲 [계급 변동] 동준 ➡️ ${rankName}! (체력: ${char.maxHp}, 공격력: ${char.attackPower})`, 'skill');
 }
 
 export const dongjunConfig: CharacterConfig = {
@@ -91,8 +93,8 @@ export const dongjunConfig: CharacterConfig = {
   speed: 0.9, // 훈련병 시작 속도
   attackPower: 10, // 훈련병 시작 공격력
   baseAttackRange: 45,
-  skillName: '군기 충전 및 진급',
-  skillDescription: '5초마다 훈련병 ➡️ 이병 ➡️ 일병 ➡️ 상병 ➡️ 병장 계급으로 자동 진급합니다. 진급 시 3% 확률로 즉시 [전역]하여 매치를 즉시 승리합니다! 액티브 발동 시 즉시 1단계 진급(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다.',
+  skillName: '군기 충전 및 계급 추첨',
+  skillDescription: '5초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 매번 계급이 오를 수도, 내려갈 수도 있습니다! 계급 변동 시 3% 확률로 즉시 [전역]하여 모든 적에게 9999 피해를 입히고 즉시 승리합니다! 액티브 발동 시 즉시 계급 추첨(3% 전역 판정 포함) 및 3초간 이동 속도가 30% 증가합니다.',
   color: '#4d5d3b', // 밀리터리 카키그린
   skillChargeRate: 20, // 5초 쿨타임
   tier: 'B',
