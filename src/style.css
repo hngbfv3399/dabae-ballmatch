@@ -960,3 +960,113 @@ body {
   border-color: rgba(255, 0, 127, 0.25);
   background: rgba(255, 255, 255, 0.04);
 }
+
+/* Stats Tabs in Lobby */
+.stats-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.4rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-family: 'Outfit', sans-serif;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--neon-yellow);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
+}
+
+/* Damage Ranking Items */
+.dmg-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: transform 0.2s ease;
+}
+
+.dmg-rank-item:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dmg-rank-num {
+  font-family: 'Orbit', sans-serif;
+  font-weight: 900;
+  font-size: 0.95rem;
+  width: 20px;
+  text-align: center;
+}
+
+.dmg-rank-num.first { color: var(--neon-yellow); text-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+.dmg-rank-num.second { color: #e0e0e0; }
+.dmg-rank-num.third { color: #cd7f32; }
+
+.dmg-rank-name {
+  font-weight: 700;
+  width: 60px;
+}
+
+.dmg-rank-bar-container {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dmg-rank-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dmg-rank-val {
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  width: 65px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+/* Custom Scrollbar for Damage Ranking */
+#damage-ranking-wrapper::-webkit-scrollbar {
+  width: 5px;
+}
+#damage-ranking-wrapper::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.01);
+  border-radius: 3px;
+}
+#damage-ranking-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+#damage-ranking-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}

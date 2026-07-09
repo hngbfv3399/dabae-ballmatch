@@ -42,6 +42,13 @@
                 </div>
                 <button id="reset-tiers-btn" class="btn-text-action">전적 초기화</button>
               </div>
+              
+              <!-- 탭 토글 버튼들 -->
+              <div class="stats-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem;">
+                <button id="tab-winrate-btn" class="tab-btn active" style="flex: 1; background: none; border: none; padding: 0.4rem; font-size: 0.82rem; color: #ffd700; font-weight: 700; cursor: pointer; border-radius: 6px; transition: all 0.2s;">🏆 실시간 티어 (승률)</button>
+                <button id="tab-damage-btn" class="tab-btn" style="flex: 1; background: none; border: none; padding: 0.4rem; font-size: 0.82rem; color: rgba(255,255,255,0.4); font-weight: 700; cursor: pointer; border-radius: 6px; transition: all 0.2s;">⚔️ 평균 가한 피해량</button>
+              </div>
+
               <div id="tier-list-notice" class="hidden" style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #ffd700; line-height: 1.5; border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px; background: rgba(255, 215, 0, 0.05); margin-bottom: 0.5rem;">
                 <!-- JS에서 동적 문구 세팅 -->
               </div>
@@ -62,6 +69,11 @@
                   <span class="tier-badge">C</span>
                   <div class="tier-chars" id="tier-chars-c"></div>
                 </div>
+              </div>
+
+              <!-- 평균 가한 피해량 랭킹 (신규 컨테이너) -->
+              <div id="damage-ranking-wrapper" class="hidden" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 250px; overflow-y: auto; padding-right: 0.3rem;">
+                <!-- JS에서 동적으로 렌더링됨 -->
               </div>
             </div>
 

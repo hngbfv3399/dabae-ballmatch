@@ -28,6 +28,12 @@ const totalSimGamesEl = document.getElementById('total-sim-games') as HTMLElemen
 const battleLogList = document.getElementById('battle-log-list') as HTMLElement;
 const logSimSpeed = document.getElementById('log-sim-speed') as HTMLElement;
 
+const tabWinrateBtn = document.getElementById('tab-winrate-btn') as HTMLButtonElement;
+const tabDamageBtn = document.getElementById('tab-damage-btn') as HTMLButtonElement;
+const damageRankingWrapper = document.getElementById('damage-ranking-wrapper') as HTMLElement;
+let currentStatsTab: 'winrate' | 'damage' = 'winrate';
+let lobbyTotalGames = 0;
+
 // Winner Modal Elements
 const winnerModal = document.getElementById('winner-modal') as HTMLElement;
 const winnerInfo = document.getElementById('winner-info') as HTMLElement;
@@ -110,6 +116,7 @@ function calculateDynamicTiers() {
       .reduce((max, g) => Math.max(max, g), 0);
     totalGames = maxCharGames;
   }
+  lobbyTotalGames = totalGames;
 
   if (totalSimGamesEl) {
     totalSimGamesEl.textContent = `${totalGames}판`;
@@ -684,6 +691,21 @@ if (resetTiersBtn) {
   resetTiersBtn.addEventListener('click', resetTierStats);
 }
 
+if (tabWinrateBtn && tabDamageBtn) {
+  tabWinrateBtn.addEventListener('click', () => {
+    currentStatsTab = 'winrate';
+    tabWinrateBtn.classList.add('active');
+    tabDamageBtn.classList.remove('active');
+    updateLobbyUI();
+  });
+  tabDamageBtn.addEventListener('click', () => {
+    currentStatsTab = 'damage';
+    tabDamageBtn.classList.add('active');
+    tabWinrateBtn.classList.remove('active');
+    updateLobbyUI();
+  });
+}
+
 function subscribeToGlobalData() {
   if (statsUnsubscribe) statsUnsubscribe();
   if (countersUnsubscribe) countersUnsubscribe();
@@ -722,6 +744,60 @@ function updateLobbyUI() {
       });
     }
   });
+
+  // 평균 가한 피해량 랭킹 채우기
+  const statsRecord = getStoredStats();
+  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const stats = statsRecord[mode] || {};
+
+  const charDmgList = availableCharacters.map(char => {
+    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+    const avgDmg = s.games > 0 ? (s.damageDealt / s.games) : 0;
+    return { char, avgDmg, games: s.games };
+  });
+
+  // 평균 피해량 높은 순으로 정렬
+  charDmgList.sort((a, b) => b.avgDmg - a.avgDmg);
+
+  const maxAvgDmg = Math.max(...charDmgList.map(item => item.avgDmg), 1);
+
+  if (damageRankingWrapper) {
+    damageRankingWrapper.innerHTML = '';
+    
+    charDmgList.forEach((item, index) => {
+      const rank = index + 1;
+      const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
+      const percent = (item.avgDmg / maxAvgDmg) * 100;
+      
+      const rankItem = document.createElement('div');
+      rankItem.className = 'dmg-rank-item';
+      rankItem.innerHTML = `
+        <span class="dmg-rank-num ${rankClass}">${rank}</span>
+        <span class="dmg-rank-name" style="color: ${item.char.color};">${item.char.name}</span>
+        <div class="dmg-rank-bar-container">
+          <div class="dmg-rank-bar" style="width: ${percent}%; background: linear-gradient(90deg, ${item.char.color} 0%, rgba(255,255,255,0.1) 100%);"></div>
+        </div>
+        <span class="dmg-rank-val">${item.avgDmg.toFixed(1)} <span style="font-size: 0.65rem; opacity: 0.6;">(${item.games}판)</span></span>
+      `;
+      damageRankingWrapper.appendChild(rankItem);
+    });
+  }
+
+  // 탭 토글 및 뷰 스왑
+  if (currentStatsTab === 'winrate') {
+    if (lobbyTotalGames < 10) {
+      if (tierListNotice) tierListNotice.classList.remove('hidden');
+      if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
+    } else {
+      if (tierListNotice) tierListNotice.classList.add('hidden');
+      if (tierRowsWrapper) tierRowsWrapper.classList.remove('hidden');
+    }
+    if (damageRankingWrapper) damageRankingWrapper.classList.add('hidden');
+  } else {
+    if (tierListNotice) tierListNotice.classList.add('hidden');
+    if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
+    if (damageRankingWrapper) damageRankingWrapper.classList.remove('hidden');
+  }
 
   // 캐릭터 카드들 내용 실시간 갱신 (승률, 전적 수치 등)
   const cards = Array.from(characterListContainer.children) as HTMLElement[];
