@@ -8,11 +8,19 @@ interface VenomProjectile {
   isHit: boolean;
 }
 
+interface PlantEntity {
+  x: number;
+  y: number;
+  radius: number;
+  lifeTime: number; // 일정 시간 안 먹으면 소멸
+}
+
 interface PumanState extends CharacterState {
   pumanStacks?: number;
-  plantTimer?: number;
   resetTimer?: number;
   projectiles?: VenomProjectile[];
+  pumanPlants?: PlantEntity[];
+  plantSpawnTimer?: number;
 }
 
 export const pumanConfig: CharacterConfig = {
@@ -23,12 +31,16 @@ export const pumanConfig: CharacterConfig = {
   attackPower: 9,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
-  skillDescription: '4초 쿨타임. 뱀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 3초간 매초 2의 지속 독 대미지를 입힙니다. 패시브: 1.5초마다 식물을 섭취해 스탯(공격력)을 쌓고, 공격 성공 시 스탯만큼 추가 대미지를 입히며 그만큼 자신의 체력을 회복합니다. 3.5초간 타격이 없으면 쌓인 스탯이 완전히 초기화됩니다.',
+  skillDescription: '4초 쿨타임. 뱀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 3초간 매초 2의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 스탯(공격력)이 쌓이고, 타격 시 스탯만큼 추가 대미지 및 체력 회복을 얻습니다. 5초간 식물 미섭취 및 적 미타격 시 스탯이 초기화됩니다.',
   color: '#008000', // 포레스트 그린
   skillChargeRate: 25.0, // 4초 쿨타임
   tier: 'B',
 
   onSkillTrigger(char: CharacterState, ctx) {
+    // 액티브 사용 즉시 스킬 쿨타임 재충전 시작하도록 제어
+    char.skillActive = false;
+    char.skillDurationLeft = 0;
+
     let closestEnemy: CharacterState | null = null;
     let minDist = Infinity;
 
@@ -65,12 +77,12 @@ export const pumanConfig: CharacterConfig = {
       const healAmt = pm.pumanStacks;
       pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
       
-      ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 섭취)`, '#39ff14', 1.5);
+      ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 효과)`, '#39ff14', 1.5);
       ctx.createParticle(pm.x, pm.y, '#39ff14', 4, 10);
     }
 
-    // 콤보 리셋 타이머 갱신 (3.5초)
-    pm.resetTimer = 3.5;
+    // 공격 성공 시 5초 타이머 갱신
+    pm.resetTimer = 5.0;
   },
 
   onUpdate(char: CharacterState, dt: number, ctx) {
@@ -78,34 +90,65 @@ export const pumanConfig: CharacterConfig = {
 
     // 변수 초기화
     if (pm.pumanStacks === undefined) pm.pumanStacks = 0;
-    if (pm.plantTimer === undefined) pm.plantTimer = 1.5;
-    if (pm.resetTimer === undefined) pm.resetTimer = 0;
+    if (pm.resetTimer === undefined) pm.resetTimer = 5.0;
     if (pm.projectiles === undefined) pm.projectiles = [];
+    if (pm.pumanPlants === undefined) pm.pumanPlants = [];
+    if (pm.plantSpawnTimer === undefined) pm.plantSpawnTimer = 2.5; // 2.5초마다 생성 시도
 
-    // 1. 패시브: 1.5초마다 식물 성장 및 섭취
-    pm.plantTimer -= dt;
-    if (pm.plantTimer <= 0) {
-      pm.plantTimer = 1.5;
-      if (pm.pumanStacks < 15) { // 스택 최대치 제한 (밸런스 조절)
-        pm.pumanStacks += 1;
-        pm.attackPower = 9 + pm.pumanStacks; // 공격력 증가
-        ctx.addFloatingText(pm.x, pm.y - 50, `🌱 스탯 +1 (${pm.pumanStacks})`, '#00ff00', 0.8);
-        ctx.createParticle(pm.x, pm.y + 15, '#00ff00', 2, 6);
+    // 1. 실시간 게임 화면 식물 🌱 스포너 생성
+    pm.plantSpawnTimer -= dt;
+    if (pm.plantSpawnTimer <= 0) {
+      pm.plantSpawnTimer = 2.5;
+      if (pm.pumanPlants.length < 6) {
+        pm.pumanPlants.push({
+          x: 40 + Math.random() * 720,
+          y: 40 + Math.random() * 520,
+          radius: 10,
+          lifeTime: 12.0 // 12초간 안 먹으면 소멸
+        });
       }
     }
 
-    // 2. 패시브: 3.5초 미타격 시 스탯 초기화
+    // 식물 소멸 타이머 차감
+    pm.pumanPlants.forEach((plant) => {
+      plant.lifeTime -= dt;
+    });
+    pm.pumanPlants = pm.pumanPlants.filter((p) => p.lifeTime > 0);
+
+    // 2. 식물 충돌 섭취 판정
+    pm.pumanPlants.forEach((plant, idx) => {
+      const dist = Math.hypot(pm.x - plant.x, pm.y - plant.y);
+      if (dist < pm.radius + plant.radius) {
+        // 섭취 완료!
+        pm.pumanPlants!.splice(idx, 1);
+        
+        if (pm.pumanStacks! < 15) {
+          pm.pumanStacks! += 1;
+          pm.attackPower = 9 + pm.pumanStacks!;
+          ctx.addFloatingText(pm.x, pm.y - 50, `🌱 식물 섭취! (+${pm.pumanStacks})`, '#00ff00', 0.9);
+          ctx.createParticle(plant.x, plant.y, '#39ff14', 3, 12);
+        } else {
+          ctx.addFloatingText(pm.x, pm.y - 50, '🌱 스탯 최대 충전!', '#39ff14', 0.9);
+        }
+
+        // 식물 섭취 시 5초 타이머 갱신
+        pm.resetTimer = 5.0;
+      }
+    });
+
+    // 3. 5초 식물 미섭취 & 미타격 시 스탯 초기화
     if (pm.pumanStacks > 0) {
       pm.resetTimer -= dt;
       if (pm.resetTimer <= 0) {
         pm.pumanStacks = 0;
-        pm.attackPower = 9; // 원복
-        ctx.addFloatingText(pm.x, pm.y - 50, '💨 스탯 초기화', '#888888', 1.0);
+        pm.attackPower = 9; // 원래 수치로 원복
+        pm.resetTimer = 5.0;
+        ctx.addFloatingText(pm.x, pm.y - 55, '💨 스탯 초기화', '#888888', 1.0);
         ctx.createExplosion(pm.x, pm.y, '#888888', 8);
       }
     }
 
-    // 3. 독액 투사체 이동 및 피격 처리
+    // 4. 독액 투사체 이동 및 피격 처리
     pm.projectiles.forEach((proj) => {
       if (proj.target.isDead) {
         proj.isHit = true;
@@ -132,7 +175,6 @@ export const pumanConfig: CharacterConfig = {
         proj.x += Math.cos(angle) * proj.speed * dt * 60;
         proj.y += Math.sin(angle) * proj.speed * dt * 60;
 
-        // 초록색 맹독 꼬리 파티클
         if (Math.random() < 0.4) {
           ctx.createParticle(proj.x, proj.y, '#00ff00', 2, 8);
         }
@@ -141,7 +183,7 @@ export const pumanConfig: CharacterConfig = {
 
     pm.projectiles = pm.projectiles.filter((p) => !p.isHit);
 
-    // 4. 전장 독성 상태 틱 대미지 업데이트
+    // 5. 전장 독성 상태 틱 대미지 업데이트
     ctx.characters.forEach((enemy) => {
       const target = enemy as any;
       if (target.isDead || !target.isPoisoned || target.poisonTimeLeft === undefined) return;
@@ -149,14 +191,12 @@ export const pumanConfig: CharacterConfig = {
       target.poisonTimeLeft -= dt;
       target.poisonDamageTimer -= dt;
 
-      // 1초마다 독 대미지 적용
       if (target.poisonDamageTimer <= 0) {
         target.poisonDamageTimer = 1.0;
         ctx.dealDamage(char, enemy, 2, '🤢 POISON');
         ctx.createExplosion(enemy.x, enemy.y, '#22aa22', 5);
       }
 
-      // 독 해제
       if (target.poisonTimeLeft <= 0) {
         target.isPoisoned = false;
         ctx.addFloatingText(enemy.x, enemy.y - 45, '🧼 독 해독 완료', '#00ffcc', 1.0);
@@ -167,8 +207,21 @@ export const pumanConfig: CharacterConfig = {
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     const pm = char as PumanState;
     const projectiles = pm.projectiles || [];
+    const plants = pm.pumanPlants || [];
 
-    // 독액 비주얼
+    // 1. 화면의 식물 🌱 그리기
+    plants.forEach((plant) => {
+      canvasCtx.save();
+      // 약간 깜빡이는 이펙트
+      const scale = 1.0 + Math.sin(Date.now() / 150) * 0.1;
+      canvasCtx.font = `${Math.round(15 * scale)}px sans-serif`;
+      canvasCtx.textAlign = 'center';
+      canvasCtx.textBaseline = 'middle';
+      canvasCtx.fillText('🌱', plant.x, plant.y);
+      canvasCtx.restore();
+    });
+
+    // 2. 독액 투사체 그리기
     projectiles.forEach((proj) => {
       canvasCtx.save();
       canvasCtx.fillStyle = '#00ff00';
@@ -180,13 +233,23 @@ export const pumanConfig: CharacterConfig = {
       canvasCtx.restore();
     });
 
-    // 식물 스택 상태 표시 🌱
+    // 3. 식물 스택 상태 표시 및 시간 게이지 바
     if (pm.pumanStacks && pm.pumanStacks > 0) {
       canvasCtx.save();
       canvasCtx.fillStyle = '#39ff14';
       canvasCtx.font = 'bold 9px Outfit, sans-serif';
       canvasCtx.textAlign = 'center';
-      canvasCtx.fillText(`🌱 x${pm.pumanStacks}`, char.x, char.y - currentRadius - 6);
+      canvasCtx.fillText(`🌱 x${pm.pumanStacks}`, char.x, char.y - currentRadius - 14);
+
+      // 5초 타이머 게이지 시각화
+      const timerWidth = currentRadius * 1.5;
+      const ratio = Math.max(0, pm.resetTimer || 0) / 5.0;
+      canvasCtx.fillStyle = 'rgba(255,255,255,0.2)';
+      canvasCtx.fillRect(char.x - timerWidth / 2, char.y - currentRadius - 8, timerWidth, 2.5);
+      
+      canvasCtx.fillStyle = '#00ff00';
+      canvasCtx.fillRect(char.x - timerWidth / 2, char.y - currentRadius - 8, timerWidth * ratio, 2.5);
+
       canvasCtx.restore();
     }
   }
