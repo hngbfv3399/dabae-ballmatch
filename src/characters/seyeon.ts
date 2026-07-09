@@ -101,8 +101,23 @@ export const seyeonConfig: CharacterConfig = {
       if (enemy.isDead || !enemy.isCharmed || enemy.charmTimeLeft === undefined) return;
 
       enemy.charmTimeLeft -= dt;
+
+      // 매혹 도트 대미지 처리용 타이머 관리
+      if ((enemy as any).charmDamageTimer === undefined) {
+        (enemy as any).charmDamageTimer = 1.0;
+      }
+      (enemy as any).charmDamageTimer -= dt;
+
+      // 1초마다 매초 3의 도트 대미지 적용 (매혹 피해 30% 증폭으로 실질 4 피해 적용)
+      if ((enemy as any).charmDamageTimer <= 0) {
+        (enemy as any).charmDamageTimer = 1.0;
+        ctx.dealDamage(char, enemy, 3, '💖 LOVE');
+        ctx.createExplosion(enemy.x, enemy.y, '#ff66b2', 5);
+      }
+
       if (enemy.charmTimeLeft <= 0) {
         enemy.isCharmed = false;
+        (enemy as any).charmDamageTimer = undefined;
         ctx.addFloatingText(enemy.x, enemy.y - 45, '💔 매혹 해제', '#888888', 1.2);
         ctx.logMessage?.(`💔 [매혹 만료] ${enemy.name}의 매혹 상태가 만료되었습니다.`, 'skill');
       } else {
