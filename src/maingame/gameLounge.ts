@@ -323,6 +323,20 @@ export class GameLounge {
         }
       }
 
+      // 운희(unhee), 세연(seyeon) 스킬 게이지 충전 상태 1초 주기 콘솔 로그 출력
+      if (char.id === 'unhee' || char.id === 'seyeon') {
+        const anyChar = char as any;
+        const now = Date.now();
+        if (anyChar.lastGaugeLogTime === undefined) {
+          anyChar.lastGaugeLogTime = 0;
+        }
+        if (now - anyChar.lastGaugeLogTime >= 1000) {
+          anyChar.lastGaugeLogTime = now;
+          const isCharging = !char.skillActive && !char.isStunned && !char.nayutaControlled;
+          console.log(`⏱️ [충전 로그] ${char.name} | 게이지: ${char.skillGauge.toFixed(1)}/100 | 충전여부: ${isCharging ? '🟢 충전중' : '🔴 정지'}`);
+        }
+      }
+
       // 기본 공격 사거리 내 적 감지 및 자동 공격 (기절 중에는 공격 불가)
       if (char.baseAttackCooldown <= 0 && !char.isStunned) {
         let closestEnemy: CharacterState | null = null;
