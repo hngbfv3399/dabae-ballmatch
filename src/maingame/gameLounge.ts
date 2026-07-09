@@ -462,6 +462,11 @@ export class GameLounge {
 
     let finalDamage = amount;
 
+    // 매혹 당한 대상은 받는 대미지 30% 증폭 (세연 매혹 취약)
+    if (target.isCharmed) {
+      finalDamage = Math.round(finalDamage * 1.3);
+    }
+
     // 지호 버프 상태일 때 공격력 2.2배 적용
     if (attacker.id === 'jiho' && attacker.skillActive) {
       finalDamage = Math.round(finalDamage * 2.2);
