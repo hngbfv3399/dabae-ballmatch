@@ -444,17 +444,22 @@ function startPracticeGame() {
     id: 'dummy',
     name: '더미볼',
     maxHp: 999999,
-    speed: 0.0,
+    speed: 0.8, // 기본 이속 부여
     attackPower: 0,
     baseAttackRange: 0,
-    skillName: '훈련 표적',
-    skillDescription: '대미지 측정용 무한 체력 샌드백입니다.',
+    skillName: '움직이는 표적',
+    skillDescription: '대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.',
     color: '#7f8c8d',
     skillChargeRate: 0,
     onUpdate(char: CharacterState) {
       char.hp = char.maxHp;
-      char.vx = 0;
-      char.vy = 0;
+      // 속도가 일정 이하로 느려지면 지속해서 표류하도록 속도 보충
+      const speed = Math.hypot(char.vx, char.vy);
+      if (speed < 1.2) {
+        const angle = Math.random() * Math.PI * 2;
+        char.vx = Math.cos(angle) * 2.2;
+        char.vy = Math.sin(angle) * 2.2;
+      }
     }
   };
 
