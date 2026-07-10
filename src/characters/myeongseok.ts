@@ -1,15 +1,8 @@
 import type { CharacterConfig, CharacterState } from './character.interface';
 
-const SKILL_CONSTANTS = {
-  COOLDOWN: 6,
-  BALL_DURATION: 3.0,          // 5초에서 3초로 감소 (너프)
-  BALL_START_DMG: 18,
-  WALL_DMG_INCREMENT: 4,
-  CHAR_DMG_INCREMENT: 6,
-  BALL_SPEED: 11.5,
-  BALL_RADIUS: 15,
-};
-
+// ═══════════════════════════════════════════
+// #region TYPES
+// ═══════════════════════════════════════════
 interface BowlingBall {
   x: number;
   y: number;
@@ -18,14 +11,32 @@ interface BowlingBall {
   damage: number;
   radius: number;
   timeLeft: number;
-  lastHitTargetId: string; // 동일 대상 다중 히트 쿨다운 관리용
+  lastHitTargetId: string; // Used to manage hit cooldowns for the same target
   hitCooldown: number;
 }
 
 interface MyeongseokState extends CharacterState {
   bowlingBalls?: BowlingBall[];
 }
+// #endregion TYPES
 
+// ═══════════════════════════════════════════
+// #region CONSTANTS
+// ═══════════════════════════════════════════
+const SKILL_CONSTANTS = {
+  COOLDOWN: 6,
+  BALL_DURATION: 3.0,          // reduced from 5s to 3s (nerf)
+  BALL_START_DMG: 18,
+  WALL_DMG_INCREMENT: 4,
+  CHAR_DMG_INCREMENT: 6,
+  BALL_SPEED: 11.5,
+  BALL_RADIUS: 15,
+};
+// #endregion CONSTANTS
+
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const myeongseokConfig: CharacterConfig = {
   id: 'myeongseok',
   name: '명석',
@@ -35,14 +46,18 @@ export const myeongseokConfig: CharacterConfig = {
   baseAttackRange: 45,
   skillName: '퍼펙트 스트라이크',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 무겁고 빠른 볼링공을 던집니다. 볼링공은 ${SKILL_CONSTANTS.BALL_DURATION}초 동안 벽과 캐릭터 사이를 바운싱하며, 벽에 충돌 시 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT} 대미지, 캐릭터 충돌 시 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 대미지가 영구적으로 중첩됩니다.`,
-  color: '#4a154b', // 무거운 가지색 / 퍼플
-  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, // 6초 쿨타임
+  color: '#4a154b', // Heavy eggplant / purple
+  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, // 6s cooldown
   tier: 'B',
   role: 'Juggernaut',
   detailedDescription: `명석은 벽과 적을 튕길 때마다 무한히 파괴력이 증가하는 볼링공을 던지는 돌격형 전사 캐릭터입니다. 스킬 발동 시 필드에 무겁고 빠른 볼링공을 투척하며, 이 볼링공은 벽에 부딪힐 때마다 공격력 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT}, 캐릭터에 부딪힐 때마다 공격력 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT}씩 누적으로 가산되어 난전이 길어질수록 피해량이 걷잡을 수 없이 치솟는 스택형 딜링 능력을 보유하고 있습니다.`,
+// #endregion CONFIG
 
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — shoot bowling ball
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
-    // 쿨타임 즉시 재가동 설정
+    // Cooldown starts immediately
     char.skillActive = false;
     char.skillDurationLeft = 0;
 
@@ -58,7 +73,7 @@ export const myeongseokConfig: CharacterConfig = {
       }
     });
 
-    // 방향 결정 (조준 대상이 없다면 랜덤 방향)
+    // Determine launch angle (random if no enemies)
     const angle = closestEnemy 
       ? Math.atan2(closestEnemy.y - char.y, closestEnemy.x - char.x)
       : Math.random() * Math.PI * 2;
@@ -66,15 +81,15 @@ export const myeongseokConfig: CharacterConfig = {
     const ms = char as MyeongseokState;
     const bowlingBalls = ms.bowlingBalls || [];
     
-    // 빠른 속도로 발사
+    // Launch bowling ball at high velocity
     bowlingBalls.push({
       x: char.x,
       y: char.y,
       vx: Math.cos(angle) * SKILL_CONSTANTS.BALL_SPEED,
       vy: Math.sin(angle) * SKILL_CONSTANTS.BALL_SPEED,
-      damage: SKILL_CONSTANTS.BALL_START_DMG, // 시작 데미지
+      damage: SKILL_CONSTANTS.BALL_START_DMG,
       radius: SKILL_CONSTANTS.BALL_RADIUS,
-      timeLeft: SKILL_CONSTANTS.BALL_DURATION, // 지속시간
+      timeLeft: SKILL_CONSTANTS.BALL_DURATION,
       lastHitTargetId: '',
       hitCooldown: 0
     });
@@ -83,7 +98,11 @@ export const myeongseokConfig: CharacterConfig = {
     ctx.addFloatingText(char.x, char.y - 50, '🎳 퍼펙트 스트라이크!', '#4a154b', 1.5);
     ctx.createExplosion(char.x, char.y, '#4a154b', 15);
   },
+  // #endregion SKILL_TRIGGER
 
+  // ═══════════════════════════════════════════
+  // #region UPDATE — ball movement, wall bounces, enemy hit resolutions
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     const ms = char as MyeongseokState;
     if (ms.bowlingBalls === undefined) ms.bowlingBalls = [];
@@ -91,16 +110,16 @@ export const myeongseokConfig: CharacterConfig = {
     ms.bowlingBalls.forEach((ball) => {
       ball.timeLeft -= dt;
 
-      // 1. 물리 이동
+      // 1. Physical translation
       ball.x += ball.vx * dt * 60;
       ball.y += ball.vy * dt * 60;
 
-      // 동일 타겟 연속 타격 방지용 쿨다운
+      // Decrement hit cooldowns
       if (ball.hitCooldown > 0) {
         ball.hitCooldown -= dt;
       }
 
-      // 2. 벽 충돌 처리 (바운싱 및 데미지 증가 +4)
+      // 2. Wall bounce handling (gain damage +4)
       let wallHit = false;
       const restitution = 1.0;
       
@@ -126,29 +145,29 @@ export const myeongseokConfig: CharacterConfig = {
 
       if (wallHit) {
         ball.damage += SKILL_CONSTANTS.WALL_DMG_INCREMENT;
-        ball.lastHitTargetId = ''; // 벽에 닿으면 타겟 락 초기화
+        ball.lastHitTargetId = ''; // Reset hit lock on wall bounce
         ctx.addFloatingText(ball.x, ball.y - 12, `🎳 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT} 대미지 (벽)`, '#ffc107', 0.8);
         ctx.createExplosion(ball.x, ball.y, '#ffffff', 4);
       }
 
-      // 3. 캐릭터 충돌 처리 (바운싱 및 데미지 증가 +6, 피해량 적용)
+      // 3. Enemy collision handling (bounce & damage increase +6, apply damage)
       ctx.characters.forEach((enemy) => {
         if (enemy.isDead || enemy.id === char.id) return;
         
-        // 쿨다운 검사
+        // Cooldown check
         if (ball.lastHitTargetId === enemy.id && ball.hitCooldown > 0) return;
 
         const dist = Math.hypot(enemy.x - ball.x, enemy.y - ball.y);
         const minDist = enemy.radius + ball.radius;
 
         if (dist < minDist) {
-          // 캐릭터 충돌 바운싱
+          // Bounce mathematics
           const dx = enemy.x - ball.x;
           const dy = enemy.y - ball.y;
           const nx = dx / dist;
           const ny = dy / dist;
 
-          // 겹침 방지 밀어내기
+          // Push out of overlapping circles
           ball.x -= nx * ((minDist - dist) / 2);
           ball.y -= ny * ((minDist - dist) / 2);
 
@@ -157,12 +176,12 @@ export const myeongseokConfig: CharacterConfig = {
           const vn = kx * nx + ky * ny;
 
           if (vn > 0) {
-            // 속도 반사
+            // Speed reflection
             ball.vx -= vn * nx * 2;
             ball.vy -= vn * ny * 2;
           }
 
-          // 데미지 처리 및 넉백
+          // Damage application & knockback
           ctx.dealDamage(char, enemy, ball.damage, '🎳 STRIKE!');
           
           enemy.vx += nx * 4.5;
@@ -170,7 +189,7 @@ export const myeongseokConfig: CharacterConfig = {
           
           ball.damage += SKILL_CONSTANTS.CHAR_DMG_INCREMENT;
           ball.lastHitTargetId = enemy.id;
-          ball.hitCooldown = 0.5; // 0.5초 연속타격 면역
+          ball.hitCooldown = 0.5; // 0.5s hit immunity for same target
 
           ctx.addFloatingText(enemy.x, enemy.y - 45, `🎳 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 대미지 (명중)`, '#ff5722', 1.2);
           ctx.createExplosion(ball.x, ball.y, '#ff5722', 12);
@@ -179,27 +198,31 @@ export const myeongseokConfig: CharacterConfig = {
       });
     });
 
-    // 만료된 볼링공 제거
+    // Filter out expired balls
     ms.bowlingBalls = ms.bowlingBalls.filter((b) => b.timeLeft > 0);
   },
+  // #endregion UPDATE
 
+  // ═══════════════════════════════════════════
+  // #region RENDER — draw bowling balls and holes, damage indicators
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, _currentRadius: number) {
     const ms = char as MyeongseokState;
     const bowlingBalls = ms.bowlingBalls || [];
 
-    // 볼링공 렌더링
+    // Render bowling balls
     bowlingBalls.forEach((ball) => {
       canvasCtx.save();
-      canvasCtx.fillStyle = '#1c0d24'; // 어두운 보라/블랙
+      canvasCtx.fillStyle = '#1c0d24'; // Dark purple/black
       canvasCtx.shadowBlur = 8;
       canvasCtx.shadowColor = '#4a154b';
       
-      // 공 본체
+      // Main body
       canvasCtx.beginPath();
       canvasCtx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
       canvasCtx.fill();
 
-      // 볼링 구멍 3개 그리기 (회전 효과 추가)
+      // 3 finger holes (with rotation effects)
       const rot = (Date.now() / 100) % (Math.PI * 2);
       canvasCtx.fillStyle = '#ffffff';
       
@@ -217,7 +240,7 @@ export const myeongseokConfig: CharacterConfig = {
         canvasCtx.fill();
       });
 
-      // 대미지 텍스트 표시
+      // Damage indicator text
       canvasCtx.fillStyle = '#ffc107';
       canvasCtx.font = 'bold 9px Outfit, sans-serif';
       canvasCtx.textAlign = 'center';
@@ -226,4 +249,5 @@ export const myeongseokConfig: CharacterConfig = {
       canvasCtx.restore();
     });
   }
+  // #endregion RENDER
 };

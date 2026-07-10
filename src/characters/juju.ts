@@ -1,5 +1,8 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region TYPES
+// ═══════════════════════════════════════════
 interface SwapPortalEffect {
   x: number;
   y: number;
@@ -12,7 +15,11 @@ interface JujuState extends CharacterState {
   blackHoleX?: number;
   blackHoleY?: number;
 }
+// #endregion TYPES
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const jujuConfig: CharacterConfig = {
   id: 'juju',
   name: '주주',
@@ -27,17 +34,21 @@ export const jujuConfig: CharacterConfig = {
   tier: 'S',
   role: 'Disabler',
   detailedDescription: '주주는 다수를 일거에 무력화하는 무적 영역 전개 능력을 가진 제어형 특수 포지션 캐릭터입니다. 스킬 작동 시 3초 동안 자신은 완전 무적(Invulnerable) 상태가 되며 적들을 기절시킨 채 한 지점으로 빨아들이는 블랙홀을 배치합니다. 소멸 시 강력한 충격파를 주고 튕겨내며, 빈사 상태 돌입 시 전장에 가장 건강한 적과 자리를 바꾸고 3초 보호막을 받는 강력한 생존 패시브도 탑재하고 있습니다.',
+// #endregion CONFIG
 
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — spawn black hole & grant immunity
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = 3.0; // 3초 유지
+    char.skillDurationLeft = 3.0; // 3 seconds duration
 
     const js = char as JujuState;
-    // 주주의 현재 시전 위치에 블랙홀 중심 설정
+    // Set center of black hole at current location
     js.blackHoleX = js.x;
     js.blackHoleY = js.y;
     
-    // 피해 무적 적용
+    // Apply damage immunity
     char.isImmune = true;
     char.immuneTimeLeft = 3.0;
 
@@ -45,27 +56,30 @@ export const jujuConfig: CharacterConfig = {
     ctx.createExplosion(char.x, char.y, '#00bfff', 15);
     ctx.logMessage?.(`🌀 [블랙홀 시동] 주주 ➡️ 현재 위치(${Math.round(js.blackHoleX)}, ${Math.round(js.blackHoleY)})에 블랙홀 기동 및 3초 피해 면역 무적!`, 'skill');
   },
+  // #endregion SKILL_TRIGGER
 
+  // ═══════════════════════════════════════════
+  // #region UPDATE — suction effect, black hole decay, immune timer
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     const js = char as JujuState;
     if (js.swapPortals === undefined) js.swapPortals = [];
 
-    // 1. 포탈 이펙트 수명 차감
+    // 1. Decay portal effects
     js.swapPortals.forEach((p) => {
       p.life -= dt * 1.8;
     });
     js.swapPortals = js.swapPortals.filter((p) => p.life > 0);
 
-    // 2. 액티브: 블랙홀 흡입 및 만료 붕괴 (쿨다운 멈춤현상 방지를 위해 항상 시간 차감)
+    // 2. Active: suction and collapse of black hole
     if (js.skillActive) {
       js.skillDurationLeft -= dt;
 
-      // 블랙홀 좌표가 유효할 때만 흡입 진행
       if (js.blackHoleX !== undefined && js.blackHoleY !== undefined) {
         const bX = js.blackHoleX;
         const bY = js.blackHoleY;
 
-        // 주주를 제외한 주변 250px 내 적들의 기절 봉쇄 및 강제 끌어당김
+        // Pull nearby enemies within 250px (exclude self)
         ctx.characters.forEach((enemy: CharacterState) => {
           if (enemy.isDead || enemy.id === js.id) return;
           
@@ -74,17 +88,17 @@ export const jujuConfig: CharacterConfig = {
           const dist = Math.hypot(dx, dy);
 
           if (dist <= 250) {
-            // A. 기절 처리하여 움직임 무력화 (0.2초 지속 스턴을 프레임마다 리프레시)
+            // A. Stun opponent to block movement (refresh 0.2s duration)
             enemy.isStunned = true;
             enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
 
-            // B. 관성 움직임을 멈춤
+            // B. Cancel velocity
             enemy.vx = 0;
             enemy.vy = 0;
 
-            // C. 중심 방향으로 강제 좌표 이동 (강제 흡입)
+            // C. Force coordinate draw towards center
             if (dist > 15) {
-              const pullSpeed = 4.8; // 강하게 끌고 들어감
+              const pullSpeed = 4.8;
               const angle = Math.atan2(dy, dx);
               enemy.x += Math.cos(angle) * pullSpeed * (dt * 60);
               enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
@@ -92,7 +106,7 @@ export const jujuConfig: CharacterConfig = {
           }
         });
 
-        // 블랙홀 빨아들이는 궤적 파티클 연출
+        // Suction particle trail effects
         if (Math.random() < 0.7) {
           const randAngle = Math.random() * Math.PI * 2;
           const startDist = 120 + Math.random() * 120;
@@ -102,7 +116,7 @@ export const jujuConfig: CharacterConfig = {
         }
       }
 
-      // 블랙홀 시간 만료 붕괴 (강력한 폭발 대미지 30 및 사방 초넉백)
+      // Black hole collapse (30 splash damage & extreme knockback)
       if (js.skillDurationLeft <= 0) {
         js.skillActive = false;
         js.skillDurationLeft = 0;
@@ -111,11 +125,11 @@ export const jujuConfig: CharacterConfig = {
           const bX = js.blackHoleX;
           const bY = js.blackHoleY;
 
-          ctx.createExplosion(bX, bY, '#1c0d24', 45); // 암흑 특이점 폭발
+          ctx.createExplosion(bX, bY, '#1c0d24', 45); // Dark core explosion
           ctx.createExplosion(bX, bY, '#00bfff', 35);
           ctx.addFloatingText(bX, bY - 20, '💥 블랙홀 붕괴!', '#ff007f', 2.2);
 
-          // 중앙 반경 250px 모든 적 피해 30 및 외곽 초넉백
+          // Apply damage and knockback
           ctx.characters.forEach((enemy: CharacterState) => {
             if (enemy.isDead || enemy.id === js.id) return;
             
@@ -126,7 +140,7 @@ export const jujuConfig: CharacterConfig = {
             if (dist <= 250) {
               ctx.dealDamage(js, enemy, 30, '💥 SINGULARITY!');
               
-              // 바깥으로 넉백 튕겨내기 (넉백 속도 28.5)
+              // Knockback outwards (speed 28.5)
               const angle = Math.atan2(dy, dx);
               enemy.vx = Math.cos(angle) * 28.5;
               enemy.vy = Math.sin(angle) * 28.5;
@@ -138,7 +152,7 @@ export const jujuConfig: CharacterConfig = {
       }
     }
 
-    // 3. 무적 보호막 잔여 시간 차감
+    // 3. Decrement immunity barrier duration
     if (js.isImmune && js.immuneTimeLeft !== undefined) {
       js.immuneTimeLeft -= dt;
       if (js.immuneTimeLeft <= 0) {
@@ -148,17 +162,88 @@ export const jujuConfig: CharacterConfig = {
       }
     }
 
-    // 홀로그램 그리드 장식
+    // Grid particles decoration
     if (Math.random() < 0.08) {
       ctx.createParticle(js.x, js.y, '#00bfff', 2, 8);
     }
   },
+  // #endregion UPDATE
 
+  // ═══════════════════════════════════════════
+  // #region DAMAGE — damage immunity & emergency dimension swap
+  // ═══════════════════════════════════════════
+  onTakeDamage(target: CharacterState, _attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) {
+    // 1. Damage immunity (Black hole active state etc.)
+    if (target.isImmune) {
+      console.log(`🛡️ [피해 무적] ${target.name}이 무적 상태이므로 피해를 받지 않습니다.`);
+      return { finalDamage: 0, blocked: true };
+    }
+
+    // 2. Emergency Swap Passive (triggers once when HP drops to 10% or below)
+    const js = target as JujuState;
+    if (!js.hasEmergencySwapped) {
+      const nextHp = target.hp - damage;
+      if (nextHp <= target.maxHp * 0.10) {
+        js.hasEmergencySwapped = true;
+
+        // Find the alive survivor with the highest HP
+        let maxHp = -Infinity;
+        let swapTarget: any = null;
+        ctx.characters.forEach((enemy) => {
+          if (enemy.isDead || enemy.id === 'juju') return;
+          if (enemy.hp > maxHp) {
+            maxHp = enemy.hp;
+            swapTarget = enemy;
+          }
+        });
+
+        if (swapTarget) {
+          const jX = target.x;
+          const jY = target.y;
+          const tX = swapTarget.x;
+          const tY = swapTarget.y;
+
+          // Swap positions
+          target.x = tX;
+          target.y = tY;
+          swapTarget.x = jX;
+          swapTarget.y = jY;
+
+          // Grant 3 seconds immunity shield
+          target.isImmune = true;
+          target.immuneTimeLeft = 3.0;
+
+          // Portal trails
+          if (!js.swapPortals) js.swapPortals = [];
+          js.swapPortals.push({ x: jX, y: jY, life: 0.8 });
+          js.swapPortals.push({ x: tX, y: tY, life: 0.8 });
+
+          ctx.createExplosion(jX, jY, '#00bfff', 18);
+          ctx.createExplosion(tX, tY, '#00bfff', 18);
+          ctx.addFloatingText(target.x, target.y - 70, '🛡️ 비상 차원 탈출! (무적 3초)', '#00bfff', 2.0);
+          console.log(`🛡️ [비상 탈출] 주주가 치사 피해를 회피하고 ${(swapTarget as CharacterState).name}와 스왑 후 3초 무적막을 얻었습니다!`);
+        } else {
+          // If only self survives, grant 3 seconds immunity
+          target.isImmune = true;
+          target.immuneTimeLeft = 3.0;
+          ctx.addFloatingText(target.x, target.y - 70, '🛡️ 비상 무적! (3초)', '#00bfff', 2.0);
+        }
+        return { finalDamage: 0, blocked: true }; // Negate original damage completely
+      }
+    }
+
+    return { finalDamage: damage, blocked: false };
+  },
+  // #endregion DAMAGE
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — portal effects, black hole visual, barrier drawing
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     const js = char as JujuState;
     const swapPortals = js.swapPortals || [];
 
-    // 1. 차원 스왑 포탈 이펙트
+    // 1. Swap portals visual effect
     swapPortals.forEach((p) => {
       canvasCtx.save();
       canvasCtx.strokeStyle = `rgba(0, 191, 255, ${p.life})`;
@@ -173,19 +258,19 @@ export const jujuConfig: CharacterConfig = {
       canvasCtx.restore();
     });
 
-    // 2. 액티브: 전술 블랙홀 코어 렌더링 (주주가 소환했던 시전 좌표)
+    // 2. Black hole rendering
     if (js.blackHoleX !== undefined && js.blackHoleY !== undefined && (js.skillActive || js.skillDurationLeft > 0)) {
       canvasCtx.save();
       const bX = js.blackHoleX;
       const bY = js.blackHoleY;
       
-      // 블랙 코어 암흑원
+      // Black core
       canvasCtx.fillStyle = 'rgba(10, 5, 20, 0.85)';
       canvasCtx.beginPath();
       canvasCtx.arc(bX, bY, 45, 0, Math.PI * 2);
       canvasCtx.fill();
 
-      // 회전하는 청색 특이점 중력 고리
+      // Rotating gravity ring
       canvasCtx.strokeStyle = '#00bfff';
       canvasCtx.lineWidth = 4;
       canvasCtx.shadowBlur = 25;
@@ -203,7 +288,7 @@ export const jujuConfig: CharacterConfig = {
       canvasCtx.restore();
     }
 
-    // 3. 무적 보호막 베리어막 드로잉
+    // 3. Immunity barrier dome drawing
     if (js.isImmune) {
       canvasCtx.save();
       canvasCtx.strokeStyle = 'rgba(0, 191, 255, 0.8)';
@@ -219,7 +304,7 @@ export const jujuConfig: CharacterConfig = {
       canvasCtx.restore();
     }
 
-    // 4. 주주 기본 그리드
+    // 4. Base hologram grid circle decoration
     canvasCtx.save();
     canvasCtx.strokeStyle = 'rgba(0, 191, 255, 0.4)';
     canvasCtx.lineWidth = 1.2;
@@ -232,4 +317,5 @@ export const jujuConfig: CharacterConfig = {
     canvasCtx.stroke();
     canvasCtx.restore();
   }
+  // #endregion RENDER
 };

@@ -12,6 +12,8 @@ import { pumanConfig } from './characters/puman';
 import { eunsuConfig } from './characters/eunsu';
 import { myeongseokConfig } from './characters/myeongseok';
 import { jujuConfig } from './characters/juju';
+import { juyeonConfig } from './characters/juyeon';
+import { sungjaeConfig } from './characters/sungjae';
 
 // 이용 가능한 캐릭터 목록
 export const availableCharacters: CharacterConfig[] = [
@@ -27,7 +29,9 @@ export const availableCharacters: CharacterConfig[] = [
   pumanConfig,
   eunsuConfig,
   myeongseokConfig,
-  jujuConfig
+  jujuConfig,
+  juyeonConfig,
+  sungjaeConfig
 ];
 
 /**

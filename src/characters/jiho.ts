@@ -1,10 +1,13 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region CONSTANTS
+// ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
   COOLDOWN: 5,
   BUG_CHANCE: 0.4,
   BUG_DURATION: 3.0,
-  BUG_SPEED_DEBUFF: 30, // 30% 속도 감소
+  BUG_SPEED_DEBUFF: 30, // 30% speed reduction
   CRASH_CHANCE: 0.5,
   CRASH_DMG: 20,
   CRASH_STUN_DURATION: 1.0,
@@ -15,13 +18,17 @@ const SKILL_CONSTANTS = {
   COMPILE_SUCCESS_SPLASH_RADIUS: 150,
   COMPILE_SUCCESS_SPLASH_DMG: 25,
   COMPILE_BUFF_DURATION: 5.0,
-  COMPILE_HEAL_PCT: 30, // 30% 회복
+  COMPILE_HEAL_PCT: 30, // 30% heal
   COMPILE_SPEED_MULTIPLIER: 2.0,
   COMPILE_ATK_MULTIPLIER: 2.2,
   COMPILE_FAIL_STUN_DURATION: 2.0,
   COMPILE_FAIL_SELF_DMG_MULTIPLIER: 1.5,
 };
+// #endregion CONSTANTS
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const jihoConfig: CharacterConfig = {
   id: 'jiho',
   name: '지호',
@@ -31,29 +38,32 @@ export const jihoConfig: CharacterConfig = {
   baseAttackRange: 45,
   skillName: '코드 컴파일 및 실행',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 기본 공격 시 ${SKILL_CONSTANTS.BUG_CHANCE * 100}% 확률로 ${SKILL_CONSTANTS.BUG_DURATION}초간 [버그] 디버프(이속 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)를 걸며, 디버프 적용 시 ${SKILL_CONSTANTS.CRASH_CHANCE * 100}% 확률로 [런타임 에러](${SKILL_CONSTANTS.CRASH_DMG} 피해 + ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절 및 주변 ${SKILL_CONSTANTS.CRASH_SPLASH_RADIUS}px 적들에게 ${SKILL_CONSTANTS.CRASH_SPLASH_DMG} 광역 피해)를 입힙니다. 스킬 성공 시 주변에 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG}의 광역 피해와 넉백을 주고 버프를 얻으며, 실패 시 기절합니다.`,
-  color: '#00ffcc',       // 터미널 그린
+  color: '#00ffcc',       // Terminal green
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'A',
   role: 'Specialist',
   detailedDescription: `지호는 확률적 디버프와 컴파일 연쇄 효과를 이용하는 테크니컬한 변수형 캐릭터입니다. 기본 공격 시 일정 확률로 상대방에게 치명적인 [버그] 디버프(이동 속도 저하)를 걸고, 디버프가 적용된 적을 재타격해 ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절과 광역 스플래시 피해를 동반하는 [런타임 에러]를 컴파일하여 예기치 못한 전술적 혼란을 야기합니다.`,
+// #endregion CONFIG
 
-  // [1] 기본 공격 시 훅 (디버프 및 확률적 대미지, 스턴, 광역 딜)
+  // ═══════════════════════════════════════════
+  // #region BASIC_ATTACK — basic attack hooks & effects
+  // ═══════════════════════════════════════════
   onBasicAttack(char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead) return;
 
-    // 40% 확률로 버그 디버프 부여
+    // 40% chance to apply bug debuff
     if (Math.random() < SKILL_CONSTANTS.BUG_CHANCE) {
       const opp = opponent as any;
 
       if (!opp.jihoDebuffTimeLeft || opp.jihoDebuffTimeLeft <= 0) {
         opp.jihoDebuffOriginalSpeed = opponent.speed;
-        opponent.speed = opponent.speed * (1 - SKILL_CONSTANTS.BUG_SPEED_DEBUFF / 100); // 속도 감소
+        opponent.speed = opponent.speed * (1 - SKILL_CONSTANTS.BUG_SPEED_DEBUFF / 100); // Reduce speed
         console.log(`🐛 [디버프 부여] 지호 -> ${opponent.name} | [버그] 부여 (${SKILL_CONSTANTS.BUG_DURATION}초간 이동 속도 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)`);
         ctx.logMessage?.(`🐛 [디버프 부여] 지호 ➡️ ${opponent.name} | [버그] 디버프 (${SKILL_CONSTANTS.BUG_DURATION}초간 이속 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)`, 'damage');
       }
-      opp.jihoDebuffTimeLeft = SKILL_CONSTANTS.BUG_DURATION; // 지속 시간
+      opp.jihoDebuffTimeLeft = SKILL_CONSTANTS.BUG_DURATION; // duration
 
-      // 디버프 부여 시 50% 확률로 런타임 에러
+      // 50% chance for runtime error crash
       if (Math.random() < SKILL_CONSTANTS.CRASH_CHANCE) {
         console.log(`💥 [디버프 격발] 지호 -> ${opponent.name} | [런타임 에러] 연쇄 충돌 발생!`);
         ctx.logMessage?.(`💥 [런타임 에러 격발] 지호 ➡️ ${opponent.name} | 연쇄 런타임 에러 (${SKILL_CONSTANTS.CRASH_DMG} 피해, ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절)`, 'damage');
@@ -64,7 +74,7 @@ export const jihoConfig: CharacterConfig = {
         opponent.vy = 0;
         ctx.createExplosion(opponent.x, opponent.y, '#ff3366', 15);
 
-        // 주변 120px 내 광역 대미지 (본인과 주 대상 제외)
+        // Splash damage to enemies within 120px (excluding attacker and main target)
         ctx.characters.forEach((enemy) => {
           if (enemy.isDead || enemy.id === char.id || enemy.id === opponent.id) return;
           const dist = Math.hypot(enemy.x - opponent.x, enemy.y - opponent.y);
@@ -72,7 +82,7 @@ export const jihoConfig: CharacterConfig = {
             ctx.dealDamage(char, enemy, SKILL_CONSTANTS.CRASH_SPLASH_DMG, '⚡ AOE ERROR!');
             ctx.createExplosion(enemy.x, enemy.y, '#ff3366', 6);
             
-            // 넉백 벡터
+            // Knockback
             const kAngle = Math.atan2(enemy.y - opponent.y, enemy.x - opponent.x);
             enemy.vx += Math.cos(kAngle) * 3;
             enemy.vy += Math.sin(kAngle) * 3;
@@ -86,19 +96,25 @@ export const jihoConfig: CharacterConfig = {
       }
     }
   },
+  // #endregion BASIC_ATTACK
 
-  // [2] 스킬 최초 시동 시 훅
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — start coding phase
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState) {
-    char.skillActive = false; // 대기 코딩 단계이므로 액티브 버프는 아직 아님
+    char.skillActive = false; // Waiting/coding stage, buff not active yet
     char.isTyping = true;
     char.typingTimeLeft = SKILL_CONSTANTS.TYPING_DURATION;
     char.vx = 0;
     char.vy = 0;
   },
+  // #endregion SKILL_TRIGGER
 
-  // [3] 매 프레임 업데이트 훅
+  // ═══════════════════════════════════════════
+  // #region UPDATE — coding timer, compile logic, debuff updates
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
-    // 디버프 상태 업데이트 (모든 적 캐릭터들에 대해 버그 디버프 시간 및 속도 복구 처리)
+    // Update bug debuffs on other characters
     ctx.characters.forEach((enemy) => {
       if (enemy.id !== char.id && !enemy.isDead) {
         const opp = enemy as any;
@@ -121,34 +137,34 @@ export const jihoConfig: CharacterConfig = {
       }
     });
 
-    // 3-A. 타이핑 코딩 중 처리
+    // Coding phase logic
     if (char.isTyping) {
       char.typingTimeLeft -= dt;
       char.vx = 0;
       char.vy = 0;
 
-      // 타이핑 파티클 생성
+      // Typing particles
       if (Math.random() < 0.4) {
         ctx.createParticle(char.x + (Math.random() - 0.5) * 20, char.y + 10, '#00ffcc', 3, 10);
       }
 
-      // 2초 코딩이 끝나면 성공/실패 판정
+      // Compile check when coding ends
       if (char.typingTimeLeft <= 0) {
         char.isTyping = false;
 
-        // 우선 기본 속도로 다시 기동
+        // Resume movement with base speed
         const randomAngle = Math.random() * Math.PI * 2;
         const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
         char.vy = Math.sin(randomAngle) * baseSpeed;
 
-        // 성공 여부 결정
         const isSuccess = Math.random() < SKILL_CONSTANTS.COMPILE_SUCCESS_CHANCE;
 
         if (isSuccess) {
           console.log(`💻 [컴파일 성공] 지호 컴파일 성공! 주변 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_RADIUS}px 광역 시스템 폭발 피해 가동 및 ${SKILL_CONSTANTS.COMPILE_BUFF_DURATION}초 버프`);
           ctx.logMessage?.(`💻 [컴파일 성공] 지호 ➡️ 성공! (주변 광역 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG} 피해, HP ${SKILL_CONSTANTS.COMPILE_HEAL_PCT}% 회복, ${SKILL_CONSTANTS.COMPILE_BUFF_DURATION}초간 이속 ${SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER}배 & 공격력 ${SKILL_CONSTANTS.COMPILE_ATK_MULTIPLIER}배)`, 'skill');
-          // 컴파일 성공: 주변 광역 시스템 폭발 피해
+          
+          // Splash damage and knockback
           ctx.characters.forEach((enemy) => {
             if (enemy.isDead || enemy.id === char.id) return;
             const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
@@ -156,14 +172,14 @@ export const jihoConfig: CharacterConfig = {
               ctx.dealDamage(char, enemy, SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG, '💻 SYSTEM BLAST!');
               ctx.createExplosion(enemy.x, enemy.y, '#00ffcc', 8);
               
-              // 넉백
+              // Knockback
               const kAngle = Math.atan2(enemy.y - char.y, enemy.x - char.x);
               enemy.vx += Math.cos(kAngle) * 5;
               enemy.vy += Math.sin(kAngle) * 5;
             }
           });
 
-          // 버프 획득 및 회복
+          // Gain buff & heal
           const wasActive = char.skillActive;
           char.skillActive = true;
           char.skillDurationLeft = SKILL_CONSTANTS.COMPILE_BUFF_DURATION;
@@ -171,12 +187,12 @@ export const jihoConfig: CharacterConfig = {
           ctx.addFloatingText(char.x, char.y - 45, '💻 [SUCCESS] 컴파일 완료!', '#00ffcc', 1.8);
           ctx.createExplosion(char.x, char.y, '#00ffcc', 20);
 
-          // 체력 치유
+          // Healing
           const healAmount = Math.round(char.maxHp * (SKILL_CONSTANTS.COMPILE_HEAL_PCT / 100));
           char.hp = Math.min(char.maxHp, char.hp + healAmount);
           ctx.addFloatingText(char.x, char.y - 25, `+${healAmount} HEAL`, '#39ff14', 1.5);
 
-          // 초록색 힐링 파티클 뿜어내기
+          // Green healing particles
           for (let i = 0; i < 12; i++) {
             ctx.createParticle(
               char.x + (Math.random() - 0.5) * 30,
@@ -187,7 +203,7 @@ export const jihoConfig: CharacterConfig = {
             );
           }
 
-          // 이동 속도 증폭
+          // Multiply velocity by speed buff factor
           if (!wasActive) {
             char.vx *= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
             char.vy *= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
@@ -210,7 +226,7 @@ export const jihoConfig: CharacterConfig = {
       return;
     }
 
-    // 2-B. 기절 중 타이머 처리
+    // Stun logic
     if (char.isStunned) {
       char.stunTimeLeft -= dt;
       char.vx = 0;
@@ -225,21 +241,53 @@ export const jihoConfig: CharacterConfig = {
       return;
     }
 
-    // 2-C. 버프 활성화 지속시간 갱신 및 롤백
+    // Buff duration tick & rollback
     if (char.skillActive) {
       char.skillDurationLeft -= dt;
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
-        // 속도 원상복구
+        // Rollback speed
         char.vx /= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
         char.vy /= SKILL_CONSTANTS.COMPILE_SPEED_MULTIPLIER;
       }
     }
   },
+  // #endregion UPDATE
 
-  // [3] 캐릭터 고유 렌더링 확장 훅
+  // ═══════════════════════════════════════════
+  // #region DAMAGE — compile success damage multiplier
+  // ═══════════════════════════════════════════
+  onDealDamage(char: CharacterState, _target: CharacterState, damage: number, _ctx: CharacterBehaviorContext) {
+    if (char.skillActive) {
+      // 2.2x damage multiplier during compile success buff
+      return Math.round(damage * SKILL_CONSTANTS.COMPILE_ATK_MULTIPLIER);
+    }
+    return damage;
+  },
+  // #endregion DAMAGE
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — glow effect, coding progress bar, stun stars
+  // ═══════════════════════════════════════════
+  onPreRender(char: CharacterState, canvasCtx: CanvasRenderingContext2D) {
+    // Green glow effect around Jiho during skill active
+    if (char.skillActive) {
+      canvasCtx.save();
+      canvasCtx.strokeStyle = 'rgba(0, 255, 196, 0.4)';
+      canvasCtx.lineWidth = 6;
+      canvasCtx.shadowBlur = 15;
+      canvasCtx.shadowColor = '#00ffcc';
+      canvasCtx.beginPath();
+      // Current radius includes scaling, but jiho doesn't scale normally. Use radius * scaleMultiplier
+      const r = char.radius * char.scaleMultiplier;
+      canvasCtx.arc(char.x, char.y, r + 12 + Math.sin(Date.now() / 80) * 3, 0, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+    }
+  },
+
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
-    // 3-A. 코딩 진행 바 그리기
+    // Coding progress bar
     if (char.isTyping) {
       canvasCtx.save();
       canvasCtx.fillStyle = 'rgba(0, 255, 196, 0.9)';
@@ -257,7 +305,7 @@ export const jihoConfig: CharacterConfig = {
       canvasCtx.restore();
     }
 
-    // 3-B. 기절 별 💫 그리기
+    // Stun stars
     if (char.isStunned) {
       canvasCtx.save();
       const numStars = 3;
@@ -275,4 +323,5 @@ export const jihoConfig: CharacterConfig = {
       canvasCtx.restore();
     }
   }
+  // #endregion RENDER
 };

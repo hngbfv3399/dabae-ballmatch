@@ -1,10 +1,17 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region TYPES
+// ═══════════════════════════════════════════
 interface SeyeonState extends CharacterState {
   charmAuraRadius?: number;
   charmDamageTimer?: number;
 }
+// #endregion TYPES
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const seyeonConfig: CharacterConfig = {
   id: 'seyeon',
   name: '세연',
@@ -19,13 +26,17 @@ export const seyeonConfig: CharacterConfig = {
   tier: 'S',
   role: 'Guardian',
   detailedDescription: '세연은 완전 피해 면역과 광역 매혹 어그로를 통해 난전을 종식시키는 결전형 수호형 캐릭터입니다. 스킬 발동 시 4초간 공격 면역 무적 버프와 고속 이동 효과를 얻어 댄스를 시작하며, 주변의 넓은 아우라 반경 내의 모든 적들을 기절시킨 채 자신에게로 강하게 빨아들이고 피해량을 50% 증폭시켜 아군의 킬 찬스를 완벽하게 열어줍니다.',
+// #endregion CONFIG
 
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — start dancing & grant immunity
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = 4.0; // 4초 유지
+    char.skillDurationLeft = 4.0; // 4 seconds duration
 
-    // 이속 50% 증가 및 무적 부여
-    char.speed = 1.3 * 1.5; // 버프 속도 (1.95)
+    // Increase speed by 50% and grant immunity
+    char.speed = 1.3 * 1.5; // Buff speed (1.95)
     char.isImmune = true;
     char.immuneTimeLeft = 4.0;
 
@@ -37,7 +48,11 @@ export const seyeonConfig: CharacterConfig = {
     ctx.createExplosion(char.x, char.y, '#ff66b2', 20);
     ctx.logMessage?.(`💃 [유혹의 댄스] 세연 ➡️ 4초간 아우라 전개, 속도 50% 증가 및 피해 무적!`, 'skill');
   },
+  // #endregion SKILL_TRIGGER
 
+  // ═══════════════════════════════════════════
+  // #region UPDATE — dance timer, dot ticks, pull enemies
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     const sy = char as SeyeonState;
 
@@ -46,7 +61,7 @@ export const seyeonConfig: CharacterConfig = {
 
       const auraRadius = sy.charmAuraRadius || 220;
 
-      // 1초마다 도트 대미지 틱 관리
+      // Manage DOT timer (1 second ticks)
       if (sy.charmDamageTimer === undefined) sy.charmDamageTimer = 1.0;
       sy.charmDamageTimer -= dt;
       let dealTick = false;
@@ -55,7 +70,7 @@ export const seyeonConfig: CharacterConfig = {
         dealTick = true;
       }
 
-      // 범위 내 모든 적 기절, 흡입, 대미지 틱 및 매혹 상태 부여
+      // Charm, pull, stun, and tick damage to all enemies in radius
       ctx.characters.forEach((enemy) => {
         if (enemy.isDead || enemy.id === char.id) return;
 
@@ -64,12 +79,12 @@ export const seyeonConfig: CharacterConfig = {
         const dist = Math.hypot(dx, dy);
 
         if (dist <= auraRadius) {
-          // A. 매혹 및 기절 상태 부여 (움직임 무력화)
+          // A. Set charmed and stunned states
           enemy.isCharmed = true;
           enemy.isStunned = true;
           enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
 
-          // B. 관성 멈춤 및 세연 방향으로 강제 흡입
+          // B. Pull towards Seyeon
           enemy.vx = 0;
           enemy.vy = 0;
           if (dist > 15) {
@@ -79,20 +94,20 @@ export const seyeonConfig: CharacterConfig = {
             enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
           }
 
-          // C. 1초마다 매초 8의 피해 (피해 50% 증폭에 의해 실질 12 적용)
+          // C. DOT Damage (8 damage tick -> amplifies to 12 via onTakeDamage)
           if (dealTick) {
             ctx.dealDamage(char, enemy, 8, '💖 LOVE TICK');
             ctx.createExplosion(enemy.x, enemy.y, '#ff66b2', 4);
           }
 
-          // 매혹 하트 입자 방출
+          // Emit charm particles
           if (Math.random() < 0.2) {
             ctx.createParticle(enemy.x, enemy.y, '#ff66b2', 2.5, 12);
           }
         }
       });
 
-      // 세연 주변에 휘몰아치는 하트 소용돌이 파티클 연출
+      // Heart swirl particles around Seyeon
       if (Math.random() < 0.6) {
         const randAngle = Math.random() * Math.PI * 2;
         const dist = Math.random() * auraRadius;
@@ -101,14 +116,14 @@ export const seyeonConfig: CharacterConfig = {
         ctx.createParticle(px, py, '#ff66b2', 2, 15);
       }
 
-      // 스킬 지속 종료 복구
+      // Skill end rollback
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
-        char.speed = 1.3; // 일반 이속 복귀
+        char.speed = 1.3; // Restore speed
         char.isImmune = false;
         char.immuneTimeLeft = 0;
 
-        // 범위 내 모든 적 매혹 및 스턴 해제
+        // Reset charmed status of other characters
         ctx.characters.forEach((enemy) => {
           if (enemy.id !== char.id) {
             enemy.isCharmed = false;
@@ -121,16 +136,39 @@ export const seyeonConfig: CharacterConfig = {
       }
     }
   },
+  // #endregion UPDATE
 
+  // ═══════════════════════════════════════════
+  // #region DAMAGE — charm immunity & damage amplification
+  // ═══════════════════════════════════════════
+  onTakeDamage(target: CharacterState, attacker: CharacterState, damage: number, _ctx: CharacterBehaviorContext) {
+    // 1. Charmed targets deal 0 damage to Seyeon
+    if (target.id === 'seyeon' && attacker.isCharmed) {
+      console.log(`🛡️ [매혹 면역] ${attacker.name} ➡️ 세연 | 매혹 상태의 적이 세연에게 입히는 피해는 무효화됩니다.`);
+      return { finalDamage: 0, blocked: true };
+    }
+
+    // 2. Charmed targets take 50% amplified damage
+    if (target.isCharmed) {
+      const finalDamage = Math.round(damage * 1.5);
+      return { finalDamage, blocked: false };
+    }
+
+    return { finalDamage: damage, blocked: false };
+  },
+  // #endregion DAMAGE
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — dance aura circle, head hearts
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     const sy = char as SeyeonState;
 
-    // 1. 매혹의 댄스 아우라 영역 렌더링
+    // Render dance aura range
     if (char.skillActive) {
       const radius = sy.charmAuraRadius || 220;
       canvasCtx.save();
       
-      // 분홍색 그라데이션 영역 표시
       const grad = canvasCtx.createRadialGradient(char.x, char.y, currentRadius, char.x, char.y, radius);
       grad.addColorStop(0, 'rgba(255, 102, 178, 0.25)');
       grad.addColorStop(0.5, 'rgba(255, 102, 178, 0.1)');
@@ -141,7 +179,7 @@ export const seyeonConfig: CharacterConfig = {
       canvasCtx.arc(char.x, char.y, radius, 0, Math.PI * 2);
       canvasCtx.fill();
 
-      // 외부 경계선 브러싱
+      // Outer dashed boundary
       canvasCtx.strokeStyle = 'rgba(255, 102, 178, 0.45)';
       canvasCtx.lineWidth = 1.5;
       canvasCtx.setLineDash([4, 4]);
@@ -152,7 +190,7 @@ export const seyeonConfig: CharacterConfig = {
       canvasCtx.restore();
     }
 
-    // 2. 머리 위 장식 하트 연출 (스킬 켜졌을 땐 큰 춤추는 하트)
+    // Head floating decoration hearts
     canvasCtx.save();
     canvasCtx.fillStyle = '#ff66b2';
     canvasCtx.shadowBlur = 8;
@@ -169,4 +207,5 @@ export const seyeonConfig: CharacterConfig = {
     }
     canvasCtx.restore();
   }
+  // #endregion RENDER
 };

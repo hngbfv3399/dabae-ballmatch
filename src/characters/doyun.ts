@@ -1,5 +1,8 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region CONSTANTS
+// ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
   COOLDOWN: 5,
   SPLASH_RADIUS: 100,
@@ -8,7 +11,11 @@ const SKILL_CONSTANTS = {
   SHIELD_AMOUNT: 6,
   SHIELD_DURATION: 3.0,
 };
+// #endregion CONSTANTS
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const doyunConfig: CharacterConfig = {
   id: 'doyun',
   name: '도윤',
@@ -23,14 +30,17 @@ export const doyunConfig: CharacterConfig = {
   tier: 'C',
   role: 'Guardian',
   detailedDescription: `도윤은 뛰어난 군중 제어(CC)와 생존 장벽을 겸비한 수호형 캐릭터입니다. 스킬 사용 시 공중으로 도약한 뒤 적에게 내려꽂히는 유도 덩크슛 공격을 시전하여 주변 적들을 일시에 기절시키고 멀리 밀쳐냅니다. 돌진이 적에게 적중했을 때에만 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 피해를 막아주는 전용 보호막(Shield)을 생성해, 정확한 판단이 요구되는 리스크-리턴형 캐릭터입니다.`,
+// #endregion CONFIG
 
-  // [1] 스킬 최초 시동 시 훅
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — air launch & targeting
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
     char.skillDurationLeft = 1.0;
-    char.scaleMultiplier = 1.6; // 도약 크기 팽창
+    char.scaleMultiplier = 1.6; // Scale up for jump
 
-    // 가장 가까운 적을 찾아서 조준 돌진 및 타겟 ID 저장
+    // Target closest enemy
     let closestEnemy: CharacterState | null = null;
     let minDist = Infinity;
     ctx.characters.forEach((enemy) => {
@@ -50,17 +60,20 @@ export const doyunConfig: CharacterConfig = {
       char.vy = Math.sin(angle) * launchSpeed;
       (char as any).slamTargetId = targetEnemy.id;
     } else {
-      // 적이 없으면 랜덤 방향 돌진
+      // Random direction dash if no enemies
       const angle = Math.random() * Math.PI * 2;
       char.vx = Math.cos(angle) * (char.speed * 10);
       char.vy = Math.sin(angle) * (char.speed * 10);
       (char as any).slamTargetId = null;
     }
   },
+  // #endregion SKILL_TRIGGER
 
-  // [2] 매 프레임 업데이트 훅
+  // ═══════════════════════════════════════════
+  // #region UPDATE — slam timing & shield decay
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
-    // 실드 시간 업데이트
+    // Shield timer update
     if (char.doyunShield && char.doyunShieldTimeLeft !== undefined && char.doyunShieldTimeLeft > 0) {
       char.doyunShieldTimeLeft -= dt;
       if (char.doyunShieldTimeLeft <= 0) {
@@ -70,20 +83,19 @@ export const doyunConfig: CharacterConfig = {
       }
     }
 
-    // 덩크 슬램 시전 중에는 기절 상태 즉시 면역 및 해제 (시전 보장 판정)
+    // Immune to stun while skill is active
     if (char.skillActive) {
       char.isStunned = false;
       char.stunTimeLeft = 0;
     }
 
-    // 2-A. 기절 상태 처리
+    // Stun state handling
     if (char.isStunned) {
       char.stunTimeLeft -= dt;
       char.vx = 0;
       char.vy = 0;
       if (char.stunTimeLeft <= 0) {
         char.isStunned = false;
-        // 기절 풀렸을 때 속도 복구
         const randomAngle = Math.random() * Math.PI * 2;
         const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
@@ -92,21 +104,20 @@ export const doyunConfig: CharacterConfig = {
       return;
     }
 
-    // 2-B. 덩크 돌진 업데이트 및 만료 처리
+    // Slam movement update
     if (char.skillActive) {
-      // 주황색 대시 잔상 파티클 방출
       if (Math.random() < 0.5) {
         ctx.createParticle(char.x, char.y, '#ff6600', 8, 15);
       }
 
-      // 유도 로직: 매 프레임 타겟을 따라 조준을 수정합니다. (무조건 맞도록)
+      // Homing logic: update angle toward target every frame
       const targetId = (char as any).slamTargetId;
       let targetEnemy = ctx.characters.find((c) => c.id === targetId && !c.isDead) as CharacterState | undefined;
       
       if (!targetEnemy) {
         let closest: CharacterState | null = null;
         let minDist = Infinity;
-        const chars = (ctx as any).characters as CharacterState[];
+        const chars = ctx.characters;
         for (const enemy of chars) {
           if (enemy.isDead || enemy.id === char.id) continue;
           const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
@@ -130,23 +141,45 @@ export const doyunConfig: CharacterConfig = {
 
       char.skillDurationLeft -= dt;
       if (char.skillDurationLeft <= 0) {
-        // 지속시간 초과 시 지상 착지 폭발 (유도 대상 강제 전달)
         executeDunkSlam(char, targetEnemy, ctx);
       }
     }
   },
+  // #endregion UPDATE
 
-  // [3] 다른 캐릭터와 물리적 충돌 발생 시 훅
+  // ═══════════════════════════════════════════
+  // #region COLLISION — explode on target hit
+  // ═══════════════════════════════════════════
   onCollisionWithTarget(char: CharacterState, opponent: CharacterState, ctx) {
-    // 덩크 도약 돌진 중에 누군가와 부딪히면 즉시 착지 폭발 격발!
     if (char.skillActive) {
       executeDunkSlam(char, opponent, ctx);
     }
   },
+  // #endregion COLLISION
 
-  // [4] 캐릭터 추가 렌더링 훅
+  // ═══════════════════════════════════════════
+  // #region DAMAGE — shield absorption logic
+  // ═══════════════════════════════════════════
+  onTakeDamage(target: CharacterState, _attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) {
+    if (target.doyunShield && target.doyunShield > 0) {
+      const absorb = Math.min(damage, target.doyunShield);
+      target.doyunShield -= absorb;
+      const finalDamage = damage - absorb;
+      console.log(`🛡️ [실드 흡수] 도윤 -> 보호막이 ${absorb} 피해를 흡수했습니다. (남은 보호막: ${target.doyunShield})`);
+      if (absorb > 0) {
+        ctx.addFloatingText(target.x, target.y - 45, `🛡️ ABSORB -${absorb}`, '#00ccff', 1.0);
+      }
+      return { finalDamage, blocked: finalDamage <= 0 };
+    }
+    return { finalDamage: damage, blocked: false };
+  },
+  // #endregion DAMAGE
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — shield visual circle, stun stars
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
-    // 실드 활성화 시 푸른색 보호막 서클 그리기
+    // Blue shield circle
     if (char.doyunShield && char.doyunShield > 0) {
       canvasCtx.save();
       canvasCtx.strokeStyle = '#00ccff';
@@ -159,7 +192,7 @@ export const doyunConfig: CharacterConfig = {
       canvasCtx.restore();
     }
 
-    // 기절 💫 드로잉
+    // Stun stars
     if (char.isStunned) {
       canvasCtx.save();
       const numStars = 3;
@@ -177,15 +210,16 @@ export const doyunConfig: CharacterConfig = {
       canvasCtx.restore();
     }
   }
+  // #endregion RENDER
 };
 
-/**
- * 도윤 덩크슛 슬램 착지 및 넉백 광역 폭화 대미지 처리 (doyun.ts 로 격리)
- */
-function executeDunkSlam(char: CharacterState, target: CharacterState | undefined, ctx: any) {
+// ═══════════════════════════════════════════
+// #region HELPERS — dunk slam execution
+// ═══════════════════════════════════════════
+function executeDunkSlam(char: CharacterState, target: CharacterState | undefined, ctx: CharacterBehaviorContext) {
   if (!char.skillActive) return;
   char.skillActive = false;
-  char.scaleMultiplier = 1.0; // 크기 원상 복귀
+  char.scaleMultiplier = 1.0; // scale back
 
   const slamX = target ? target.x : char.x;
   const slamY = target ? target.y : char.y;
@@ -197,10 +231,9 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
   ctx.createExplosion(slamX, slamY, '#ffd700', 15);
   ctx.addFloatingText(slamX, slamY - 35, '🏀 SLAM DUNK!', '#ff6600', 1.6);
 
-  // 적중 여부 판정: 광역 범위 내 적이 1명이라도 있어야 실드 획득
   let hitEnemy = false;
 
-  // 100px 내 광역 피해 및 강한 넉백
+  // Splash damage and knockback within splash radius
   ctx.characters.forEach((enemy: CharacterState) => {
     if (enemy.isDead || enemy.id === char.id) return;
     const dist = Math.hypot(enemy.x - slamX, enemy.y - slamY);
@@ -209,12 +242,12 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
       ctx.dealDamage(char, enemy, damage, 'DUNK SLAM!');
       hitEnemy = true;
 
-      // 강한 넉백 각도
+      // Strong knockback
       const kAngle = Math.atan2(enemy.y - slamY, enemy.x - slamX);
       enemy.vx = Math.cos(kAngle) * 14;
       enemy.vy = Math.sin(kAngle) * 14;
 
-      // 최소 속도 보장
+      // Min speed guarantee
       const curSpd = Math.hypot(enemy.vx, enemy.vy);
       const baseSpd = 3.5 * enemy.speed;
       if (curSpd < baseSpd * 0.8) {
@@ -224,7 +257,7 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
     }
   });
 
-  // 적에게 적중한 경우에만 실드 부여
+  // Grant shield only on successful hits
   if (hitEnemy) {
     char.doyunShield = SKILL_CONSTANTS.SHIELD_AMOUNT;
     char.doyunShieldTimeLeft = SKILL_CONSTANTS.SHIELD_DURATION;
@@ -236,8 +269,9 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
     ctx.addFloatingText(char.x, char.y - 65, '❌ MISS! 실드 없음', '#888888', 1.2);
   }
 
-  // 본인 속도 안정화
+  // Stabilize own velocity
   const currentSpeed = Math.hypot(char.vx, char.vy);
   char.vx = (char.vx / (currentSpeed || 1)) * (char.speed * 3.5);
   char.vy = (char.vy / (currentSpeed || 1)) * (char.speed * 3.5);
 }
+// #endregion HELPERS

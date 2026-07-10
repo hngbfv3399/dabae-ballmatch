@@ -60,7 +60,7 @@ export class GameLounge {
   private animationFrameId: number | null = null;
   private lastTime: number = 0;
   private simulationSpeed: number = 1.0;
-  private roundTimer: number = 60.0;
+  private roundTimer: number = 90.0;
   
   // 게임 오버 애니메이션 지연을 위한 변수들
   private isGameOver: boolean = false;
@@ -147,7 +147,7 @@ export class GameLounge {
     this.isGameOver = false;
     this.gameOverTimer = 0;
     this.winnerCharacter = null;
-    this.roundTimer = 60.0;
+    this.roundTimer = 90.0;
     this.eliminationOrder = [];
     this.eliminationCount = 0;
 
@@ -165,6 +165,14 @@ export class GameLounge {
         char.onCollisionWithTarget = orig.onCollisionWithTarget;
         char.onBasicAttack = orig.onBasicAttack;
         char.onRenderExtra = orig.onRenderExtra;
+        
+        // Restore new lifecycle hooks
+        char.onTakeDamage = orig.onTakeDamage;
+        char.onDealDamage = orig.onDealDamage;
+        char.onDeath = orig.onDeath;
+        char.onPreRender = orig.onPreRender;
+        char.onRenderOverlay = orig.onRenderOverlay;
+        char.isTargetable = orig.isTargetable;
       }
 
       // 이미지 프리로딩 개시
@@ -270,7 +278,7 @@ export class GameLounge {
     // 분신(eunsu_clone)은 플레이어가 아니므로 승리 조건 판정에서 제외
     const aliveRealPlayers = aliveCharacters.filter((c) => !c.id.includes('eunsu_clone'));
 
-    // 60초 타이머 (연습모드 제외하고 항상 작동)
+    // 90초 타이머 (연습모드 제외하고 항상 작동)
     const isPractice = this.characters.some(c => c.id === 'dummy');
 
     if (this.isPrepared && !this.isGameOver && !isPractice) {
@@ -424,11 +432,12 @@ export class GameLounge {
           char.vx = Math.cos(randomAngle) * baseSpeed;
           char.vy = Math.sin(randomAngle) * baseSpeed;
 
+          const isUnhee = char.id === 'unhee';
           this.floatingTexts.push({
             x: char.x,
             y: char.y - 45,
-            text: '🏋️ 기절 해제 (운동 끝)',
-            color: '#00ffcc',
+            text: isUnhee ? '🏋️ 기절 해제 (운동 끝)' : '🧼 기절 해제!',
+            color: isUnhee ? '#ff9900' : '#00ffcc',
             life: 1.2
           });
           console.log(`🧼 [기절 해제] ${char.name}의 기절이 만료되어 비행을 재개합니다.`);
@@ -496,7 +505,7 @@ export class GameLounge {
 
         aliveCharacters.forEach((enemy) => {
           if (enemy.id === char.id) return;
-          if (enemy.isSuInvisible) return; // 은신 중인 대상은 타겟 설정 불가
+          if (enemy.isTargetable && !enemy.isTargetable(enemy)) return; // hook-based targetable check (e.g. Su invisibility)
           if (char.isCharmed && enemy.id === 'seyeon') return; // 매혹 중에는 세연 공격 타겟 제외
           
           // 은수 본체와 분신 관계 간의 아군 판정 (상호 타격 타겟 제외)
@@ -616,138 +625,27 @@ export class GameLounge {
   private dealDamage(attacker: CharacterState, target: CharacterState, amount: number, customText?: string) {
     if (target.isDead) return;
 
-    // 무적 상태 시 대미지 무시 (주주 보호막 등)
-    if (target.isImmune) {
-      console.log(`🛡️ [피해 무적] ${target.name}이 무적 상태이므로 피해를 받지 않습니다.`);
-      return;
-    }
-
-    // 수 정밀 저격 은신/무적 상태 시 대미지 무시
-    if (target.isSuInvisible) {
-      console.log(`🛡️ [은신 면역] ${target.name}이 은신 상태이므로 피해를 받지 않습니다.`);
-      return;
-    }
-
-    // 은수 본체와 분신 간 상호 피해 무시
+    // 은수 본체와 분신 간 상호 피해 무시 (분신 시스템 아군 판정이므로 엔진 레벨 유지)
     if ((attacker.id === 'eunsu' && target.id.includes('eunsu_clone')) ||
         (attacker.id.includes('eunsu_clone') && target.id === 'eunsu') ||
         (attacker.id.includes('eunsu_clone') && target.id.includes('eunsu_clone'))) {
       return;
     }
 
-    // 세연 매혹 대미지 무시 판정 (매혹당한 대상이 세연이에게 입히는 피해 0)
-    if (target.id === 'seyeon' && attacker.isCharmed) {
-      console.log(`🛡️ [매혹 면역] ${attacker.name} ➡️ 세연 | 매혹 상태의 적이 세연에게 입히는 피해는 무효화됩니다.`);
-      return;
-    }
-
     let finalDamage = amount;
+    const context = this.getBehaviorContext();
 
-    // 매혹 당한 대상은 받는 대미지 50% 증폭 (세연 매혹 취약)
-    if (target.isCharmed) {
-      finalDamage = Math.round(finalDamage * 1.5);
+    // 1. Invoke outgoing damage modifier hook (e.g. Jiho's 2.2x damage buff)
+    if (attacker.onDealDamage) {
+      finalDamage = attacker.onDealDamage(attacker, target, finalDamage, context);
     }
 
-    // 지호 버프 상태일 때 공격력 2.2배 적용
-    if (attacker.id === 'jiho' && attacker.skillActive) {
-      finalDamage = Math.round(finalDamage * 2.2);
-    }
-
-    // 찬휘 신라천정 시전 중 받는 대미지 97% 감소 (3%만 받음)
-    if (target.id === 'chanhwi' && target.skillActive) {
-      finalDamage = Math.round(finalDamage * 0.03);
-      if (finalDamage < 1 && amount >= 1) {
-        finalDamage = 1; // 최소 1 피해 보장
-      }
-    }
-
-    // 도윤 보호막(실드) 흡수 처리
-    if (target.id === 'doyun' && target.doyunShield && target.doyunShield > 0) {
-      const absorb = Math.min(finalDamage, target.doyunShield);
-      target.doyunShield -= absorb;
-      finalDamage -= absorb;
-      console.log(`🛡️ [실드 흡수] 도윤 -> 보호막이 ${absorb} 피해를 흡수했습니다. (남은 보호막: ${target.doyunShield})`);
-      if (absorb > 0) {
-        this.floatingTexts.push({
-          x: target.x,
-          y: target.y - 45,
-          text: `🛡️ ABSORB -${absorb}`,
-          color: '#00ccff',
-          life: 1.0
-        });
-      }
-    }
-
-    // 운희 벌크업 상태 시 받는 피해 50% 감소
-    if (target.id === 'unhee' && (target as any).unhwiBuffActive) {
-      finalDamage = Math.round(finalDamage * 0.5);
-      if (finalDamage < 1 && amount >= 1) {
-        finalDamage = 1; // 최소 1 피해 보장
-      }
-    }
-
-    // 주주 비상 차원 스왑 패시브 (체력 10% 이하 위기 모면)
-    if (target.id === 'juju' && !(target as any).hasEmergencySwapped) {
-      const nextHp = target.hp - finalDamage;
-      if (nextHp <= target.maxHp * 0.10) {
-        // 긴급 회피 격발!
-        (target as any).hasEmergencySwapped = true;
-
-        // 가장 체력이 높은 생존자 찾기
-        let maxHp = -Infinity;
-        let swapTarget: any = null;
-        this.characters.forEach((enemy) => {
-          if (enemy.isDead || enemy.id === 'juju') return;
-          if (enemy.hp > maxHp) {
-            maxHp = enemy.hp;
-            swapTarget = enemy;
-          }
-        });
-
-        if (swapTarget) {
-          const jX = target.x;
-          const jY = target.y;
-          const tX = swapTarget.x;
-          const tY = swapTarget.y;
-
-          // 위치 교환
-          target.x = tX;
-          target.y = tY;
-          swapTarget.x = jX;
-          swapTarget.y = jY;
-
-          // 무적 보호막 가동 (3초)
-          target.isImmune = true;
-          target.immuneTimeLeft = 3.0;
-
-          // 포탈 흔적 이펙트
-          if (!(target as any).swapPortals) (target as any).swapPortals = [];
-          (target as any).swapPortals.push({ x: jX, y: jY, life: 0.8 });
-          (target as any).swapPortals.push({ x: tX, y: tY, life: 0.8 });
-
-          this.createExplosion(jX, jY, '#00bfff', 18);
-          this.createExplosion(tX, tY, '#00bfff', 18);
-          this.floatingTexts.push({
-            x: target.x,
-            y: target.y - 70,
-            text: '🛡️ 비상 차원 탈출! (무적 3초)',
-            color: '#00bfff',
-            life: 2.0
-          });
-          console.log(`🛡️ [비상 탈출] 주주가 치사 피해를 회피하고 ${swapTarget.name}와 스왑 후 3초 무적막을 얻었습니다!`);
-        } else {
-          // 남은 생존자가 본인뿐일 경우 생존 무적막만 가동
-          target.isImmune = true;
-          target.immuneTimeLeft = 3.0;
-          this.floatingTexts.push({
-            x: target.x,
-            y: target.y - 70,
-            text: '🛡️ 비상 무적! (3초)',
-            color: '#00bfff',
-            life: 2.0
-          });
-        }
-        return; // 원래 입으려던 대미지 완전 무효화!
+    // 2. Invoke incoming damage protection & passive hook (e.g. Juju emergency swap, Su invisible immune, Seyeon charm immunity, Doyun shield, Chanhwi/Unhee dmg reduction)
+    if (target.onTakeDamage) {
+      const result = target.onTakeDamage(target, attacker, finalDamage, context);
+      finalDamage = result.finalDamage;
+      if (result.blocked) {
+        return; // Damage fully blocked or processed by passive Swaps
       }
     }
 
@@ -823,63 +721,8 @@ export class GameLounge {
         this.onCharacterDeath?.(target.id, attacker.id, this.characters.length);
       }
 
-      // 만약 사망한 캐릭터가 찬익이라면, 찬익이 생존자들에게 건 전술 감속 디버프를 모두 해제합니다.
-      if (target.id === 'chanik') {
-        this.characters.forEach((enemy) => {
-          const opp = enemy as any;
-          if (opp.chanikSlowApplied && opp.chanikOriginalSpeed !== undefined) {
-            enemy.speed = opp.chanikOriginalSpeed;
-            opp.chanikSlowApplied = false;
-            this.floatingTexts.push({
-              x: enemy.x,
-              y: enemy.y - 25,
-              text: '🚨 포격 취소 (이속 복구)',
-              color: '#00ffcc',
-              life: 1.0
-            });
-            console.log(`🚨 [전술 감속 해제] 찬익 사망으로 인해 ${enemy.name}의 감속이 해제되고 속도가 복구되었습니다.`);
-          }
-        });
-      }
-
-      // 만약 사망한 캐릭터가 나유타라면, 맵 전체의 지배 상태를 해제합니다.
-      if (target.id === 'nayuta') {
-        this.characters.forEach((enemy) => {
-          if (enemy.nayutaControlled) {
-            enemy.nayutaControlled = false;
-            enemy.nayutaControlTimeLeft = 0;
-            this.floatingTexts.push({
-              x: enemy.x,
-              y: enemy.y - 25,
-              text: '해제 (나유타 사망)',
-              color: '#00ffcc',
-              life: 1.0
-            });
-            console.log(`👁️ [지배 해제] 나유타 사망으로 인해 ${enemy.name}의 지배가 해제되었습니다.`);
-          }
-        });
-      }
-
-      // 은수 본체 사망 시 모든 분신도 함께 즉사 처리
-      if (target.id === 'eunsu') {
-        this.characters.forEach((clone) => {
-          if (!clone.isDead && clone.id.includes('eunsu_clone')) {
-            clone.hp = 0;
-            clone.isDead = true;
-            clone.opacity = 0.8;
-            (clone as any).deathAnimationTime = 1.5;
-            this.createExplosion(clone.x, clone.y, '#ff007f', 20);
-            this.floatingTexts.push({
-              x: clone.x,
-              y: clone.y - 10,
-              text: '분신 소멸',
-              color: '#ff007f',
-              life: 1.5
-            });
-            console.log(`👥 [분신 소멸] 은수 본체 사망으로 인해 분신(${clone.id})이 제거되었습니다.`);
-          }
-        });
-      }
+      // Trigger character-specific death hook (e.g. Chanik slow release, Nayuta domination release, Eunsu clone destruction)
+      target.onDeath?.(target, attacker, context);
 
       this.createExplosion(target.x, target.y, '#ffffff', 40);
       this.createExplosion(target.x, target.y, target.color, 30);
@@ -948,31 +791,11 @@ export class GameLounge {
     }
   }
 
-  /* ==================== 렌더링 메서드 ==================== */
   private render() {
     this.ctx.save();
 
-    // 찬휘 신라천정 시전 시 화면 흔들림 효과
-    let shakeAmount = 0;
-    const chanhwi = this.characters.find((c) => c.id === 'chanhwi' && c.skillActive && !c.isDead);
-    if (chanhwi) {
-      const elapsed = 17.4 - chanhwi.skillDurationLeft;
-      if (elapsed >= 2.0 && elapsed < 17.0) {
-        // 시간이 흐를수록 격렬하게 떨림 (최대 10px, 순간이동 완료 후 대사 시작할 때부터 시작)
-        const ratio = (elapsed - 2.0) / 15.0;
-        shakeAmount = ratio * 10;
-      } else if (elapsed >= 17.0) {
-        // 격발 순간 최대 25px 진동, 0.4초간 서서히 진정
-        const blastElapsed = elapsed - 17.0;
-        shakeAmount = (1.0 - (blastElapsed / 0.4)) * 25;
-      }
-    }
+    // Screen shake, screen darkening, subtitles are now handled via onRenderOverlay hooks on characters.
 
-    if (shakeAmount > 0) {
-      const dx = (Math.random() - 0.5) * shakeAmount;
-      const dy = (Math.random() - 0.5) * shakeAmount;
-      this.ctx.translate(dx, dy);
-    }
 
     this.ctx.fillStyle = '#06060c';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -997,7 +820,7 @@ export class GameLounge {
     this.ctx.lineWidth = 6;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 60초 타이머 그리기 (연습모드 제외하고 항상 작동)
+    // 90초 타이머 그리기 (연습모드 제외하고 항상 작동)
     const isPractice = this.characters.some(c => c.id === 'dummy');
 
     if (this.isPrepared && !this.isGameOver && !isPractice) {
@@ -1084,26 +907,11 @@ export class GameLounge {
 
       this.ctx.save();
 
-      // 수 정밀 저격 은신 상태 시 반투명화
-      if (char.isSuInvisible) {
-        this.ctx.globalAlpha = 0.25;
-      }
+      // Invoke character-specific pre-render adjustments (e.g. Su alpha, Jiho aura glow)
+      char.onPreRender?.(char, this.ctx);
 
       // 스케일 반영된 반경
       const currentRadius = char.radius * char.scaleMultiplier;
-
-      // 지호 버프 상태(초록 광륜) 이펙트
-      if (char.id === 'jiho' && char.skillActive) {
-        this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(0, 255, 196, 0.4)';
-        this.ctx.lineWidth = 6;
-        this.ctx.shadowBlur = 15;
-        this.ctx.shadowColor = '#00ffcc';
-        this.ctx.beginPath();
-        this.ctx.arc(char.x, char.y, currentRadius + 12 + Math.sin(Date.now() / 80) * 3, 0, Math.PI * 2);
-        this.ctx.stroke();
-        this.ctx.restore();
-      }
 
       // 원형 클리핑 영역 및 배경
       this.ctx.save();
@@ -1229,51 +1037,10 @@ export class GameLounge {
       this.ctx.restore();
     });
 
-    // 6. 찬휘 신라천정 암전 및 화이트아웃 오버레이
-    if (chanhwi) {
-      const elapsed = 17.4 - chanhwi.skillDurationLeft;
-      if (elapsed >= 2.0 && elapsed < 17.0) {
-        // 캐스팅 동안 점진적 암전 (순간이동 완료 후 시작)
-        const alpha = Math.min(0.55, ((elapsed - 2.0) / 15.0) * 0.55);
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-        this.ctx.fillRect(-50, -50, this.canvas.width + 100, this.canvas.height + 100);
-      } else if (elapsed >= 17.0) {
-        // 격발 시 화이트아웃 섬광
-        const blastElapsed = elapsed - 17.0;
-        const flashAlpha = 1.0 - (blastElapsed / 0.4);
-        if (flashAlpha > 0) {
-          this.ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-          this.ctx.fillRect(-50, -50, this.canvas.width + 100, this.canvas.height + 100);
-        }
-      }
-
-      // 7. 찬휘 자막 드로잉 (어두운 화면 오버레이 위에 배치하여 완전 선명하게 표출!)
-      if ((chanhwi as any).currentQuotes && (chanhwi as any).currentQuotes.length > 0) {
-        this.ctx.save();
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.strokeStyle = '#000000';
-        this.ctx.lineWidth = 4.5;
-        this.ctx.font = 'bold 20px "Noto Sans KR", Arial, sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-
-        const lines = (chanhwi as any).currentQuotes as string[];
-        const isFinalBlast = lines[0].includes('신라');
-
-        if (isFinalBlast) {
-          this.ctx.font = 'bold 46px "Noto Sans KR", Arial, sans-serif';
-          this.ctx.fillStyle = '#ffcc00'; // 황금빛
-          this.ctx.strokeText(lines[0], 400, 300);
-          this.ctx.fillText(lines[0], 400, 300);
-        } else {
-          // 한 음절만 노출 (마지막 대사 하나만 렌더링)
-          const currentLine = lines[lines.length - 1];
-          this.ctx.strokeText(currentLine, 400, 300);
-          this.ctx.fillText(currentLine, 400, 300);
-        }
-        this.ctx.restore();
-      }
-    }
+    // 6. 캐릭터 전용 전체화면 오버레이 훅 실행 (예: 찬휘 신라천정 암전/자막/화면흔들림)
+    this.characters.forEach((char) => {
+      char.onRenderOverlay?.(char, this.ctx, this.canvas.width, this.canvas.height);
+    });
 
     // 8. 데미지 플로팅 텍스트 렌더링
     this.ctx.save();

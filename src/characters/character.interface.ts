@@ -23,12 +23,31 @@ export interface CharacterConfig {
   role: 'Nuker' | 'Sniper' | 'Speedster' | 'Guardian' | 'Juggernaut' | 'Disabler' | 'Summoner' | 'Specialist' | 'Supporter'; // 캐릭터 역할군
   detailedDescription: string; // 상세 플레이 스타일 설명
 
-  // 고유 로직 라이프사이클 훅
+  // === Lifecycle Hooks (character-specific logic) ===
   onSkillTrigger?: (char: CharacterState, ctx: CharacterBehaviorContext) => void;
   onUpdate?: (char: CharacterState, dt: number, ctx: CharacterBehaviorContext) => void;
   onCollisionWithTarget?: (char: CharacterState, opponent: CharacterState, ctx: CharacterBehaviorContext) => void;
   onBasicAttack?: (char: CharacterState, opponent: CharacterState, ctx: CharacterBehaviorContext) => void;
   onRenderExtra?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) => void;
+
+  // === Damage Hooks (called from dealDamage) ===
+  // Return modified damage. If blocked=true, damage is fully negated.
+  onTakeDamage?: (target: CharacterState, attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) => { finalDamage: number; blocked: boolean };
+  // Return modified outgoing damage amount.
+  onDealDamage?: (attacker: CharacterState, target: CharacterState, damage: number, ctx: CharacterBehaviorContext) => number;
+
+  // === Death Hook (cleanup when this character dies) ===
+  onDeath?: (char: CharacterState, killer: CharacterState, ctx: CharacterBehaviorContext) => void;
+
+  // === Render Hooks ===
+  // Called before the character circle is drawn (e.g., globalAlpha, glow).
+  onPreRender?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D) => void;
+  // Called after all characters are drawn, for fullscreen overlays (e.g., screen darkening, subtitles).
+  onRenderOverlay?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => void;
+
+  // === Targeting Hook ===
+  // Return false to exclude this character from being targeted by enemies.
+  isTargetable?: (char: CharacterState) => boolean;
 }
 
 export interface CharacterState extends CharacterConfig {

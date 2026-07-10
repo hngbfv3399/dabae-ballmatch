@@ -1,5 +1,8 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const nayutaConfig: CharacterConfig = {
   id: 'nayuta',
   name: '나유타',
@@ -14,17 +17,20 @@ export const nayutaConfig: CharacterConfig = {
   tier: 'B',
   role: 'Speedster',
   detailedDescription: '나유타는 텔레포트와 스킬 충전 봉쇄를 통해 특정 타겟을 집중 견제하고 마킹하는 기동형 공격수 캐릭터입니다. 적 타격 시 일정 확률로 대상을 지배하여 10초간 적의 스킬 게이지 충전을 완벽하게 틀어막고, 순간적인 텔레포트로 지배 대상을 추적해 차원 도약 피해와 디버프를 퍼부으며 상대 핵심 전력을 사전에 격살합니다.',
+// #endregion CONFIG
 
-  // [1] 스킬 최초 시동 시 훅
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — initiate domination on controlled targets
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = 5.0; // 5초간 지배 조종 가동
+    char.skillDurationLeft = 5.0; // 5 seconds domination active duration
 
     ctx.addFloatingText(char.x, char.y - 60, '👁️ 지배!', '#e52b50', 1.5);
     console.log(`👁️ [스킬 발동] 나유타 -> 지배 가동! (5초간 대상 지속 대미지/디버프 및 스킬 봉인)`);
     ctx.logMessage?.(`👁️ [스킬 발동] 나유타 ➡️ 지배 개시! 지배 대상들 5초간 디버프 및 조종 가동`, 'skill');
 
-    // 발동 시점에 지배당한 모든 대상의 스킬 및 게이지를 즉시 소멸
+    // Instantly cancel active skills and reset gauges of dominated targets
     const chars = ctx.characters;
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
@@ -35,20 +41,22 @@ export const nayutaConfig: CharacterConfig = {
           console.log(`🚫 [스킬 강제 소멸] 나유타 -> ${enemy.name}의 활성화된 스킬을 강제 차단했습니다.`);
           ctx.logMessage?.(`🚫 [스킬 강제 차단] 나유타 ➡️ ${enemy.name}의 활성화된 스킬 차단 및 게이지 리셋`, 'skill');
         }
-        enemy.skillGauge = 0; // 게이지 리셋
+        enemy.skillGauge = 0; // reset gauge
         ctx.createExplosion(enemy.x, enemy.y, '#ff0033', 8);
         ctx.addFloatingText(enemy.x, enemy.y - 45, '🚫 SKILL CANCEL!', '#ff0033', 1.5);
       }
     });
-
   },
+  // #endregion SKILL_TRIGGER
 
-  // [2] 매 프레임 업데이트 훅
+  // ═══════════════════════════════════════════
+  // #region UPDATE — control dominated enemies, deal DOT, handle timers
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     const chars = ctx.characters;
-    (char as any)._charactersRef = chars; // 렌더러용 참조 저장
+    (char as any)._charactersRef = chars; // save reference for renderer
 
-    // A. 지배 타이머 및 디버프 상태 실시간 갱신 (지배는 찬휘의 스킬 상태에 무관하게 실시간 감소)
+    // A. Update domination duration timer on enemies
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
       if (enemy.nayutaControlled) {
@@ -64,24 +72,22 @@ export const nayutaConfig: CharacterConfig = {
       }
     });
 
-    // B. 스킬이 켜져 있을 때 (8초간 지속 대미지/디버프 + 조종)
+    // B. Domination skill active phase
     if (char.skillActive) {
       char.skillDurationLeft -= dt;
 
-      // 스킬 시전 중에도 나유타는 계속 이동 가능
-
-      // 지배당한 적들을 조종하여 공격에 참여시킴
+      // Dominated enemies control logic
       chars.forEach((enemy) => {
         if (enemy.isDead || enemy.id === char.id) return;
         if (enemy.nayutaControlled) {
-           // 1. 강제 스킬 취소 상태 유지 (스킬 무효화)
+          // 1. Maintain skill cancellation
           if (enemy.skillActive) {
             enemy.skillActive = false;
             enemy.skillDurationLeft = 0;
           }
-          enemy.skillGauge = 0; // 게이지 강제 0 고정
+          enemy.skillGauge = 0; // force gauge to 0
 
-          // 2. 지속 대미지 (0.5초마다 8 데미지)
+          // 2. DOT Damage (8 damage every 0.5 seconds)
           if (!(enemy as any)._lastDominationTick) (enemy as any)._lastDominationTick = 0;
           const tickNow = Date.now();
           if (tickNow - (enemy as any)._lastDominationTick > 500) {
@@ -90,7 +96,7 @@ export const nayutaConfig: CharacterConfig = {
             console.log(`👁️ [지배 데미지] 나유타 -> ${enemy.name} | 8 데미지`);
           }
 
-          // 2. 조종: 지배당하지 않은 가장 가까운 다른 적을 표적으로 탐색
+          // 3. Control movement: pursue closest non-dominated enemy
           let closestTarget: CharacterState | null = null;
           let minDist = Infinity;
 
@@ -103,14 +109,13 @@ export const nayutaConfig: CharacterConfig = {
             }
           });
 
-          // 표적을 향해 돌진
+          // Move towards target at high speed (7.5px/frame)
           if (closestTarget) {
             const kAngle = Math.atan2((closestTarget as CharacterState).y - enemy.y, (closestTarget as CharacterState).x - enemy.x);
-            // 일반 이동속도보다 훨씬 강력한 돌진 속도(7.5px/frame) 부여
             enemy.vx = Math.cos(kAngle) * 7.5;
             enemy.vy = Math.sin(kAngle) * 7.5;
 
-            // 3. 자폭/인형 타격 접촉 피해 연산
+            // Contact explosion damage
             const currentMinDist = enemy.radius + (closestTarget as CharacterState).radius + 6;
             if (minDist <= currentMinDist) {
               const now = Date.now();
@@ -127,18 +132,17 @@ export const nayutaConfig: CharacterConfig = {
         }
       });
 
-      // 스킬 완료 처리
+      // Complete skill duration
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
         
-        // 스킬 종료 직후 즉시 다시 자유 기동하도록 속도 복구
         const randomAngle = Math.random() * Math.PI * 2;
         const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
         char.vy = Math.sin(randomAngle) * baseSpeed;
       }
     } else {
-      // 기절 처리
+      // Stun handling
       if (char.isStunned) {
         char.stunTimeLeft -= dt;
         char.vx = 0;
@@ -153,29 +157,47 @@ export const nayutaConfig: CharacterConfig = {
       }
     }
   },
+  // #endregion UPDATE
 
-  // [3] 캐릭터 고유 렌더링 확장 훅
+  // ═══════════════════════════════════════════
+  // #region DEATH — release all controlled enemies on death
+  // ═══════════════════════════════════════════
+  onDeath(_char: CharacterState, _killer: CharacterState, ctx: CharacterBehaviorContext) {
+    // Release all targets dominated by Nayuta
+    ctx.characters.forEach((enemy) => {
+      if (enemy.nayutaControlled) {
+        enemy.nayutaControlled = false;
+        enemy.nayutaControlTimeLeft = 0;
+        ctx.addFloatingText(enemy.x, enemy.y - 25, '해제 (나유타 사망)', '#00ffcc', 1.0);
+        console.log(`👁️ [지배 해제] 나유타 사망으로 인해 ${enemy.name}의 지배가 해제되었습니다.`);
+      }
+    });
+  },
+  // #endregion DEATH
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — collar effects on targets, stun stars
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     const chars = (char as any)._charactersRef as CharacterState[] || [];
 
     chars.forEach((enemy) => {
        if (enemy.isDead || enemy.id === char.id) return;
 
-       // 1. 지배당한 대상들의 빨간색 테두리 서클(칼라) 점멸 렌더링
+       // Red pulsing collar rings around controlled targets
        if (enemy.nayutaControlled) {
-         canvasCtx.save();
-         canvasCtx.strokeStyle = 'rgba(229, 43, 80, 0.75)';
-         canvasCtx.lineWidth = 3.0;
-         // 점멸하며 팽창/수축하는 붉은 고리
-         const collarPulse = enemy.radius + 6 + Math.abs(Math.sin(Date.now() / 120)) * 4;
-         canvasCtx.beginPath();
-         canvasCtx.arc(enemy.x, enemy.y, collarPulse, 0, Math.PI * 2);
-         canvasCtx.stroke();
-         canvasCtx.restore();
+          canvasCtx.save();
+          canvasCtx.strokeStyle = 'rgba(229, 43, 80, 0.75)';
+          canvasCtx.lineWidth = 3.0;
+          const collarPulse = enemy.radius + 6 + Math.abs(Math.sin(Date.now() / 120)) * 4;
+          canvasCtx.beginPath();
+          canvasCtx.arc(enemy.x, enemy.y, collarPulse, 0, Math.PI * 2);
+          canvasCtx.stroke();
+          canvasCtx.restore();
        }
     });
 
-    // 기절 이펙트 그리기
+    // Stun stars
     if (char.isStunned) {
       canvasCtx.save();
       const numStars = 3;
@@ -193,4 +215,5 @@ export const nayutaConfig: CharacterConfig = {
       canvasCtx.restore();
     }
   }
+  // #endregion RENDER
 };

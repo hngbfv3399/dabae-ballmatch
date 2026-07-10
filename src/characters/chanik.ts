@@ -1,5 +1,8 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region TYPES
+// ═══════════════════════════════════════════
 interface Projectile {
   startX: number;
   startY: number;
@@ -17,7 +20,11 @@ interface ArtilleryStrike {
   durationLeft: number;
   shellTimer: number;
 }
+// #endregion TYPES
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const chanikConfig: CharacterConfig = {
   id: 'chanik',
   name: '찬익',
@@ -32,10 +39,13 @@ export const chanikConfig: CharacterConfig = {
   tier: 'A',
   role: 'Nuker',
   detailedDescription: '찬익은 광역 전탄 포격을 요청하여 맵 전체에 무차별 폭격을 쏟아붓는 포격형 누커 캐릭터입니다. 스킬이 켜지면 공습경보와 함께 전장에 있는 모든 적의 이동 속도를 감소시키며, 연속으로 무차별 낙하하는 포탄을 투하해 대량의 넉백과 누적 대미지를 가해 전장 전체를 초토화시킵니다.',
+// #endregion CONFIG
 
-  // [1] 스킬 최초 시동 시 훅
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — request artillery strike
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
-    char.skillActive = false; // 포격 호출 직후 스킬 상태 종료하여 다시 쿨타임 돌기
+    char.skillActive = false; // Ends skill immediately to restart cooldown
 
     ctx.addFloatingText(char.x, char.y - 45, '🚨 공습경보 발령!', '#ff3300', 1.5);
     console.log(`📻 [포격 요청] 찬익 -> 맵 전체 무차별 전탄 융단폭격 지원 요청! (공습경보 가동)`);
@@ -43,23 +53,26 @@ export const chanikConfig: CharacterConfig = {
 
     const activeStrikes = (char as any).activeStrikes || [];
     activeStrikes.push({
-      targetX: 400, // 맵 중앙
-      targetY: 300, // 맵 중앙
-      radius: 1000, // 전 화면 커버
-      delayLeft: 1.5, // 1.5초 폭격 대기 및 공습경보 노출 시간
-      durationLeft: 4.8, // 4.8초 포격 지속 시간 (1초 상향)
+      targetX: 400, // Center of map
+      targetY: 300,
+      radius: 1000, // Entire screen
+      delayLeft: 1.5, // Alert warning phase
+      durationLeft: 4.8, // Bombardment duration
       shellTimer: 0
     });
     (char as any).activeStrikes = activeStrikes;
   },
+  // #endregion SKILL_TRIGGER
 
-  // [2] 매 프레임 업데이트 훅
+  // ═══════════════════════════════════════════
+  // #region UPDATE — projectile flight & blast logic, target debuff updates
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     const activeStrikes = ((char as any).activeStrikes || []) as ArtilleryStrike[];
     const projectiles = ((char as any).projectiles || []) as Projectile[];
-    const chars = (ctx as any).characters as CharacterState[];
+    const chars = ctx.characters;
 
-    // 포격 조준 범위 내 적 감속 디버프 부여
+    // Apply speed reduction debuff to enemies inside alert zone
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
       const opp = enemy as any;
@@ -76,7 +89,7 @@ export const chanikConfig: CharacterConfig = {
         if (!opp.chanikSlowApplied) {
           opp.chanikSlowApplied = true;
           opp.chanikOriginalSpeed = enemy.speed;
-          enemy.speed = enemy.speed * 0.8; // 20% 감속 (기존 40%)
+          enemy.speed = enemy.speed * 0.8; // 20% slow
           ctx.addFloatingText(enemy.x, enemy.y - 25, '🚨 공습경보 (이속 -20%)', '#ff3300', 1.0);
           console.log(`🚨 [전술 감속] 찬익의 전탄 융단폭격 공습경보 작동 -> ${enemy.name} 이동 속도 20% 감소`);
         }
@@ -92,33 +105,24 @@ export const chanikConfig: CharacterConfig = {
       }
     });
 
-    // 1. 포격 타이머 및 폭포탄 소환
+    // 1. Strike timer and spawn projectiles
     activeStrikes.forEach((strike) => {
       if (strike.delayLeft > 0) {
         strike.delayLeft -= dt;
-        // 조준 영역에 임의의 붉은 위험 신호 파티클 방출 (맵 전체 범위 무작위)
         if (Math.random() < 0.3) {
-          ctx.createParticle(
-            Math.random() * 800,
-            Math.random() * 600,
-            '#ff3300',
-            2,
-            5
-          );
+          ctx.createParticle(Math.random() * 800, Math.random() * 600, '#ff3300', 2, 5);
         }
       } else if (strike.durationLeft > 0) {
         strike.durationLeft -= dt;
         strike.shellTimer -= dt;
         if (strike.shellTimer <= 0) {
-          strike.shellTimer = 0.15; // 0.15초 간격으로 신속 포격 투하
+          strike.shellTimer = 0.15; // Shoot every 0.15s
           
-          // 맵 전체 범위 내 무작위 낙하 좌표 계산
           const bombX = Math.random() * 800;
           const bombY = Math.random() * 600;
 
-          // 공중 투하 포탄 오브젝트 추가
           projectiles.push({
-            startX: bombX - 100, // 빗겨 떨어지는 포탄 궤적
+            startX: bombX - 100,
             startY: bombY - 400,
             targetX: bombX,
             targetY: bombY,
@@ -129,22 +133,20 @@ export const chanikConfig: CharacterConfig = {
       }
     });
 
-    // 완료된 폭격 요청 정제
+    // Clean up finished strikes
     (char as any).activeStrikes = activeStrikes.filter((s) => s.delayLeft > 0 || s.durationLeft > 0);
 
-    // 2. 포탄 비행 투하 업데이트
+    // 2. Missile flight and explosions
     projectiles.forEach((proj) => {
-      proj.progress += dt * 4.0; // 0.25초 만에 폭발점에 도달
+      proj.progress += dt * 4.0; // Reach target in 0.25 seconds
       
       const curX = proj.startX + (proj.targetX - proj.startX) * proj.progress;
       const curY = proj.startY + (proj.targetY - proj.startY) * proj.progress;
 
-      // 비행 꼬리 파티클 방출
       if (proj.progress < 1.0 && Math.random() < 0.3) {
         ctx.createParticle(curX, curY, '#ff6600', 3, 5);
       }
 
-      // 폭발 시점 감지
       if (proj.progress >= 1.0 && !proj.damageDealt) {
         proj.progress = 1.0;
         proj.damageDealt = true;
@@ -155,15 +157,15 @@ export const chanikConfig: CharacterConfig = {
         ctx.createExplosion(proj.targetX, proj.targetY, '#ff3300', 18);
         ctx.addFloatingText(proj.targetX, proj.targetY - 20, '💥 BOMB!', '#ff3300', 1.0);
 
-        // 폭격 범위 내의 적(반경 135px)에게 피해 적용
-        const chars = (ctx as any).characters as CharacterState[];
-        chars.forEach((enemy) => {
+        // Apply 10 damage within 135px radius
+        const targetRadius = 135;
+        ctx.characters.forEach((enemy) => {
           if (enemy.isDead || enemy.id === char.id) return;
           const dist = Math.hypot(enemy.x - proj.targetX, enemy.y - proj.targetY);
-          if (dist <= 135) {
+          if (dist <= targetRadius) {
             ctx.dealDamage(char, enemy, 10, '💥 BOMBARD!');
             
-            // 강력한 폭발 넉백 벡터 적용
+            // Strong explosion knockback
             const kAngle = Math.atan2(enemy.y - proj.targetY, enemy.x - proj.targetX);
             enemy.vx += Math.cos(kAngle) * 8;
             enemy.vy += Math.sin(kAngle) * 8;
@@ -172,10 +174,9 @@ export const chanikConfig: CharacterConfig = {
       }
     });
 
-    // 만료된 포탄 오브젝트 정제
     (char as any).projectiles = projectiles.filter((p) => p.progress < 1.0);
 
-    // 기절 수동 제어
+    // Stun logic
     if (char.isStunned) {
       char.stunTimeLeft -= dt;
       char.vx = 0;
@@ -189,36 +190,55 @@ export const chanikConfig: CharacterConfig = {
       }
     }
   },
+  // #endregion UPDATE
 
-  // [3] 캐릭터 고유 렌더링 확장 훅
+  // ═══════════════════════════════════════════
+  // #region DEATH — remove slow debuff on death
+  // ═══════════════════════════════════════════
+  onDeath(_char: CharacterState, _killer: CharacterState, ctx: CharacterBehaviorContext) {
+    // If Chanik dies, restore speeds of all slowed characters
+    ctx.characters.forEach((enemy) => {
+      const opp = enemy as any;
+      if (opp.chanikSlowApplied && opp.chanikOriginalSpeed !== undefined) {
+        enemy.speed = opp.chanikOriginalSpeed;
+        opp.chanikSlowApplied = false;
+        ctx.addFloatingText(enemy.x, enemy.y - 25, '🚨 포격 취소 (이속 복구)', '#00ffcc', 1.0);
+        console.log(`🚨 [전술 감속 해제] 찬익 사망으로 인해 ${enemy.name}의 감속이 해제되고 속도가 복구되었습니다.`);
+      }
+    });
+  },
+  // #endregion DEATH
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — alert area siren, falling missiles, stun stars
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     const activeStrikes = ((char as any).activeStrikes || []) as ArtilleryStrike[];
     const projectiles = ((char as any).projectiles || []) as Projectile[];
 
-    // 1. 붉은 조준 영역 경고 및 오버레이 점멸 그리기
+    // 1. Siren warnings and alert zone dashed lines
     canvasCtx.save();
     activeStrikes.forEach((strike) => {
       if (strike.radius >= 1000) {
-        // 화면 가장자리 빨간색 사이렌 라인 그리기
+        // Siren border lines
         canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.45)';
         canvasCtx.lineWidth = 10;
         canvasCtx.strokeRect(0, 0, 800, 600);
 
-        // 화면 전체에 은은한 붉은색 오버레이 점멸 이펙트
+        // Slow flashing red overlay screen
         const pulse = Math.abs(Math.sin(Date.now() / 150)) * 0.08;
         canvasCtx.fillStyle = `rgba(255, 0, 0, ${pulse})`;
         canvasCtx.fillRect(0, 0, 800, 600);
 
-        // 🚨 공습경보!! 대형 자막 출력 (폭탄 낙하 대기 1.5초 동안 중앙에 표출)
+        // Big alert text during warning delay
         if (strike.delayLeft > 0) {
           canvasCtx.save();
           canvasCtx.fillStyle = '#ff3300';
           canvasCtx.strokeStyle = '#000000';
           canvasCtx.lineWidth = 5.0;
           
-          // 긴박한 고속 점멸 계수 (80ms 주기)
           const textPulse = Math.abs(Math.sin(Date.now() / 80));
-          canvasCtx.globalAlpha = 0.3 + textPulse * 0.7; // 0.3 ~ 1.0 점멸
+          canvasCtx.globalAlpha = 0.3 + textPulse * 0.7;
           
           canvasCtx.font = 'bold 52px "Noto Sans KR", Arial, sans-serif';
           canvasCtx.textAlign = 'center';
@@ -252,13 +272,13 @@ export const chanikConfig: CharacterConfig = {
     });
     canvasCtx.restore();
 
-    // 2. 공중에서 낙하하는 미사일 포탄 그리기
+    // 2. Falling missiles
     canvasCtx.save();
     projectiles.forEach((proj) => {
       const curX = proj.startX + (proj.targetX - proj.startX) * proj.progress;
       const curY = proj.startY + (proj.targetY - proj.startY) * proj.progress;
 
-      // 미사일 연소 화염 꼬리선
+      // Rocket tail lines
       canvasCtx.beginPath();
       canvasCtx.moveTo(curX, curY);
       const angle = Math.atan2(proj.targetY - proj.startY, proj.targetX - proj.startX);
@@ -269,10 +289,10 @@ export const chanikConfig: CharacterConfig = {
       canvasCtx.lineWidth = 4;
       canvasCtx.stroke();
 
-      // 포탄 몸체 구체 그리기
+      // Missile head
       canvasCtx.beginPath();
       canvasCtx.arc(curX, curY, 6, 0, Math.PI * 2);
-      canvasCtx.fillStyle = '#4b5320'; // 올리브 국방색
+      canvasCtx.fillStyle = '#4b5320';
       canvasCtx.strokeStyle = '#ff3300';
       canvasCtx.lineWidth = 1.5;
       canvasCtx.fill();
@@ -280,7 +300,7 @@ export const chanikConfig: CharacterConfig = {
     });
     canvasCtx.restore();
 
-    // 기절 이펙트 그리기
+    // Stun stars
     if (char.isStunned) {
       canvasCtx.save();
       const numStars = 3;
@@ -298,4 +318,5 @@ export const chanikConfig: CharacterConfig = {
       canvasCtx.restore();
     }
   }
+  // #endregion RENDER
 };

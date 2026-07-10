@@ -1,21 +1,28 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
 
+// ═══════════════════════════════════════════
+// #region CONSTANTS
+// ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
   COOLDOWN: 10,
-  WORKOUT_DURATION: 2.0,       // 쇠질 채널링 시간 (2초)
-  BULKUP_DURATION: 7.0,        // 벌크업 버프 지속시간 (7초)
-  TOTAL_DURATION: 9.0,         // 총 스킬 지속 (2 + 7 = 9초)
-  HEAL_AMOUNT: 35,             // 쇠질 완료 시 회복량
-  ATK_MULTIPLIER: 2,           // 공격력 배율
-  BASE_ATK: 12,                // 기본 공격력
-  BULKUP_ATK: 24,              // 벌크업 공격력 (12 * 2)
-  BASE_SPEED: 1.5,             // 기본 이속
-  SPEED_REDUCTION_PCT: 30,     // 벌크업 이속 감소 비율 (%)
-  BULKUP_SPEED: 1.05,          // 벌크업 이속 (1.5 * 0.7 = 1.05)
-  SCALE: 1.6,                  // 덩치 확대 배율
-  DMG_REDUCTION_PCT: 50,       // 받는 피해 감소 비율
+  WORKOUT_DURATION: 2.0,       // workout channeling time (2s)
+  BULKUP_DURATION: 7.0,        // bulkup buff duration (7s)
+  TOTAL_DURATION: 9.0,         // total skill duration (2 + 7 = 9s)
+  HEAL_AMOUNT: 35,             // heal amount on workout completion
+  ATK_MULTIPLIER: 2,           // attack multiplier
+  BASE_ATK: 12,                // base attack power
+  BULKUP_ATK: 24,              // bulkup attack power (12 * 2)
+  BASE_SPEED: 1.5,             // base movement speed
+  SPEED_REDUCTION_PCT: 30,     // speed reduction % during bulkup
+  BULKUP_SPEED: 1.05,          // bulkup speed (1.5 * 0.7 = 1.05)
+  SCALE: 1.6,                  // scale multiplier
+  DMG_REDUCTION_PCT: 50,       // damage reduction %
 };
+// #endregion CONSTANTS
 
+// ═══════════════════════════════════════════
+// #region CONFIG — character stats & metadata
+// ═══════════════════════════════════════════
 export const unheeConfig: CharacterConfig = {
   id: 'unhee',
   name: '운희',
@@ -30,15 +37,18 @@ export const unheeConfig: CharacterConfig = {
   tier: 'D',
   role: 'Juggernaut',
   detailedDescription: `운희는 '쇠질(웨이트 트레이닝)'과 적 접촉 시 발동되는 강제 쇠질 패시브를 활용하여 적의 기동력을 억제하고 생존력을 높이는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 완료 시 대량의 체력 회복과 함께 덩치 및 공격력이 대폭 상승하고 받는 피해를 50% 줄인 채 적을 압박할 수 있습니다.`,
+// #endregion CONFIG
 
-  // [1] 스킬 최초 시동 훅
+  // ═══════════════════════════════════════════
+  // #region SKILL_TRIGGER — start workout channeling
+  // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = SKILL_CONSTANTS.TOTAL_DURATION; // 2초 쇠질 + 7초 벌크업 버프
+    char.skillDurationLeft = SKILL_CONSTANTS.TOTAL_DURATION; // 2s workout + 7s bulkup
     (char as any).workoutFinished = false;
     (char as any).unhwiBuffActive = false;
     
-    // 강제 정지
+    // Stop movement
     char.vx = 0;
     char.vy = 0;
 
@@ -46,39 +56,30 @@ export const unheeConfig: CharacterConfig = {
     console.log(`🏋️ [쇠질 돌입] 운희 -> ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 운동 개시 (움직임 불가능)`);
     ctx.logMessage?.(`🏋️ [쇠질 돌입] 운희 ➡️ ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 쇠질 운동 개시 (이동 불가)`, 'skill');
   },
+  // #endregion SKILL_TRIGGER
 
-  // [2] 매 프레임 업데이트 훅
+  // ═══════════════════════════════════════════
+  // #region UPDATE — workout channel & bulkup timer
+  // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx) {
     if (char.skillActive) {
       char.skillDurationLeft -= dt;
-      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft; // 경과 시간
+      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
 
-      // 1. 운동 중 (0.0 ~ WORKOUT_DURATION초)
+      // 1. Channeling Workout (0.0 ~ WORKOUT_DURATION)
       if (elapsed < SKILL_CONSTANTS.WORKOUT_DURATION) {
         char.vx = 0;
         char.vy = 0;
 
-        // 운동 땀방울(하늘색) 및 기운 파티클 생성
+        // Sweat drops (blue) & energy particles (orange)
         if (Math.random() < 0.25) {
-          ctx.createParticle(
-            char.x + (Math.random() - 0.5) * 20,
-            char.y - 15,
-            '#00ddff', // 땀방울
-            2 + Math.random() * 2,
-            10
-          );
+          ctx.createParticle(char.x + (Math.random() - 0.5) * 20, char.y - 15, '#00ddff', 2 + Math.random() * 2, 10);
         }
         if (Math.random() < 0.2) {
-          ctx.createParticle(
-            char.x + (Math.random() - 0.5) * 35,
-            char.y + 15,
-            '#ff8c00', // 열기 파티클
-            2.5,
-            12
-          );
+          ctx.createParticle(char.x + (Math.random() - 0.5) * 35, char.y + 15, '#ff8c00', 2.5, 12);
         }
 
-        // 1초마다 운동 대사 띄우기
+        // Show floating quotes every 800ms
         const quoteTimer = (char as any).quoteTimer || 0;
         if (Date.now() - quoteTimer > 800) {
           (char as any).quoteTimer = Date.now();
@@ -87,24 +88,24 @@ export const unheeConfig: CharacterConfig = {
           ctx.addFloatingText(char.x, char.y - 45, randQuote, '#ff8c00', 0.8);
         }
       } 
-      // 2. 운동 종료 및 벌크업 버프 돌입 시점 (WORKOUT_DURATION 시점)
+      // 2. Workout Complete -> Enter Bulkup Buff Phase
       else if (!(char as any).workoutFinished) {
         (char as any).workoutFinished = true;
         (char as any).unhwiBuffActive = true;
 
-        char.scaleMultiplier = SKILL_CONSTANTS.SCALE; // 덩치 확대
-        char.speed = SKILL_CONSTANTS.BULKUP_SPEED;    // 이속 30% 감소 (1.5 -> 1.05)
-        char.attackPower = SKILL_CONSTANTS.BULKUP_ATK; // 공격력 2배 (12 -> 24)
+        char.scaleMultiplier = SKILL_CONSTANTS.SCALE; // Grow size
+        char.speed = SKILL_CONSTANTS.BULKUP_SPEED;    // Speed reduction (1.5 -> 1.05)
+        char.attackPower = SKILL_CONSTANTS.BULKUP_ATK; // Double attack power (12 -> 24)
 
-        // 체력 회복 35 즉시 수행
+        // Instant HP recovery
         const healAmount = SKILL_CONSTANTS.HEAL_AMOUNT;
         char.hp = Math.min(char.maxHp, char.hp + healAmount);
         ctx.addFloatingText(char.x, char.y - 85, `💚 +${healAmount} HEAL`, '#39ff14', 1.8);
-        ctx.createParticle(char.x, char.y, '#39ff14', 5, 20); // 초록색 힐 이펙트 파티클
+        ctx.createParticle(char.x, char.y, '#39ff14', 5, 20);
 
-        // 운동 후 정지하는 문제를 해결하기 위해 운동 완료 즉시 움직임 가해줌
+        // Resume movement immediately to avoid sticking
         const randomAngle = Math.random() * Math.PI * 2;
-        const baseSpeed = 3.5 * char.speed; // 감속된 속도 기준 비행 개시
+        const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
         char.vy = Math.sin(randomAngle) * baseSpeed;
 
@@ -114,16 +115,15 @@ export const unheeConfig: CharacterConfig = {
         ctx.logMessage?.(`🏋️ [벌크업 성공] 운희 ➡️ 체력 ${healAmount} 회복 및 ${SKILL_CONSTANTS.BULKUP_DURATION}초 벌크업 (공격력 ${SKILL_CONSTANTS.BULKUP_ATK}, 피해감소 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}%, 크기 ${SKILL_CONSTANTS.SCALE}배)`, 'skill');
       }
 
-      // 3. 스킬 지속 종료 처리 (TOTAL_DURATION 만료)
+      // 3. Skills End
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
         char.scaleMultiplier = 1.0;
-        char.speed = SKILL_CONSTANTS.BASE_SPEED;    // 원래 스피드로 복귀
-        char.attackPower = SKILL_CONSTANTS.BASE_ATK; // 원래 공격력 복귀
+        char.speed = SKILL_CONSTANTS.BASE_SPEED;
+        char.attackPower = SKILL_CONSTANTS.BASE_ATK;
         (char as any).unhwiBuffActive = false;
         (char as any).workoutFinished = false;
 
-        // 버프 종료 시점에도 자연스러운 움직임 확보
         const randomAngle = Math.random() * Math.PI * 2;
         const baseSpeed = 3.5 * char.speed;
         char.vx = Math.cos(randomAngle) * baseSpeed;
@@ -134,11 +134,15 @@ export const unheeConfig: CharacterConfig = {
       }
     }
   },
+  // #endregion UPDATE
 
+  // ═══════════════════════════════════════════
+  // #region COLLISION — passive forced workout on contact
+  // ═══════════════════════════════════════════
   onCollisionWithTarget(_char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead || opponent.id.includes('clone')) return;
 
-    // 패시브: 상대방 접촉 시 35% 확률로 1.5초간 강제 쇠질 (기절) (타겟별 4.0초 내부 재사용 대기시간 적용)
+    // Passive: 35% chance to force opponent to exercise (stun 1.5s) on contact (4s internal cooldown per target)
     const now = Date.now();
     const oppAny = opponent as any;
     if (oppAny.lastUnheeStunTime === undefined) {
@@ -155,41 +159,52 @@ export const unheeConfig: CharacterConfig = {
 
         ctx.addFloatingText(opponent.x, opponent.y - 50, '🏋️ 강제 쇠질! (1.5초)', '#ff8c00', 1.6);
         
-        // 땀방울 파티클 생성
         for (let i = 0; i < 5; i++) {
-          ctx.createParticle(
-            opponent.x + (Math.random() - 0.5) * 15,
-            opponent.y - 15,
-            '#00ddff',
-            2 + Math.random() * 2,
-            10
-          );
+          ctx.createParticle(opponent.x, opponent.y - 15, '#00ddff', 2 + Math.random() * 2, 10);
         }
 
         ctx.logMessage?.(`🏋️ [강제 쇠질] 운희 ➡️ ${opponent.name}에게 1.5초간 강제 운동 부여! (이동 불가)`, 'damage');
       }
     }
   },
+  // #endregion COLLISION
 
-  // [3] 캐릭터 고유 렌더링 확장 훅 (바벨 그리기 및 벌크업 오라)
+  // ═══════════════════════════════════════════
+  // #region DAMAGE — 50% damage reduction during bulkup
+  // ═══════════════════════════════════════════
+  onTakeDamage(target: CharacterState, _attacker: CharacterState, damage: number, _ctx: CharacterBehaviorContext) {
+    if ((target as any).unhwiBuffActive) {
+      let finalDamage = Math.round(damage * (1 - SKILL_CONSTANTS.DMG_REDUCTION_PCT / 100));
+      if (finalDamage < 1 && damage >= 1) {
+        finalDamage = 1; // Minimum 1 damage guarantee
+      }
+      return { finalDamage, blocked: false };
+    }
+    return { finalDamage: damage, blocked: false };
+  },
+  // #endregion DAMAGE
+
+  // ═══════════════════════════════════════════
+  // #region RENDER — barbell visual, bulkup aura ring
+  // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     if (char.skillActive) {
       const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
 
-      // A. 운동 중일 때 바벨(Barbell) 드로잉 연출
+      // Barbell rendering during workout
       if (elapsed < SKILL_CONSTANTS.WORKOUT_DURATION) {
         canvasCtx.save();
         canvasCtx.strokeStyle = '#555555';
         canvasCtx.lineWidth = 4;
         
-        // 역기 봉 그리기
+        // Bar
         const barLength = currentRadius * 2.2;
         canvasCtx.beginPath();
         canvasCtx.moveTo(char.x - barLength / 2, char.y - currentRadius - 8);
         canvasCtx.lineTo(char.x + barLength / 2, char.y - currentRadius - 8);
         canvasCtx.stroke();
 
-        // 양끝 원판(중량 플레이트) 그리기
+        // Outer plates
         canvasCtx.fillStyle = '#111111';
         canvasCtx.beginPath();
         canvasCtx.arc(char.x - barLength / 2, char.y - currentRadius - 8, 8, 0, Math.PI * 2);
@@ -204,7 +219,7 @@ export const unheeConfig: CharacterConfig = {
 
         canvasCtx.restore();
       } 
-      // B. 벌크업 활성 시 붉은/주황색 불꽃 테두리 오라 연출
+      // Flame aura during bulkup
       else if ((char as any).unhwiBuffActive) {
         canvasCtx.save();
         canvasCtx.strokeStyle = '#ff3300';
@@ -212,7 +227,6 @@ export const unheeConfig: CharacterConfig = {
         canvasCtx.shadowBlur = 18;
         canvasCtx.shadowColor = '#ff6600';
         
-        // 살짝 둥근 파동 맥동 효과
         const pulse = Math.sin(Date.now() / 60) * 3;
         canvasCtx.beginPath();
         canvasCtx.arc(char.x, char.y, currentRadius + 4 + pulse, 0, Math.PI * 2);
@@ -221,4 +235,5 @@ export const unheeConfig: CharacterConfig = {
       }
     }
   }
+  // #endregion RENDER
 };
