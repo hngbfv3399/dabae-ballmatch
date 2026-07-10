@@ -1470,3 +1470,66 @@ body {
   font-weight: 700;
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
 }
+
+/* 게임 모드 전용 CSS 스타일링 */
+.mode-tab {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-tab:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.mode-tab.active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 보스전 UI 애니메이션 및 스타일 */
+.boss-crown-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 1.25rem;
+  background: rgba(18, 18, 37, 0.85);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  z-index: 10;
+  cursor: pointer;
+  animation: crown-glow 2s infinite alternate;
+}
+
+@keyframes crown-glow {
+  0% { transform: scale(1); box-shadow: 0 0 4px rgba(255, 215, 0, 0.3); }
+  100% { transform: scale(1.1) rotate(5deg); box-shadow: 0 0 12px rgba(255, 215, 0, 0.6); }
+}
+
+.character-card.boss-selected {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.18) !important;
+}
+
+.character-card.boss-selected .avatar-img {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
+}
+
+/* 팀전 UI 및 구별용 링 스타일 */
+.team-indicator-1 {
+  border: 2.5px solid #ff3b30 !important;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.35) !important;
+}
+
+.team-indicator-2 {
+  border: 2.5px solid #007aff !important;
+  box-shadow: 0 0 10px rgba(0, 122, 255, 0.35) !important;
+}

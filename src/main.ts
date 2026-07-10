@@ -46,6 +46,10 @@ const selectedIds: Set<string> = new Set();
 let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
 
+// 게임 모드 상태 변수
+let currentMode: 'solo' | 'team' | 'boss' = 'solo';
+let bossCharacterId: string | null = null;
+
 // 아바타 HTML 렌더러 (이모지 대체)
 function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
   if (image) {
@@ -378,10 +382,34 @@ function initLobby(preserveSelections = false) {
     if (selectedIds.has(char.id)) {
       card.classList.add('selected');
     }
+    if (currentMode === 'boss' && bossCharacterId === char.id) {
+      card.classList.add('boss-selected');
+    }
     card.dataset.id = char.id;
+
+    let crownHTML = '';
+    if (currentMode === 'boss') {
+      const isBossChar = bossCharacterId === char.id;
+      crownHTML = `<div class="boss-crown-badge" style="${isBossChar ? 'background: #ffd700; color: #000; border-color: #ffd700;' : 'background: rgba(18, 18, 37, 0.8); color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.15);'}" title="보스로 선정하기">👑</div>`;
+    }
+
+    let modeBadgeHTML = '';
+    if (selectedIds.has(char.id)) {
+      if (currentMode === 'team') {
+        const selectedArr = Array.from(selectedIds);
+        const idx = selectedArr.indexOf(char.id);
+        const isRed = idx % 2 === 0;
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: ${isRed ? '#ff3b30' : '#007aff'}; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${isRed ? '🔴 RED' : '🔵 BLUE'}</div>`;
+      } else if (currentMode === 'boss') {
+        const isBossChar = bossCharacterId === char.id;
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: ${isBossChar ? '#ffd700' : '#ff3b30'}; color: ${isBossChar ? '#000' : '#fff'}; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 40px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${isBossChar ? '👑 BOSS' : '⚔️ 도전자'}</div>`;
+      }
+    }
 
     const currentTier = char.tier || 'C';
     card.innerHTML = `
+      ${crownHTML}
+      ${modeBadgeHTML}
       <div class="tier-card-badge tier-badge-${currentTier.toLowerCase()}">${currentTier}</div>
       <button class="char-detail-trigger-btn" data-id="${char.id}" title="상세 설명 보기" style="position: absolute; top: 12px; left: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(6px); color: rgba(255, 255, 255, 0.85); font-size: 0.72rem; padding: 3px 8px; border-radius: 12px; cursor: pointer; z-index: 10; font-family: 'Orbit', sans-serif; transition: all 0.2s;">ℹ️ 정보</button>
       ${getAvatarHTML(char.name, char.image)}
@@ -434,8 +462,40 @@ function initLobby(preserveSelections = false) {
       });
     }
 
+    // 보스 왕관 뱃지 클릭 이벤트 바인딩
+    if (currentMode === 'boss') {
+      const crownBtn = card.querySelector('.boss-crown-badge');
+      if (crownBtn) {
+        crownBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 카드 선택 클릭 버블링 방지
+          
+          if (bossCharacterId === char.id) {
+            bossCharacterId = null;
+            card.classList.remove('boss-selected');
+            (crownBtn as HTMLElement).style.background = 'rgba(18, 18, 37, 0.8)';
+            (crownBtn as HTMLElement).style.color = 'rgba(255,255,255,0.35)';
+            (crownBtn as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)';
+            console.log(`👑 [보스전] 보스 지정을 해제했습니다.`);
+          } else {
+            bossCharacterId = char.id;
+            selectedIds.add(char.id); // 보스는 강제 참가
+            card.classList.add('selected');
+            card.classList.add('boss-selected');
+            initLobby(true); // 로비 카드 상태 갱신 (기존 보스 카드 스타일 초기화 위함)
+            console.log(`👑 [보스전] ${char.name} 캐릭터가 보스로 선정되었습니다.`);
+          }
+          updateStartButtonState();
+        });
+      }
+    }
+
     card.addEventListener('click', () => {
       if (selectedIds.has(char.id)) {
+        // 만약 보스로 지정된 카드인데 도전자 해제를 하려 한다면 보스 지위도 함께 해제
+        if (currentMode === 'boss' && bossCharacterId === char.id) {
+          bossCharacterId = null;
+          card.classList.remove('boss-selected');
+        }
         selectedIds.delete(char.id);
         card.classList.remove('selected');
       } else {
@@ -450,8 +510,17 @@ function initLobby(preserveSelections = false) {
 }
 
 function updateStartButtonState() {
-  // 최소 2개 이상 선택되어야 시작 가능 (도윤, 지호, 수, 찬익, 찬휘 중에서 2개 선택 가능)
-  if (selectedIds.size >= 2) {
+  let canStart = false;
+
+  if (currentMode === 'boss') {
+    // 보스전: 보스가 반드시 선택되어 있어야 하고, 도전자 포함 최소 2명 이상이어야 시작 가능
+    canStart = (bossCharacterId !== null) && (selectedIds.size >= 2);
+  } else {
+    // 개인전 / 팀전: 최소 2명 이상 선택되어야 시작 가능
+    canStart = selectedIds.size >= 2;
+  }
+
+  if (canStart) {
     startBtn.disabled = false;
     startBtn.classList.add('active');
   } else {
@@ -459,7 +528,7 @@ function updateStartButtonState() {
     startBtn.classList.remove('active');
   }
 
-  // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요)
+  // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요, 연습은 모드 무관)
   const practiceStartBtn = document.getElementById('practice-start-btn') as HTMLButtonElement;
   if (practiceStartBtn) {
     if (selectedIds.size >= 1) {
@@ -475,15 +544,64 @@ function updateStartButtonState() {
 // Start Simulator
 function startGame() {
   if (selectedIds.size < 2) return;
+  if (currentMode === 'boss' && !bossCharacterId) return;
+
+  isPracticeMode = false; // 표준 대전 모드로 보정
 
   lobbyView.classList.add('hidden');
   gameView.classList.remove('hidden');
 
+  // 보스전과 팀전 전용 헤더 UI 토글
+  const bossHeader = document.getElementById('boss-battle-header');
+  const teamHeader = document.getElementById('team-battle-header');
+  if (bossHeader) {
+    if (currentMode === 'boss') bossHeader.classList.remove('hidden');
+    else bossHeader.classList.add('hidden');
+  }
+  if (teamHeader) {
+    if (currentMode === 'team') teamHeader.classList.remove('hidden');
+    else teamHeader.classList.add('hidden');
+  }
+
   const selectedConfigs = availableCharacters.filter((char) => selectedIds.has(char.id));
   const total = selectedConfigs.length;
-  const initialStates = selectedConfigs.map((config, index) => 
-    createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height)
-  );
+  
+  const initialStates = selectedConfigs.map((config, index) => {
+    const state = createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height);
+    
+    // 모드별 스탯 및 팀 세팅
+    if (currentMode === 'boss') {
+      if (state.id === bossCharacterId) {
+        state.isBoss = true;
+        state.teamId = 2; // 보스는 2팀
+        state.maxHp = config.maxHp * 2;
+        state.hp = state.maxHp;
+        if (state.attackPower > 0) state.attackPower = config.attackPower * 2;
+        state.radius = 35 * 1.6; // 기본 radius 35px 기준으로 1.6배 확장 (56px)
+        state.cooldownMultiplier = 2.0; // 스킬 쿨다운 2배
+        state.damageMultiplier = 2.0; // 가하는 대미지 2배
+      } else {
+        state.isBoss = false;
+        state.teamId = 1; // 도전자들은 1팀
+        state.cooldownMultiplier = 1.0;
+        state.damageMultiplier = 1.0;
+      }
+    } else if (currentMode === 'team') {
+      // 팀전: 홀수/짝수 인덱스로 레드팀(1)과 블루팀(2) 자동 분배
+      state.teamId = (index % 2 === 0) ? 1 : 2;
+      state.isBoss = false;
+      state.cooldownMultiplier = 1.0;
+      state.damageMultiplier = 1.0;
+    } else {
+      // 개인전: 모든 팀 ID 미정의
+      state.teamId = undefined;
+      state.isBoss = false;
+      state.cooldownMultiplier = 1.0;
+      state.damageMultiplier = 1.0;
+    }
+
+    return state;
+  });
 
   totalCountEl.textContent = total.toString();
   aliveCountEl.textContent = total.toString();
@@ -591,6 +709,55 @@ function updateHUD(characters: CharacterState[]) {
   const aliveCount = characters.filter((c) => !c.isDead && !c.id.includes('eunsu_clone')).length;
   aliveCountEl.textContent = aliveCount.toString();
 
+  // === 모드별 헤더 UI 실시간 업데이트 ===
+  if (currentMode === 'boss') {
+    const boss = characters.find(c => c.isBoss && !c.id.includes('eunsu_clone'));
+    const bossHpFill = document.getElementById('boss-hp-fill');
+    const bossHpRatio = document.getElementById('boss-hp-ratio');
+    const bossNameLabel = document.getElementById('boss-name-label');
+
+    if (boss) {
+      const hpRatio = boss.hp / boss.maxHp;
+      const hpPercent = Math.max(0, Math.min(100, hpRatio * 100));
+      if (bossHpFill) bossHpFill.style.width = `${hpPercent}%`;
+      if (bossHpRatio) bossHpRatio.textContent = `${hpPercent.toFixed(1)}% (${boss.hp}/${boss.maxHp})`;
+      if (bossNameLabel) bossNameLabel.textContent = `👑 BOSS (${boss.name})`;
+    } else {
+      if (bossHpFill) bossHpFill.style.width = '0%';
+      if (bossHpRatio) bossHpRatio.textContent = '0% (처치됨)';
+    }
+  } else if (currentMode === 'team') {
+    const redTeam = characters.filter(c => c.teamId === 1 && !c.id.includes('eunsu_clone'));
+    const blueTeam = characters.filter(c => c.teamId === 2 && !c.id.includes('eunsu_clone'));
+
+    const redAlive = redTeam.filter(c => !c.isDead).length;
+    const blueAlive = blueTeam.filter(c => !c.isDead).length;
+
+    const redCurrentHp = redTeam.reduce((sum, c) => sum + (c.isDead ? 0 : c.hp), 0);
+    const blueCurrentHp = blueTeam.reduce((sum, c) => sum + (c.isDead ? 0 : c.hp), 0);
+
+    const totalCurrentHp = redCurrentHp + blueCurrentHp;
+    let redBarWidth = 50;
+    let blueBarWidth = 50;
+    if (totalCurrentHp > 0) {
+      redBarWidth = (redCurrentHp / totalCurrentHp) * 100;
+      blueBarWidth = 100 - redBarWidth;
+    } else {
+      redBarWidth = 0;
+      blueBarWidth = 0;
+    }
+
+    const redFill = document.getElementById('team-hp-fill-1');
+    const blueFill = document.getElementById('team-hp-fill-2');
+    const redAliveEl = document.getElementById('team-alive-1');
+    const blueAliveEl = document.getElementById('team-alive-2');
+
+    if (redFill) redFill.style.width = `${redBarWidth}%`;
+    if (blueFill) blueFill.style.width = `${blueBarWidth}%`;
+    if (redAliveEl) redAliveEl.textContent = redAlive.toString();
+    if (blueAliveEl) blueAliveEl.textContent = blueAlive.toString();
+  }
+
   // 분신(eunsu_clone)은 HUD 목록에서도 제외
   const sorted = [...characters].filter((c) => !c.id.includes('eunsu_clone')).sort((a, b) => {
     if (a.isDead && !b.isDead) return 1;
@@ -615,13 +782,21 @@ function updateHUD(characters: CharacterState[]) {
       item.style.boxShadow = `0 0 10px ${char.color}`;
     }
 
+    // 팀 식별 비주얼 오프셋
+    let teamIndicatorClass = '';
+    if (currentMode === 'team') {
+      teamIndicatorClass = char.teamId === 1 ? 'team-indicator-1' : 'team-indicator-2';
+    } else if (currentMode === 'boss') {
+      teamIndicatorClass = char.isBoss ? 'team-indicator-2' : 'team-indicator-1';
+    }
+
     item.innerHTML = `
       <div class="hud-avatar">
-        ${getAvatarHTML(char.name, char.image)}
+        ${getAvatarHTML(char.name, char.image, teamIndicatorClass)}
       </div>
       <div class="hud-info">
         <div class="hud-name-row">
-          <span style="color: ${char.color}">${char.name}</span>
+          <span style="color: ${char.color}">${char.name}${char.isBoss ? ' (👑)' : ''}</span>
           <span class="hud-hp-text">${char.isDead ? '탈락' : `${char.hp}/${char.maxHp}`}</span>
         </div>
         <!-- HP Bar -->
@@ -716,12 +891,57 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   const mvp = realChars.find(c => (c as any).isMvp) || winner || realChars[0];
   const sorted = [...realChars].sort((a, b) => ((a as any).rank || 99) - ((b as any).rank || 99));
 
+  // 모드별 팀 승리 배너 정의
+  let modeWinnerBanner = '';
+  if (currentMode === 'team') {
+    const redAlive = realChars.some(c => c.teamId === 1 && !c.isDead);
+    const blueAlive = realChars.some(c => c.teamId === 2 && !c.isDead);
+    
+    if (redAlive && !blueAlive) {
+      modeWinnerBanner = `
+        <div style="background: rgba(255,59,48,0.15); border: 2.5px solid #ff3b30; color: #ff3b30; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(255,59,48,0.4); box-shadow: 0 0 20px rgba(255,59,48,0.15);">
+          🔴 RED TEAM WIN!
+        </div>
+      `;
+    } else if (blueAlive && !redAlive) {
+      modeWinnerBanner = `
+        <div style="background: rgba(0,122,255,0.15); border: 2.5px solid #007aff; color: #007aff; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(0,122,255,0.4); box-shadow: 0 0 20px rgba(0,122,255,0.15);">
+          🔵 BLUE TEAM WIN!
+        </div>
+      `;
+    } else {
+      modeWinnerBanner = `
+        <div style="background: rgba(255,255,255,0.06); border: 2.5px solid rgba(255,255,255,0.15); color: #fff; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif;">
+          🤝 무승부 (DRAW)
+        </div>
+      `;
+    }
+  } else if (currentMode === 'boss') {
+    const boss = realChars.find(c => c.isBoss);
+    const bossDead = boss ? boss.isDead : true;
+    
+    if (bossDead) {
+      modeWinnerBanner = `
+        <div style="background: rgba(255,59,48,0.15); border: 2.5px solid #ff3b30; color: #ff3b30; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(255,59,48,0.4); box-shadow: 0 0 20px rgba(255,59,48,0.15);">
+          ⚔️ 도전자 승리! (보스 처치 성공)
+        </div>
+      `;
+    } else {
+      modeWinnerBanner = `
+        <div style="background: rgba(255,215,0,0.15); border: 2.5px solid #ffd700; color: #ffd700; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(255,215,0,0.4); box-shadow: 0 0 20px rgba(255,215,0,0.15);">
+          👑 보스 승리! (도전자단 전멸)
+        </div>
+      `;
+    }
+  }
+
   // Build MVP card HTML
   const mvpScore = (mvp as any).mvpScore ? Math.round((mvp as any).mvpScore) : 0;
   const mvpKills = (mvp as any).kills || 0;
   const mvpDmg = mvp.totalDamageDealt || 0;
   
   let html = `
+    ${modeWinnerBanner}
     <!-- MVP Spotlight Section -->
     <div class="mvp-spotlight-card" style="width: 100%; border: 1px solid ${mvp.color}40; box-shadow: 0 0 15px ${mvp.color}20;">
       <div class="mvp-badge" style="background: ${mvp.color}; color: #000; box-shadow: 0 0 10px ${mvp.color}80;">🎖️ MATCH MVP</div>
@@ -1126,7 +1346,49 @@ function openCharacterDetail(charId: string) {
   charDetailModal.classList.remove('hidden');
 }
 
+// Initialize Game Mode Tab Selection
+function initModeSelection() {
+  const modeTabs = document.querySelectorAll('.mode-tab');
+  const modeDesc = document.getElementById('mode-desc');
+
+  const modeDescriptions: Record<string, string> = {
+    solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
+    team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
+    boss: '👑 보스전: 선택된 보스(1명) vs 도전자들의 비대칭 대결! 보스는 크기 1.6배, HP 2배, 공격력 2배가 되지만, 스킬 쿨타임이 2배로 길어집니다.'
+  };
+
+  modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // 액티브 탭 클래스 토글
+      modeTabs.forEach(t => {
+        t.classList.remove('active');
+        (t as HTMLElement).style.background = 'transparent';
+        (t as HTMLElement).style.color = '#888';
+      });
+      tab.classList.add('active');
+      (tab as HTMLElement).style.background = 'rgba(255, 255, 255, 0.1)';
+      (tab as HTMLElement).style.color = '#fff';
+
+      const selectedMode = tab.getAttribute('data-mode') as 'solo' | 'team' | 'boss';
+      currentMode = selectedMode;
+
+      if (modeDesc) {
+        modeDesc.textContent = modeDescriptions[selectedMode] || '';
+      }
+
+      // 보스전이 해제되면 보스 ID도 초기화
+      if (selectedMode !== 'boss') {
+        bossCharacterId = null;
+      }
+
+      // 로비 재렌더링하여 모드별 특화 UI(왕관 등) 동기화
+      initLobby(true);
+    });
+  });
+}
+
 // Start APP
+initModeSelection();
 initLobby();
 subscribeToGlobalData();
 initPatchNotesSubscription();

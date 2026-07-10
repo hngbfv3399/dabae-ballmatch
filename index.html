@@ -65,6 +65,19 @@
               </button>
             </div>
 
+            <!-- 게임 모드 선택 탭 -->
+            <div class="game-mode-selection card" style="margin-bottom: 0.8rem; padding: 1.2rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.8rem; font-family: 'Orbit', sans-serif;">🎮 게임 모드</h3>
+              <div class="mode-tabs" style="display: flex; gap: 0.4rem; background: rgba(0,0,0,0.25); padding: 0.35rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                <button class="mode-tab active" data-mode="solo" style="flex: 1; padding: 0.55rem; font-size: 0.85rem; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">개인전</button>
+                <button class="mode-tab" data-mode="team" style="flex: 1; padding: 0.55rem; font-size: 0.85rem; border-radius: 6px; border: none; background: transparent; color: #888; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">팀전</button>
+                <button class="mode-tab" data-mode="boss" style="flex: 1; padding: 0.55rem; font-size: 0.85rem; border-radius: 6px; border: none; background: transparent; color: #888; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">보스전</button>
+              </div>
+              <div id="mode-desc" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.6rem; line-height: 1.5; min-height: 2.2rem;">
+                ⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)
+              </div>
+            </div>
+
             <div class="game-settings card">
               <h3>게임 설정</h3>
               <div class="setting-item">
@@ -131,6 +144,29 @@
 
       <!-- 게임 화면 -->
       <section id="game-view" class="view hidden">
+        <!-- 보스전 전용 상단 거대 체력바 -->
+        <div id="boss-battle-header" class="boss-battle-header hidden" style="width: calc(100% - 2rem); max-width: 800px; margin: 1rem auto 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 0.8rem 1.2rem; box-sizing: border-box; background: rgba(18, 18, 37, 0.45); border: 1px solid rgba(255, 215, 0, 0.25); border-radius: 12px; backdrop-filter: blur(12px); box-shadow: 0 0 25px rgba(255, 215, 0, 0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="boss-name-label" style="font-family: 'Orbit', sans-serif; font-weight: bold; color: #ffd700; font-size: 1.05rem; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">👑 BOSS</span>
+            <span id="boss-hp-ratio" style="font-family: 'Orbit', sans-serif; font-size: 0.9rem; color: #ff3b30; font-weight: bold;">100%</span>
+          </div>
+          <div style="width: 100%; height: 18px; background: rgba(0,0,0,0.65); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; position: relative;">
+            <div id="boss-hp-fill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff3b30 0%, #ff5e3a 50%, #ff9500 100%); transition: width 0.1s ease; box-shadow: 0 0 12px rgba(255, 59, 48, 0.45);"></div>
+          </div>
+        </div>
+
+        <!-- 팀전 전용 상단 체력 스코어바 -->
+        <div id="team-battle-header" class="team-battle-header hidden" style="width: calc(100% - 2rem); max-width: 800px; margin: 1rem auto 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 0.8rem 1.2rem; box-sizing: border-box; background: rgba(18, 18, 37, 0.45); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; backdrop-filter: blur(12px); box-shadow: 0 0 20px rgba(255, 255, 255, 0.02);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-family: 'Orbit', sans-serif; font-weight: 700; letter-spacing: 0.5px;">
+            <span style="color: #ff3b30;">🔴 RED TEAM (생존: <span id="team-alive-1">0</span>)</span>
+            <span style="color: #007aff;">🔵 BLUE TEAM (생존: <span id="team-alive-2">0</span>)</span>
+          </div>
+          <div style="display: flex; width: 100%; height: 14px; background: rgba(0,0,0,0.65); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden;">
+            <div id="team-hp-fill-1" style="width: 50%; height: 100%; background: linear-gradient(90deg, #ff5e3a 0%, #ff3b30 100%); transition: width 0.2s ease;"></div>
+            <div id="team-hp-fill-2" style="width: 50%; height: 100%; background: linear-gradient(90deg, #007aff 0%, #00c6ff 100%); transition: width 0.2s ease;"></div>
+          </div>
+        </div>
+
         <header class="game-header">
           <button id="back-to-lobby-btn" class="btn btn-secondary">← 로비로</button>
           <div id="game-status-banner" class="status-banner">

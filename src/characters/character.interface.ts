@@ -85,4 +85,10 @@ export interface CharacterState extends CharacterConfig {
   poisonDamageTimer?: number; // 독성 대미지 틱 타이머 (초)
   isImmune?: boolean; // 주주 피해 무적 보호막 여부
   immuneTimeLeft?: number; // 무적 보호막 남은 시간 (초)
+  
+  // === 게임 모드 관련 확장 프로퍼티 ===
+  teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀
+  isBoss?: boolean;           // 보스전의 보스 여부
+  cooldownMultiplier?: number;// 스킬 충전 쿨타임 배율 (기본 1.0, 보스는 2.0)
+  damageMultiplier?: number;  // 대미지 가산 배율 (기본 1.0, 보스는 2.0)
 }

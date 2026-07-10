@@ -476,7 +476,8 @@ export class GameLounge {
         }
 
         if (canCharge && char.skillGauge < 100) {
-          char.skillGauge += char.skillChargeRate * dt;
+          const rateMultiplier = char.cooldownMultiplier !== undefined ? (1.0 / char.cooldownMultiplier) : 1.0;
+          char.skillGauge += char.skillChargeRate * rateMultiplier * dt;
         }
         if (char.skillGauge >= 100) {
           char.skillGauge = 100;
@@ -508,6 +509,11 @@ export class GameLounge {
           if (enemy.isTargetable && !enemy.isTargetable(enemy)) return; // hook-based targetable check (e.g. Su invisibility)
           if (char.isCharmed && enemy.id === 'seyeon') return; // 매혹 중에는 세연 공격 타겟 제외
           
+          // 팀전 아군 및 보스전 도전자 아군은 공격 대상에서 제외 (타겟팅 차단)
+          if (char.teamId !== undefined && enemy.teamId !== undefined && char.teamId === enemy.teamId) {
+            return;
+          }
+
           // 은수 본체와 분신 관계 간의 아군 판정 (상호 타격 타겟 제외)
           if ((char.id === 'eunsu' && enemy.id.includes('eunsu_clone')) ||
               (char.id.includes('eunsu_clone') && enemy.id === 'eunsu') ||
@@ -540,9 +546,15 @@ export class GameLounge {
           const midY = (c1.y + c2.y) / 2;
           this.createExplosion(midX, midY, '#ffffff', 5);
 
-          // 충돌 시 양측 스킬 게이지 충전 보너스 (+5)
-          if (!c1.skillActive && !c1.isStunned && !c1.isTyping && !c1.nayutaControlled) c1.skillGauge = Math.min(100, c1.skillGauge + 5);
-          if (!c2.skillActive && !c2.isStunned && !c2.isTyping && !c2.nayutaControlled) c2.skillGauge = Math.min(100, c2.skillGauge + 5);
+           // 충돌 시 양측 스킬 게이지 충전 보너스 (+5, 보스는 배율 적용)
+          if (!c1.skillActive && !c1.isStunned && !c1.isTyping && !c1.nayutaControlled) {
+            const mult = c1.cooldownMultiplier !== undefined ? (1.0 / c1.cooldownMultiplier) : 1.0;
+            c1.skillGauge = Math.min(100, c1.skillGauge + 5 * mult);
+          }
+          if (!c2.skillActive && !c2.isStunned && !c2.isTyping && !c2.nayutaControlled) {
+            const mult = c2.cooldownMultiplier !== undefined ? (1.0 / c2.cooldownMultiplier) : 1.0;
+            c2.skillGauge = Math.min(100, c2.skillGauge + 5 * mult);
+          }
 
           // 나유타 접촉 지배 판정
           if (c1.id === 'nayuta' && !c2.isDead) {
@@ -625,6 +637,11 @@ export class GameLounge {
   private dealDamage(attacker: CharacterState, target: CharacterState, amount: number, customText?: string) {
     if (target.isDead) return;
 
+    // 팀전 아군 피해 면역 및 보스전 도전자 간 피해 면역 (팀 킬 방지)
+    if (attacker.teamId !== undefined && target.teamId !== undefined && attacker.teamId === target.teamId) {
+      return;
+    }
+
     // 은수 본체와 분신 간 상호 피해 무시 (분신 시스템 아군 판정이므로 엔진 레벨 유지)
     if ((attacker.id === 'eunsu' && target.id.includes('eunsu_clone')) ||
         (attacker.id.includes('eunsu_clone') && target.id === 'eunsu') ||
@@ -633,6 +650,12 @@ export class GameLounge {
     }
 
     let finalDamage = amount;
+    
+    // 공격자가 보스이거나 대미지 배율이 설정되어 있을 경우 보정 적용 (2배 대미지)
+    if (attacker && attacker.damageMultiplier !== undefined) {
+      finalDamage *= attacker.damageMultiplier;
+    }
+
     const context = this.getBehaviorContext();
 
     // 1. Invoke outgoing damage modifier hook (e.g. Jiho's 2.2x damage buff)
@@ -943,17 +966,31 @@ export class GameLounge {
       }
       this.ctx.restore(); // 클리핑 해제
 
-      // 캐릭터 테두리 빛 효과 선
+      // 캐릭터 테두리 빛 효과 선 (팀전/보스전일 경우 전용 테두리 링 및 글로우 적용)
       this.ctx.save();
-      this.ctx.strokeStyle = char.color;
-      this.ctx.lineWidth = 3;
-      if (char.skillActive) {
-        this.ctx.shadowBlur = 25;
-        this.ctx.shadowColor = char.color;
-      } else {
-        this.ctx.shadowBlur = 10;
-        this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      
+      let strokeColor = char.color;
+      let strokeWidth = 3;
+      let shadowB = char.skillActive ? 25 : 10;
+      let shadowC = char.skillActive ? char.color : 'rgba(0,0,0,0.5)';
+
+      if (char.isBoss) {
+        strokeColor = '#ffd700'; // 보스는 눈부신 골드색
+        strokeWidth = 6;
+        shadowB = 25;
+        shadowC = '#ffd700';
+      } else if (char.teamId !== undefined) {
+        strokeColor = char.teamId === 1 ? '#ff3b30' : '#007aff'; // 1: 레드팀(도전자), 2: 블루팀
+        strokeWidth = 4.5;
+        shadowB = 15;
+        shadowC = strokeColor;
       }
+
+      this.ctx.strokeStyle = strokeColor;
+      this.ctx.lineWidth = strokeWidth;
+      this.ctx.shadowBlur = shadowB;
+      this.ctx.shadowColor = shadowC;
+
       this.ctx.beginPath();
       this.ctx.arc(char.x, char.y, currentRadius, 0, Math.PI * 2);
       this.ctx.stroke();
@@ -961,6 +998,27 @@ export class GameLounge {
 
       // 캐릭터 고유 렌더링 확장 훅 위임 (코딩진행바, 기절별 등)
       char.onRenderExtra?.(char, this.ctx, currentRadius);
+
+      // 2-B. 보스 캐릭터 추가 장식 (머리 위 왕관 👑 렌더링)
+      if (char.isBoss) {
+        this.ctx.save();
+        this.ctx.shadowBlur = 10;
+        this.ctx.shadowColor = '#ffd700';
+        
+        // 캐릭터 머리 위에 왕관 이모지를 둥실둥실 뜨는 효과와 함께 띄웁니다.
+        const bobbing = Math.sin(Date.now() / 200) * 3;
+        this.ctx.font = `${currentRadius * 0.5}px "Orbit", sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText('👑', char.x, char.y - currentRadius - 5 + bobbing);
+        
+        // BOSS 라벨 텍스트
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.font = `bold ${Math.max(9, currentRadius * 0.25)}px "Orbit", sans-serif`;
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('BOSS', char.x, char.y + currentRadius + 18);
+        this.ctx.restore();
+      }
 
       // 3. 준비 모드 중 조준 화살표 그리기
       if (!this.isPrepared) {
