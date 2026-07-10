@@ -1,5 +1,15 @@
 import type { CharacterConfig, CharacterState } from './character.interface';
 
+const SKILL_CONSTANTS = {
+  COOLDOWN: 6,
+  BALL_DURATION: 3.0,          // 5초에서 3초로 감소 (너프)
+  BALL_START_DMG: 18,
+  WALL_DMG_INCREMENT: 4,
+  CHAR_DMG_INCREMENT: 6,
+  BALL_SPEED: 11.5,
+  BALL_RADIUS: 15,
+};
+
 interface BowlingBall {
   x: number;
   y: number;
@@ -24,12 +34,12 @@ export const myeongseokConfig: CharacterConfig = {
   attackPower: 14,
   baseAttackRange: 45,
   skillName: '퍼펙트 스트라이크',
-  skillDescription: '6초 쿨타임. 무겁고 빠른 볼링공을 던집니다. 볼링공은 5초 동안 벽과 캐릭터 사이를 바운싱하며, 벽에 충돌 시 +4 대미지, 캐릭터 충돌 시 +6 대미지가 영구적으로 중첩됩니다.',
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 무겁고 빠른 볼링공을 던집니다. 볼링공은 ${SKILL_CONSTANTS.BALL_DURATION}초 동안 벽과 캐릭터 사이를 바운싱하며, 벽에 충돌 시 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT} 대미지, 캐릭터 충돌 시 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 대미지가 영구적으로 중첩됩니다.`,
   color: '#4a154b', // 무거운 가지색 / 퍼플
-  skillChargeRate: 16.6, // 6초 쿨타임
+  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, // 6초 쿨타임
   tier: 'B',
   role: 'Juggernaut',
-  detailedDescription: '명석은 벽과 적을 튕길 때마다 무한히 파괴력이 증가하는 볼링공을 던지는 돌격형 전사 캐릭터입니다. 스킬 발동 시 필드에 무겁고 빠른 볼링공을 투척하며, 이 볼링공은 벽에 부딪힐 때마다 공격력 +4, 캐릭터에 부딪힐 때마다 공격력 +6씩 누적으로 가산되어 난전이 길어질수록 피해량이 걷잡을 수 없이 치솟는 스택형 딜링 능력을 보유하고 있습니다.',
+  detailedDescription: `명석은 벽과 적을 튕길 때마다 무한히 파괴력이 증가하는 볼링공을 던지는 돌격형 전사 캐릭터입니다. 스킬 발동 시 필드에 무겁고 빠른 볼링공을 투척하며, 이 볼링공은 벽에 부딪힐 때마다 공격력 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT}, 캐릭터에 부딪힐 때마다 공격력 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT}씩 누적으로 가산되어 난전이 길어질수록 피해량이 걷잡을 수 없이 치솟는 스택형 딜링 능력을 보유하고 있습니다.`,
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 쿨타임 즉시 재가동 설정
@@ -56,15 +66,15 @@ export const myeongseokConfig: CharacterConfig = {
     const ms = char as MyeongseokState;
     const bowlingBalls = ms.bowlingBalls || [];
     
-    // 빠른 속도로 발사 (speed 11.5)
+    // 빠른 속도로 발사
     bowlingBalls.push({
       x: char.x,
       y: char.y,
-      vx: Math.cos(angle) * 11.5,
-      vy: Math.sin(angle) * 11.5,
-      damage: 18, // 시작 데미지
-      radius: 15,
-      timeLeft: 5.0, // 5초 지속
+      vx: Math.cos(angle) * SKILL_CONSTANTS.BALL_SPEED,
+      vy: Math.sin(angle) * SKILL_CONSTANTS.BALL_SPEED,
+      damage: SKILL_CONSTANTS.BALL_START_DMG, // 시작 데미지
+      radius: SKILL_CONSTANTS.BALL_RADIUS,
+      timeLeft: SKILL_CONSTANTS.BALL_DURATION, // 지속시간
       lastHitTargetId: '',
       hitCooldown: 0
     });
@@ -115,9 +125,9 @@ export const myeongseokConfig: CharacterConfig = {
       }
 
       if (wallHit) {
-        ball.damage += 4;
+        ball.damage += SKILL_CONSTANTS.WALL_DMG_INCREMENT;
         ball.lastHitTargetId = ''; // 벽에 닿으면 타겟 락 초기화
-        ctx.addFloatingText(ball.x, ball.y - 12, `🎳 +4 대미지 (벽)`, '#ffc107', 0.8);
+        ctx.addFloatingText(ball.x, ball.y - 12, `🎳 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT} 대미지 (벽)`, '#ffc107', 0.8);
         ctx.createExplosion(ball.x, ball.y, '#ffffff', 4);
       }
 
@@ -158,13 +168,13 @@ export const myeongseokConfig: CharacterConfig = {
           enemy.vx += nx * 4.5;
           enemy.vy += ny * 4.5;
           
-          ball.damage += 6;
+          ball.damage += SKILL_CONSTANTS.CHAR_DMG_INCREMENT;
           ball.lastHitTargetId = enemy.id;
           ball.hitCooldown = 0.5; // 0.5초 연속타격 면역
 
-          ctx.addFloatingText(enemy.x, enemy.y - 45, `🎳 +6 대미지 (명중)`, '#ff5722', 1.2);
+          ctx.addFloatingText(enemy.x, enemy.y - 45, `🎳 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 대미지 (명중)`, '#ff5722', 1.2);
           ctx.createExplosion(ball.x, ball.y, '#ff5722', 12);
-          ctx.logMessage?.(`🎳 [스트라이크] 명석 ➡️ ${enemy.name} | ${ball.damage - 6} 피해 (스탯 증가 후: ${ball.damage})`, 'skill');
+          ctx.logMessage?.(`🎳 [스트라이크] 명석 ➡️ ${enemy.name} | ${ball.damage - SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 피해 (스탯 증가 후: ${ball.damage})`, 'skill');
         }
       });
     });
