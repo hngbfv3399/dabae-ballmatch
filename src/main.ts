@@ -123,7 +123,6 @@ function calculateDynamicTiers() {
   const stats = statsAll[mode] || {};
   
   let totalGames = (stats as any).totalGames || 0;
-  // 기존 데이터 소급 적용 (totalGames가 0이지만 캐릭터별 판수가 존재할 경우 최대값을 복원)
   if (totalGames === 0) {
     const maxCharGames = Object.values(stats)
       .map((s: any) => typeof s === 'object' && s !== null ? (s.games || 0) : 0)
@@ -136,50 +135,64 @@ function calculateDynamicTiers() {
     totalSimGamesEl.textContent = `${totalGames}판`;
   }
 
-  const modeText = mode === 'all' ? '전체 매치' : `${mode}인전`;
-
-  if (totalGames < 10) {
-    // 10판 미만인 경우: 기본 티어로 복귀 및 안내 노출
-    availableCharacters.forEach(char => {
-      char.tier = DEFAULT_TIERS[char.id] || 'F';
-    });
-
-    if (tierListNotice && tierRowsWrapper) {
-      tierListNotice.classList.remove('hidden');
-      tierRowsWrapper.classList.add('hidden');
-      tierListNotice.innerHTML = `⚠️ <strong>${modeText}</strong>의 전적이 부족하여 기본 티어가 표시됩니다.<br><span style="font-size: 0.8rem; opacity: 0.8;">(실시간 티어 측정에는 최소 10판이 필요합니다. 현재: ${totalGames}/10판)</span>`;
-    }
-    return;
-  }
-
-  // 10판 이상인 경우: 동적 티어 계산 활성화
+  // 플레이어 요구에 맞추어 판수 제한 잠금 완전히 제거
   if (tierListNotice && tierRowsWrapper) {
     tierListNotice.classList.add('hidden');
     tierRowsWrapper.classList.remove('hidden');
   }
 
-  const charWinRates = availableCharacters.map(char => {
+  const charScores = availableCharacters.map(char => {
     const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-    const winRate = s.games > 0 ? (s.wins / s.games) * 100 : -1;
-    return { id: char.id, winRate, wins: s.wins, games: s.games };
+    
+    let kills = 0;
+    let deaths = 0;
+    currentGlobalCounters.forEach(item => {
+      if (item.mode === mode) {
+        if (item.killerId === char.id) kills += item.count;
+        if (item.victimId === char.id) deaths += item.count;
+      }
+    });
+
+    const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
+    const avgDmgDealt = s.games > 0 ? s.damageDealt / s.games : 0;
+    const avgDmgTaken = s.games > 0 ? s.damageTaken / s.games : 0;
+    
+    // 팀전 전용 기여도 공식
+    const contribution = (winRate * 2.5) + (avgDmgDealt * 0.15) + (kills * 8) - (avgDmgTaken * 0.05);
+
+    return { 
+      id: char.id, 
+      winRate, 
+      contribution, 
+      wins: s.wins, 
+      games: s.games,
+      kills,
+      deaths
+    };
   });
 
-  // 승률 높은 순 정렬 (미플레이 대상은 기본 티어로 순서 매김)
-  charWinRates.sort((a, b) => {
-    if (a.winRate !== b.winRate) {
+  // 정렬 규칙 분기
+  charScores.sort((a, b) => {
+    if (mode === 'team') {
+      return b.contribution - a.contribution;
+    } else if (mode === 'boss') {
       return b.winRate - a.winRate;
+    } else {
+      if (a.winRate !== b.winRate) {
+        return b.winRate - a.winRate;
+      }
+      const tierOrder = { S: 7, A: 6, B: 5, C: 4, D: 3, E: 2, F: 1 };
+      const tierA = DEFAULT_TIERS[a.id] || 'F';
+      const tierB = DEFAULT_TIERS[b.id] || 'F';
+      if (tierOrder[tierA] !== tierOrder[tierB]) {
+        return tierOrder[tierB] - tierOrder[tierA];
+      }
+      return a.id.localeCompare(b.id);
     }
-    const tierOrder = { S: 7, A: 6, B: 5, C: 4, D: 3, E: 2, F: 1 };
-    const tierA = DEFAULT_TIERS[a.id] || 'F';
-    const tierB = DEFAULT_TIERS[b.id] || 'F';
-    if (tierOrder[tierA] !== tierOrder[tierB]) {
-      return tierOrder[tierB] - tierOrder[tierA];
-    }
-    return a.id.localeCompare(b.id);
   });
 
-  // 13개 캐릭터 분포: 1위 S, 2~3위 A, 4~5위 B, 6~7위 C, 8~9위 D, 10~11위 E, 12~13위 F
-  charWinRates.forEach((item, index) => {
+  // 13개 캐릭터 분배: 1위 S, 2~3위 A, 4~5위 B, 6~7위 C, 8~9위 D, 10~11위 E, 12~13위 F
+  charScores.forEach((item, index) => {
     let tier: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' = 'F';
     if (index === 0) tier = 'S';
     else if (index <= 2) tier = 'A';
@@ -196,17 +209,17 @@ function calculateDynamicTiers() {
   });
 }
 
-async function recordGameStart(participantIds: string[], playerCount: number) {
+async function recordGameStart(participantIds: string[], mode: string) {
   if (isPracticeMode) return;
   try {
     await convexClient.mutation(api.stats.recordGameStart, {
       participantIds,
-      mode: playerCount.toString()
+      mode
     });
   } catch (err) {}
 }
 
-async function recordGameEnd(winnerId: string, allChars: CharacterState[], playerCount: number) {
+async function recordGameEnd(winnerId: string, allChars: CharacterState[], mode: string) {
   if (isPracticeMode) return;
   const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
   const realChars = allChars.filter(char => !char.id.includes('clone'));
@@ -214,7 +227,7 @@ async function recordGameEnd(winnerId: string, allChars: CharacterState[], playe
   try {
     await convexClient.mutation(api.stats.recordGameEnd, {
       winnerId: finalWinnerId,
-      mode: playerCount.toString(),
+      mode,
       allChars: realChars.map(char => ({
         characterId: char.id,
         damageDealt: char.totalDamageDealt || 0,
@@ -271,19 +284,61 @@ function renderTierList() {
       container.innerHTML = '';
       const tierChars = availableCharacters.filter(c => (c.tier || 'F').toLowerCase() === t);
       
-      // Sort inside the tier: win rate descending
+      // 내부 정렬 규칙
       const sortedTierChars = [...tierChars].sort((a, b) => {
-        const sA = stats[a.id] || { wins: 0, games: 0 };
-        const sB = stats[b.id] || { wins: 0, games: 0 };
+        const sA = stats[a.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+        const sB = stats[b.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+        
         const wrA = sA.games > 0 ? sA.wins / sA.games : -1;
         const wrB = sB.games > 0 ? sB.wins / sB.games : -1;
-        return wrB - wrA;
+
+        if (mode === 'team') {
+          // 팀전: 기여도 기반
+          let kA = 0, kB = 0, dA = 0, dB = 0;
+          currentGlobalCounters.forEach(item => {
+            if (item.mode === 'team') {
+              if (item.killerId === a.id) kA += item.count;
+              if (item.killerId === b.id) kB += item.count;
+              if (item.victimId === a.id) dA += item.count;
+              if (item.victimId === b.id) dB += item.count;
+            }
+          });
+          const avgDmgA = sA.games > 0 ? sA.damageDealt / sA.games : 0;
+          const avgDmgB = sB.games > 0 ? sB.damageDealt / sB.games : 0;
+          const avgDmgTakenA = sA.games > 0 ? sA.damageTaken / sA.games : 0;
+          const avgDmgTakenB = sB.games > 0 ? sB.damageTaken / sB.games : 0;
+
+          const scoreA = (wrA * 250) + (avgDmgA * 0.15) + (kA * 8) - (avgDmgTakenA * 0.05);
+          const scoreB = (wrB * 250) + (avgDmgB * 0.15) + (kB * 8) - (avgDmgTakenB * 0.05);
+          return scoreB - scoreA;
+        } else {
+          return wrB - wrA;
+        }
       });
 
       sortedTierChars.forEach(char => {
-        const s = stats[char.id] || { wins: 0, games: 0 };
+        const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
         const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
-        const winRateText = s.games > 0 ? `${winRate.toFixed(0)}%` : '0%';
+        
+        let subText = '';
+        if (mode === 'team') {
+          // KDA 및 기여도 노출
+          let kills = 0;
+          let deaths = 0;
+          currentGlobalCounters.forEach(item => {
+            if (item.mode === 'team') {
+              if (item.killerId === char.id) kills += item.count;
+              if (item.victimId === char.id) deaths += item.count;
+            }
+          });
+          const assists = Math.floor(s.damageDealt / 250);
+          subText = `<span style="color: var(--neon-cyan);">${kills}K / ${deaths}D / ${assists}A</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
+        } else if (mode === 'boss') {
+          // 보스 난이도 노출
+          subText = `<span style="color: var(--neon-yellow);">보스승률 ${winRate.toFixed(0)}%</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
+        } else {
+          subText = `<span>승률 ${winRate.toFixed(0)}%</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
+        }
         
         const chip = document.createElement('div');
         chip.className = `tier-char-chip-premium tier-chip-${t}`;
@@ -295,7 +350,7 @@ function renderTierList() {
           </div>
           <div class="tier-char-info">
             <span class="tier-char-name" style="color: ${char.color};">${char.name}</span>
-            <span class="tier-char-winrate">${winRateText} <span style="font-size: 0.65rem; opacity: 0.65;">(${s.games}판)</span></span>
+            <span class="tier-char-winrate" style="font-size: 0.72rem;">${subText}</span>
           </div>
         `;
         container.appendChild(chip);
@@ -717,7 +772,8 @@ function startGame() {
   aliveCountEl.textContent = total.toString();
 
   // 게임 시작 기록 (참여 판수 증가)
-  recordGameStart(selectedConfigs.map((c) => c.id), total);
+  const gameModeStr = currentMode === 'team' ? 'team' : currentMode === 'boss' ? 'boss' : total.toString();
+  recordGameStart(selectedConfigs.map((c) => c.id), gameModeStr);
 
   // 배틀 로그 초기화
   if (battleLogList) {
@@ -972,7 +1028,8 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = '게임 종료';
   
   // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
-  recordGameEnd(winner ? winner.id : "draw", allChars, allChars.length);
+  const gameModeStr = currentMode === 'team' ? 'team' : currentMode === 'boss' ? 'boss' : allChars.length.toString();
+  recordGameEnd(winner ? winner.id : "draw", allChars, gameModeStr);
 
 
 
