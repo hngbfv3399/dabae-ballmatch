@@ -24,12 +24,12 @@ export const unheeConfig: CharacterConfig = {
   attackPower: SKILL_CONSTANTS.BASE_ATK,
   baseAttackRange: 45,
   skillName: '벌크업 피트니스 (Bulk-up)',
-  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 게이지가 100%가 되면 제자리에서 ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 쇠질 운동을 시작합니다. 운동 중에는 움직일 수 없지만, 완료 시 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 즉시 회복하고 ${SKILL_CONSTANTS.BULKUP_DURATION}초간 덩치가 ${SKILL_CONSTANTS.SCALE}배 커지고 공격력이 ${SKILL_CONSTANTS.ATK_MULTIPLIER}배(${SKILL_CONSTANTS.BULKUP_ATK}) 증가하며 받는 피해가 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 감소합니다. 대신 이동 속도가 ${SKILL_CONSTANTS.SPEED_REDUCTION_PCT}%(${SKILL_CONSTANTS.BULKUP_SPEED}) 느려집니다.`,
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 게이지가 100%가 되면 제자리에서 ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 쇠질 운동을 시작합니다. 운동 중에는 움직일 수 없지만, 완료 시 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 즉시 회복하고 ${SKILL_CONSTANTS.BULKUP_DURATION}초간 덩치가 ${SKILL_CONSTANTS.SCALE}배 커지고 공격력이 ${SKILL_CONSTANTS.ATK_MULTIPLIER}배(${SKILL_CONSTANTS.BULKUP_ATK}) 증가하며 받는 피해가 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 감소합니다. 대신 이동 속도가 ${SKILL_CONSTANTS.SPEED_REDUCTION_PCT}%(${SKILL_CONSTANTS.BULKUP_SPEED}) 느려집니다. 패시브: 적과 충돌 시 35% 확률로 1.5초간 대상을 [강제 쇠질] 상태(이동 불가 기절, 대상별 내부 쿨타임 4초)로 만듭니다.`,
   color: '#ff8c00', // 진한 오렌지 (쇠질 느낌)
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, // 10초 쿨타임
   tier: 'D',
   role: 'Juggernaut',
-  detailedDescription: `운희는 '쇠질(웨이트 트레이닝)'을 통해 비약적인 스탯 상승을 도모하는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 발동 시 ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 자리에 멈춰 서서 쇠질을 마친 후 즉시 대량의 체력을 회복하고, ${SKILL_CONSTANTS.BULKUP_DURATION}초간 공격력을 ${SKILL_CONSTANTS.ATK_MULTIPLIER}배 증가시키고 받는 대미지를 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 반감시켜 엄청난 크기의 탱딜 하이브리드 거인으로 돌격합니다.`,
+  detailedDescription: `운희는 '쇠질(웨이트 트레이닝)'과 적 접촉 시 발동되는 강제 쇠질 패시브를 활용하여 적의 기동력을 억제하고 생존력을 높이는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 완료 시 대량의 체력 회복과 함께 덩치 및 공격력이 대폭 상승하고 받는 피해를 50% 줄인 채 적을 압박할 수 있습니다.`,
 
   // [1] 스킬 최초 시동 훅
   onSkillTrigger(char: CharacterState, ctx) {
