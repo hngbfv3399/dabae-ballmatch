@@ -12,7 +12,6 @@ interface PlantEntity {
   x: number;
   y: number;
   radius: number;
-  lifeTime: number; // 일정 시간 안 먹으면 소멸
 }
 
 interface PumanState extends CharacterState {
@@ -30,7 +29,6 @@ const SKILL_CONSTANTS = {
   BASE_ATK: 15,
   PLANT_SPAWN_INTERVAL: 2.5,
   MAX_PLANTS: 6,
-  PLANT_LIFETIME: 12.0,
 };
 
 export const pumanConfig: CharacterConfig = {
@@ -41,12 +39,12 @@ export const pumanConfig: CharacterConfig = {
   attackPower: SKILL_CONSTANTS.BASE_ATK,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
-  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +1 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS})이 쌓입니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택 수만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +1 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS})과 스택x2 만큼의 즉시 체력 회복을 얻습니다. 상대방이 식물과 접촉하면 식물이 소멸하며 푸만의 현재 스택x2 만큼의 피해를 입힙니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택x2 만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,
   color: '#008000', // 포레스트 그린
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'B',
   role: 'Juggernaut',
-  detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시마다 중첩되는 공격력 스택을 기본 공격 적중 시 전량 소모하여 체력 회복 효과로 변환하는 성장-회수 사이클로 운영합니다.`,
+  detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시와 기본 공격 적중 시 스택에 비례한 높은 체력 회복(스택x2)을 통해 초반 라인전 유지력을 보완합니다. 또한 식물이 상대방에게 밟힐 경우 스택x2 만큼의 트랩 피해를 선사합니다.`,
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 액티브 사용 즉시 스킬 쿨타임 재충전 시작하도록 제어
@@ -85,9 +83,9 @@ export const pumanConfig: CharacterConfig = {
   onBasicAttack(char: CharacterState, _opponent: CharacterState, ctx) {
     const pm = char as PumanState;
     if (pm.pumanStacks && pm.pumanStacks > 0) {
-      // 보유한 모든 스택 소모 후 소모한 수만큼 체력 회복
+      // 보유한 모든 스택 소모 후 소모한 수 * 2 만큼 체력 회복
       const consumedStacks = pm.pumanStacks;
-      const healAmt = consumedStacks;
+      const healAmt = consumedStacks * 2;
       pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
       
       ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 ${consumedStacks}스택 소모)`, '#39ff14', 1.5);
@@ -118,35 +116,62 @@ export const pumanConfig: CharacterConfig = {
         pm.pumanPlants.push({
           x: 40 + Math.random() * 720,
           y: 40 + Math.random() * 520,
-          radius: 10,
-          lifeTime: SKILL_CONSTANTS.PLANT_LIFETIME
+          radius: 10
         });
       }
     }
 
-    // 식물 소멸 타이머 차감
+    // 2. 식물 충돌 판정 (푸만 섭취 혹은 상대방 접촉)
+    const plantsToKeep: PlantEntity[] = [];
     pm.pumanPlants.forEach((plant) => {
-      plant.lifeTime -= dt;
-    });
-    pm.pumanPlants = pm.pumanPlants.filter((p) => p.lifeTime > 0);
-
-    // 2. 식물 충돌 섭취 판정
-    pm.pumanPlants.forEach((plant, idx) => {
-      const dist = Math.hypot(pm.x - plant.x, pm.y - plant.y);
-      if (dist < pm.radius + plant.radius) {
-        // 섭취 완료!
-        pm.pumanPlants!.splice(idx, 1);
-        
+      // 푸만과의 충돌 검사
+      const distToPuman = Math.hypot(pm.x - plant.x, pm.y - plant.y);
+      if (distToPuman < pm.radius + plant.radius) {
+        // 푸만이 먹은 경우
         if (pm.pumanStacks! < SKILL_CONSTANTS.MAX_STACKS) {
           pm.pumanStacks! += 1;
           pm.attackPower = SKILL_CONSTANTS.BASE_ATK + pm.pumanStacks!;
-          ctx.addFloatingText(pm.x, pm.y - 50, `🌱 식물 섭취! (+${pm.pumanStacks})`, '#00ff00', 0.9);
-          ctx.createParticle(plant.x, plant.y, '#39ff14', 3, 12);
-        } else {
-          ctx.addFloatingText(pm.x, pm.y - 50, '🌱 스택 최대 충전!', '#39ff14', 0.9);
+        }
+        
+        // 섭취 시 스택 * 2만큼 즉시 회복 (초반 체력 관리)
+        const healAmt = pm.pumanStacks! * 2;
+        pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
+
+        ctx.addFloatingText(pm.x, pm.y - 50, `🌱 섭취 (+1스택, +${healAmt} HP)`, '#00ff00', 0.9);
+        ctx.createParticle(plant.x, plant.y, '#39ff14', 3, 12);
+        console.log(`🌱 [식물 섭취] 푸만 -> 스택: ${pm.pumanStacks}, 체력 ${healAmt} 회복`);
+        return; // 제거됨
+      }
+
+      // 상대방들과의 충돌 검사
+      let hitEnemy: CharacterState | null = null;
+      for (const enemy of ctx.characters) {
+        if (enemy.isDead || enemy.id === pm.id) continue;
+        const distToEnemy = Math.hypot(enemy.x - plant.x, enemy.y - plant.y);
+        if (distToEnemy < enemy.radius + plant.radius) {
+          hitEnemy = enemy;
+          break;
         }
       }
+
+      if (hitEnemy) {
+        // 적이 접촉했을 경우: 사라지며 스택 * 2 피해
+        const dmg = pm.pumanStacks! * 2;
+        if (dmg > 0) {
+          ctx.dealDamage(pm, hitEnemy, dmg, '🌱 식물 가시!');
+          ctx.createExplosion(plant.x, plant.y, '#22aa22', 8);
+          console.log(`💥 [식물 밟음] ${hitEnemy.name} -> 푸만 식물 접촉, ${dmg} 피해 받음`);
+          ctx.logMessage?.(`💥 [식물 밟음] ${hitEnemy.name} ➡️ 푸만 식물 접촉, ${dmg} 피해 받음`, 'damage');
+        } else {
+          ctx.createExplosion(plant.x, plant.y, '#888888', 4);
+        }
+        ctx.addFloatingText(plant.x, plant.y - 20, '💥 식물 밟음!', '#ff3300', 1.0);
+        return; // 제거됨
+      }
+
+      plantsToKeep.push(plant);
     });
+    pm.pumanPlants = plantsToKeep;
 
 
     // 4. 독액 투사체 이동 및 피격 처리
