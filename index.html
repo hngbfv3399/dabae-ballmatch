@@ -108,7 +108,13 @@
             <!-- 랜덤전 카드 -->
             <div class="random-match card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
               <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">🎲 랜덤전</h3>
-              <div class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="random-mode-selector" style="margin-bottom: 0.8rem; font-size: 0.82rem; display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.08); padding-bottom: 0.6rem;">
+                <span style="color: var(--text-secondary);">모드:</span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="solo" checked style="margin: 0;"> 개인</label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="team" style="margin: 0;"> 팀전</label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="boss" style="margin: 0;"> 보스</label>
+              </div>
+              <div id="random-count-setting-item" class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <label for="random-player-count" style="font-size: 0.9rem; color: var(--text-secondary);">참가 인원: </label>
                 <select id="random-player-count" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
                   <option value="1">1인전</option>

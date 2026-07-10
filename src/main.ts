@@ -43,6 +43,8 @@ const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonEl
 
 // Selected characters state
 const selectedIds: Set<string> = new Set();
+const selectedRedIds: Set<string> = new Set();
+const selectedBlueIds: Set<string> = new Set();
 let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
 
@@ -379,31 +381,71 @@ function initLobby(preserveSelections = false) {
 
     const card = document.createElement('div');
     card.className = 'character-card card';
-    if (selectedIds.has(char.id)) {
-      card.classList.add('selected');
-    }
-    if (currentMode === 'boss' && bossCharacterId === char.id) {
-      card.classList.add('boss-selected');
+    
+    // 모드별 카드 테두리 및 선택 스타일 적용
+    if (currentMode === 'solo') {
+      if (selectedIds.has(char.id)) {
+        card.classList.add('selected');
+      }
+    } else if (currentMode === 'team') {
+      if (selectedRedIds.has(char.id)) {
+        card.classList.add('selected');
+        card.classList.add('team-indicator-1'); // RED 테두리
+      } else if (selectedBlueIds.has(char.id)) {
+        card.classList.add('selected');
+        card.classList.add('team-indicator-2'); // BLUE 테두리
+      }
+    } else if (currentMode === 'boss') {
+      if (bossCharacterId === char.id) {
+        card.classList.add('selected');
+        card.classList.add('boss-selected'); // BOSS 황금 테두리
+      } else if (selectedRedIds.has(char.id)) {
+        card.classList.add('selected');
+        card.classList.add('team-indicator-1'); // 도전자 RED 테두리
+      }
     }
     card.dataset.id = char.id;
 
     let crownHTML = '';
-    if (currentMode === 'boss') {
-      const isBossChar = bossCharacterId === char.id;
-      crownHTML = `<div class="boss-crown-badge" style="${isBossChar ? 'background: #ffd700; color: #000; border-color: #ffd700;' : 'background: rgba(18, 18, 37, 0.8); color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.15);'}" title="보스로 선정하기">👑</div>`;
+    if (currentMode === 'boss' && bossCharacterId === char.id) {
+      crownHTML = `<div class="boss-crown-badge" style="background: #ffd700; color: #000; border-color: #ffd700;" title="현재 보스">👑</div>`;
     }
 
     let modeBadgeHTML = '';
-    if (selectedIds.has(char.id)) {
-      if (currentMode === 'team') {
-        const selectedArr = Array.from(selectedIds);
-        const idx = selectedArr.indexOf(char.id);
-        const isRed = idx % 2 === 0;
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: ${isRed ? '#ff3b30' : '#007aff'}; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${isRed ? '🔴 RED' : '🔵 BLUE'}</div>`;
-      } else if (currentMode === 'boss') {
-        const isBossChar = bossCharacterId === char.id;
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: ${isBossChar ? '#ffd700' : '#ff3b30'}; color: ${isBossChar ? '#000' : '#fff'}; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 40px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${isBossChar ? '👑 BOSS' : '⚔️ 도전자'}</div>`;
+    if (currentMode === 'team') {
+      if (selectedRedIds.has(char.id)) {
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ff3b30; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔴 RED</div>`;
+      } else if (selectedBlueIds.has(char.id)) {
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: #007aff; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔵 BLUE</div>`;
       }
+    } else if (currentMode === 'boss') {
+      if (bossCharacterId === char.id) {
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ffd700; color: #000; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">👑 BOSS</div>`;
+      } else if (selectedRedIds.has(char.id)) {
+        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ff3b30; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">⚔️ 도전자</div>`;
+      }
+    }
+
+    // 카드 하단 모드별 팀 지정기 UI 추가
+    let teamSelectorHTML = '';
+    if (currentMode === 'team') {
+      const isRed = selectedRedIds.has(char.id);
+      const isBlue = selectedBlueIds.has(char.id);
+      teamSelectorHTML = `
+        <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
+          <button class="red-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isRed ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isRed ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isRed ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔴 RED</button>
+          <button class="blue-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBlue ? '#007aff' : 'rgba(255,255,255,0.1)'}; background: ${isBlue ? '#007aff' : 'rgba(0,0,0,0.2)'}; color: ${isBlue ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔵 BLUE</button>
+        </div>
+      `;
+    } else if (currentMode === 'boss') {
+      const isBoss = bossCharacterId === char.id;
+      const isChallenger = selectedRedIds.has(char.id);
+      teamSelectorHTML = `
+        <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
+          <button class="boss-team-btn" style="flex: 1.2; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? '#ffd700' : 'rgba(255,255,255,0.1)'}; background: ${isBoss ? '#ffd700' : 'rgba(0,0,0,0.2)'}; color: ${isBoss ? '#000' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 BOSS</button>
+          <button class="challenger-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isChallenger ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isChallenger ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isChallenger ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">⚔️ 도전자</button>
+        </div>
+      `;
     }
 
     const currentTier = char.tier || 'C';
@@ -451,6 +493,7 @@ function initLobby(preserveSelections = false) {
           <span class="stat-val text-neon-green" style="font-weight: 700;">${bestVictimStr}</span>
         </div>
       </div>
+      ${teamSelectorHTML}
     `;
 
     // 상세 정보 버튼 이벤트 리스너 바인딩
@@ -462,40 +505,93 @@ function initLobby(preserveSelections = false) {
       });
     }
 
-    // 보스 왕관 뱃지 클릭 이벤트 바인딩
-    if (currentMode === 'boss') {
-      const crownBtn = card.querySelector('.boss-crown-badge');
-      if (crownBtn) {
-        crownBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // 카드 선택 클릭 버블링 방지
-          
+    // 모드별 수동 지정 버튼 이벤트 바인딩
+    if (currentMode === 'team') {
+      const redBtn = card.querySelector('.red-team-btn');
+      const blueBtn = card.querySelector('.blue-team-btn');
+
+      redBtn?.addEventListener('click', (e) => {
+        e.stopPropagation(); // 카드 자체 클릭 차단
+        if (selectedRedIds.has(char.id)) {
+          selectedRedIds.delete(char.id);
+          selectedIds.delete(char.id);
+        } else {
+          // 인원 체크: 레드팀 3명 제한
+          if (selectedRedIds.size >= 3) {
+            alert('🔴 레드팀은 최대 3명까지만 선택할 수 있습니다!');
+            return;
+          }
+          selectedRedIds.add(char.id);
+          selectedBlueIds.delete(char.id); // 타 팀 해제
+          selectedIds.add(char.id);
+        }
+        initLobby(true); // UI 실시간 업데이트
+      });
+
+      blueBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (selectedBlueIds.has(char.id)) {
+          selectedBlueIds.delete(char.id);
+          selectedIds.delete(char.id);
+        } else {
+          // 인원 체크: 블루팀 3명 제한
+          if (selectedBlueIds.size >= 3) {
+            alert('🔵 블루팀은 최대 3명까지만 선택할 수 있습니다!');
+            return;
+          }
+          selectedBlueIds.add(char.id);
+          selectedRedIds.delete(char.id); // 타 팀 해제
+          selectedIds.add(char.id);
+        }
+        initLobby(true);
+      });
+    } else if (currentMode === 'boss') {
+      const bossBtn = card.querySelector('.boss-team-btn');
+      const challengerBtn = card.querySelector('.challenger-team-btn');
+
+      bossBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (bossCharacterId === char.id) {
+          bossCharacterId = null;
+          selectedIds.delete(char.id);
+        } else {
+          // 보스는 1명 제한
+          const prevBossId = bossCharacterId;
+          if (prevBossId) {
+            selectedIds.delete(prevBossId);
+          }
+          bossCharacterId = char.id;
+          selectedRedIds.delete(char.id); // 도전자 해제
+          selectedIds.add(char.id);
+        }
+        initLobby(true);
+      });
+
+      challengerBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (selectedRedIds.has(char.id)) {
+          selectedRedIds.delete(char.id);
+          selectedIds.delete(char.id);
+        } else {
+          // 도전자 3명 제한
+          if (selectedRedIds.size >= 3) {
+            alert('⚔️ 도전자는 최대 3명까지만 선택할 수 있습니다!');
+            return;
+          }
           if (bossCharacterId === char.id) {
             bossCharacterId = null;
-            card.classList.remove('boss-selected');
-            (crownBtn as HTMLElement).style.background = 'rgba(18, 18, 37, 0.8)';
-            (crownBtn as HTMLElement).style.color = 'rgba(255,255,255,0.35)';
-            (crownBtn as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)';
-            console.log(`👑 [보스전] 보스 지정을 해제했습니다.`);
-          } else {
-            bossCharacterId = char.id;
-            selectedIds.add(char.id); // 보스는 강제 참가
-            card.classList.add('selected');
-            card.classList.add('boss-selected');
-            initLobby(true); // 로비 카드 상태 갱신 (기존 보스 카드 스타일 초기화 위함)
-            console.log(`👑 [보스전] ${char.name} 캐릭터가 보스로 선정되었습니다.`);
           }
-          updateStartButtonState();
-        });
-      }
+          selectedRedIds.add(char.id);
+          selectedIds.add(char.id);
+        }
+        initLobby(true);
+      });
     }
 
     card.addEventListener('click', () => {
+      if (currentMode !== 'solo') return; // 팀/보스전은 하단 전용 버튼으로만 지정
+      
       if (selectedIds.has(char.id)) {
-        // 만약 보스로 지정된 카드인데 도전자 해제를 하려 한다면 보스 지위도 함께 해제
-        if (currentMode === 'boss' && bossCharacterId === char.id) {
-          bossCharacterId = null;
-          card.classList.remove('boss-selected');
-        }
         selectedIds.delete(char.id);
         card.classList.remove('selected');
       } else {
@@ -513,10 +609,13 @@ function updateStartButtonState() {
   let canStart = false;
 
   if (currentMode === 'boss') {
-    // 보스전: 보스가 반드시 선택되어 있어야 하고, 도전자 포함 최소 2명 이상이어야 시작 가능
-    canStart = (bossCharacterId !== null) && (selectedIds.size >= 2);
+    // 보스전 (1vs3): 보스 1명 및 도전자 3명 합쳐서 4명일 때 활성화
+    canStart = (bossCharacterId !== null) && (selectedRedIds.size === 3);
+  } else if (currentMode === 'team') {
+    // 팀전 (3vs3): 레드 3명 & 블루 3명 합쳐서 6명일 때 활성화
+    canStart = (selectedRedIds.size === 3) && (selectedBlueIds.size === 3);
   } else {
-    // 개인전 / 팀전: 최소 2명 이상 선택되어야 시작 가능
+    // 개인전: 최소 2명 이상 선택 시 시작 가능
     canStart = selectedIds.size >= 2;
   }
 
@@ -527,6 +626,17 @@ function updateStartButtonState() {
     startBtn.disabled = true;
     startBtn.classList.remove('active');
   }
+
+  // 게임 시작 버튼 문구에 가이드 메시지 실시간 노출
+  let startBtnText = '게임 시작하기';
+  if (currentMode === 'team') {
+    startBtnText = `게임 시작 (팀전 RED ${selectedRedIds.size}/3 | BLUE ${selectedBlueIds.size}/3)`;
+  } else if (currentMode === 'boss') {
+    startBtnText = `게임 시작 (보스전 BOSS ${bossCharacterId ? 1 : 0}/1 | 도전자 ${selectedRedIds.size}/3)`;
+  } else {
+    startBtnText = `게임 시작 (개인전 ${selectedIds.size}명 선택됨)`;
+  }
+  startBtn.textContent = startBtnText;
 
   // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요, 연습은 모드 무관)
   const practiceStartBtn = document.getElementById('practice-start-btn') as HTMLButtonElement;
@@ -573,7 +683,7 @@ function startGame() {
     if (currentMode === 'boss') {
       if (state.id === bossCharacterId) {
         state.isBoss = true;
-        state.teamId = 2; // 보스는 2팀
+        state.teamId = 2; // 보스는 2팀 (블루)
         state.maxHp = config.maxHp * 2;
         state.hp = state.maxHp;
         if (state.attackPower > 0) state.attackPower = config.attackPower * 2;
@@ -582,13 +692,13 @@ function startGame() {
         state.damageMultiplier = 2.0; // 가하는 대미지 2배
       } else {
         state.isBoss = false;
-        state.teamId = 1; // 도전자들은 1팀
+        state.teamId = 1; // 도전자들은 1팀 (레드)
         state.cooldownMultiplier = 1.0;
         state.damageMultiplier = 1.0;
       }
     } else if (currentMode === 'team') {
-      // 팀전: 홀수/짝수 인덱스로 레드팀(1)과 블루팀(2) 자동 분배
-      state.teamId = (index % 2 === 0) ? 1 : 2;
+      // 수동 지정된 팀 배정 (1: 레드, 2: 블루)
+      state.teamId = selectedRedIds.has(state.id) ? 1 : 2;
       state.isBoss = false;
       state.cooldownMultiplier = 1.0;
       state.damageMultiplier = 1.0;
@@ -1019,8 +1129,8 @@ function goBackToLobby() {
 }
 
 function startRandomGame() {
-  const count = parseInt(randomPlayerCountSelect.value, 10);
-  if (isNaN(count) || count < 1 || count > 6) return;
+  const modeRadio = document.querySelector('input[name="random-game-mode"]:checked') as HTMLInputElement;
+  const randMode = modeRadio ? modeRadio.value : 'solo';
 
   // 피셔-예이츠 셔플 알고리즘을 사용해 완전한 무작위 보장
   const shuffled = [...availableCharacters];
@@ -1028,22 +1138,72 @@ function startRandomGame() {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const selected = shuffled.slice(0, count);
 
-  // 로비 선택 상태 및 카드 동기화
   selectedIds.clear();
-  selected.forEach(c => selectedIds.add(c.id));
+  selectedRedIds.clear();
+  selectedBlueIds.clear();
+  bossCharacterId = null;
 
-  const cards = Array.from(characterListContainer.children) as HTMLElement[];
-  cards.forEach(card => {
-    const id = card.dataset.id;
-    if (id && selectedIds.has(id)) {
-      card.classList.add('selected');
-    } else {
-      card.classList.remove('selected');
+  // 탭 상태 비주얼 동기화 헬퍼
+  const syncModeTabs = (mode: 'solo' | 'team' | 'boss') => {
+    currentMode = mode;
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    const modeDesc = document.getElementById('mode-desc');
+    const modeDescriptions: Record<string, string> = {
+      solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
+      team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
+      boss: '👑 보스전: 선택된 보스(1명) vs 도전자들의 비대칭 대결! 보스는 크기 1.6배, HP 2배, 공격력 2배가 되지만, 스킬 쿨타임이 2배로 길어집니다.'
+    };
+    modeTabs.forEach(t => {
+      t.classList.remove('active');
+      (t as HTMLElement).style.background = 'transparent';
+      (t as HTMLElement).style.color = '#888';
+    });
+    const targetTab = document.querySelector(`.mode-tab[data-mode="${mode}"]`) as HTMLElement;
+    if (targetTab) {
+      targetTab.classList.add('active');
+      targetTab.style.background = 'rgba(255, 255, 255, 0.1)';
+      targetTab.style.color = '#fff';
     }
-  });
+    if (modeDesc) {
+      modeDesc.textContent = modeDescriptions[mode] || '';
+    }
+  };
 
+  if (randMode === 'team') {
+    // 팀전 랜덤 (무조건 6명)
+    const selected = shuffled.slice(0, 6);
+    selected.forEach((c, index) => {
+      selectedIds.add(c.id);
+      if (index < 3) {
+        selectedRedIds.add(c.id); // 3명 RED
+      } else {
+        selectedBlueIds.add(c.id); // 3명 BLUE
+      }
+    });
+    syncModeTabs('team');
+  } else if (randMode === 'boss') {
+    // 보스전 랜덤 (무조건 4명)
+    const selected = shuffled.slice(0, 4);
+    bossCharacterId = selected[0].id;
+    selectedIds.add(selected[0].id);
+
+    selected.slice(1).forEach(c => {
+      selectedIds.add(c.id);
+      selectedRedIds.add(c.id); // 3명 도전자 (RED)
+    });
+    syncModeTabs('boss');
+  } else {
+    // 개인전 랜덤 (지정 인원)
+    const count = parseInt(randomPlayerCountSelect.value, 10);
+    if (isNaN(count) || count < 1 || count > 6) return;
+    const selected = shuffled.slice(0, count);
+    selected.forEach(c => selectedIds.add(c.id));
+    syncModeTabs('solo');
+  }
+
+  // 로비 카드 및 시작 버튼 갱신 후 플레이 개시
+  initLobby(true);
   updateStartButtonState();
   startGame();
 }
@@ -1376,19 +1536,46 @@ function initModeSelection() {
         modeDesc.textContent = modeDescriptions[selectedMode] || '';
       }
 
-      // 보스전이 해제되면 보스 ID도 초기화
-      if (selectedMode !== 'boss') {
-        bossCharacterId = null;
-      }
+      // 모드 변경 시 선택 정보 초기화
+      selectedIds.clear();
+      selectedRedIds.clear();
+      selectedBlueIds.clear();
+      bossCharacterId = null;
 
-      // 로비 재렌더링하여 모드별 특화 UI(왕관 등) 동기화
-      initLobby(true);
+      // 로비 재렌더링하여 모드별 특화 UI 동기화
+      initLobby(false);
+    });
+  });
+}
+
+// Initialize Random Game Mode Radio Change Listeners
+function initRandomModeRadioListeners() {
+  const radioButtons = document.querySelectorAll('input[name="random-game-mode"]');
+  const countSettingItem = document.getElementById('random-count-setting-item');
+  const playerCountSelect = document.getElementById('random-player-count') as HTMLSelectElement;
+
+  radioButtons.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const targetVal = (e.target as HTMLInputElement).value;
+      if (countSettingItem && playerCountSelect) {
+        if (targetVal === 'solo') {
+          countSettingItem.style.opacity = '1';
+          countSettingItem.style.pointerEvents = 'auto';
+          playerCountSelect.disabled = false;
+        } else {
+          // 팀전/보스전 시 인원 선택기 비활성화 (팀전은 3vs3 6명, 보스전은 1vs3 4명으로 고정)
+          countSettingItem.style.opacity = '0.5';
+          countSettingItem.style.pointerEvents = 'none';
+          playerCountSelect.disabled = true;
+        }
+      }
     });
   });
 }
 
 // Start APP
 initModeSelection();
+initRandomModeRadioListeners();
 initLobby();
 subscribeToGlobalData();
 initPatchNotesSubscription();
