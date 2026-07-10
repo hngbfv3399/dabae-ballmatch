@@ -324,13 +324,56 @@ export class GameLounge {
 
     // 승리 조건 검사 (데스 애니메이션을 위해 2초 지연 적용)
     if (!this.isGameOver) {
-      if (aliveRealPlayers.length <= 1) {
-        this.isGameOver = true;
-        this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
-        this.winnerCharacter = aliveRealPlayers[0] || null;
+      const isBossGame = this.characters.some(p => p.isBoss && !p.id.includes('clone'));
+      const isTeamGame = this.characters.some(p => p.teamId !== undefined && !p.id.includes('clone'));
 
-        if (!this.winnerCharacter) {
-          this.onLogMessage?.(`⚔️ [전투 종료] 양측 동시 사망으로 인해 무승부(러브샷) 처리되었습니다!`, 'default');
+      if (isBossGame) {
+        const bossAlive = aliveRealPlayers.some(p => p.isBoss);
+        const challengersAlive = aliveRealPlayers.some(p => !p.isBoss);
+
+        if (!bossAlive || !challengersAlive) {
+          this.isGameOver = true;
+          this.gameOverTimer = 2.0;
+
+          if (!bossAlive && challengersAlive) {
+            this.winnerCharacter = aliveRealPlayers.find(p => !p.isBoss) || null;
+            this.onLogMessage?.(`👑 [보스 레이드 성공] 도전자들이 보스를 처치하였습니다!`, 'skill');
+          } else if (bossAlive && !challengersAlive) {
+            this.winnerCharacter = aliveRealPlayers.find(p => p.isBoss) || null;
+            this.onLogMessage?.(`👑 [보스 레이드 방어 성공] 보스가 모든 도전자를 전멸시켰습니다!`, 'skill');
+          } else {
+            this.winnerCharacter = null;
+            this.onLogMessage?.(`⚔️ [보스 레이드 종료] 동시 처치로 무승부 처리되었습니다!`, 'default');
+          }
+        }
+      } else if (isTeamGame) {
+        const redTeamAlive = aliveRealPlayers.some(p => p.teamId === 1);
+        const blueTeamAlive = aliveRealPlayers.some(p => p.teamId === 2);
+
+        if (!redTeamAlive || !blueTeamAlive) {
+          this.isGameOver = true;
+          this.gameOverTimer = 2.0;
+
+          if (redTeamAlive && !blueTeamAlive) {
+            this.winnerCharacter = aliveRealPlayers.find(p => p.teamId === 1) || null;
+            this.onLogMessage?.(`🔴 [팀전 종료] 레드팀(RED)이 블루팀을 전멸시키고 승리하였습니다!`, 'skill');
+          } else if (blueTeamAlive && !redTeamAlive) {
+            this.winnerCharacter = aliveRealPlayers.find(p => p.teamId === 2) || null;
+            this.onLogMessage?.(`🔵 [팀전 종료] 블루팀(BLUE)이 레드팀을 전멸시키고 승리하였습니다!`, 'skill');
+          } else {
+            this.winnerCharacter = null;
+            this.onLogMessage?.(`⚔️ [팀전 종료] 양 팀 동시 전멸로 무승부 처리되었습니다!`, 'default');
+          }
+        }
+      } else {
+        if (aliveRealPlayers.length <= 1) {
+          this.isGameOver = true;
+          this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
+          this.winnerCharacter = aliveRealPlayers[0] || null;
+
+          if (!this.winnerCharacter) {
+            this.onLogMessage?.(`⚔️ [전투 종료] 양측 동시 사망으로 인해 무승부(러브샷) 처리되었습니다!`, 'default');
+          }
         }
       }
     } else {
@@ -999,7 +1042,42 @@ export class GameLounge {
       // 캐릭터 고유 렌더링 확장 훅 위임 (코딩진행바, 기절별 등)
       char.onRenderExtra?.(char, this.ctx, currentRadius);
 
-      // 2-B. 보스 캐릭터 추가 장식 (머리 위 왕관 👑 렌더링)
+      // 2-B. 팀전/보스전 소속 머리 위 텍스트 라벨 렌더링
+      if (!char.isDead) {
+        this.ctx.save();
+        this.ctx.shadowBlur = 6;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        
+        let labelText = '';
+        let labelColor = '#ffffff';
+        
+        const isBossGame = this.characters.some(p => p.isBoss && !p.id.includes('clone'));
+        const isTeamGame = this.characters.some(p => p.teamId !== undefined && !p.id.includes('clone'));
+
+        if (isBossGame && !char.isBoss) {
+          labelText = '🔴 도전자';
+          labelColor = '#ff3b30';
+        } else if (isTeamGame) {
+          if (char.teamId === 1) {
+            labelText = '🔴 RED';
+            labelColor = '#ff3b30';
+          } else if (char.teamId === 2) {
+            labelText = '🔵 BLUE';
+            labelColor = '#007aff';
+          }
+        }
+
+        if (labelText) {
+          this.ctx.fillStyle = labelColor;
+          this.ctx.shadowColor = labelColor;
+          this.ctx.font = `bold ${Math.max(10, currentRadius * 0.32)}px "Orbit", sans-serif`;
+          this.ctx.fillText(labelText, char.x, char.y - currentRadius - 8);
+        }
+        this.ctx.restore();
+      }
+
+      // 2-C. 보스 캐릭터 추가 장식 (머리 위 왕관 👑 렌더링 및 하단 BOSS 표기)
       if (char.isBoss) {
         this.ctx.save();
         this.ctx.shadowBlur = 10;
