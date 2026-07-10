@@ -29,6 +29,8 @@ const SKILL_CONSTANTS = {
   BASE_ATK: 15,
   PLANT_SPAWN_INTERVAL: 1.5,
   MAX_PLANTS: 6,
+  ATK_PER_STACK: 6,             // 식물 1개당 공격력 상승량 (5~8 사이)
+  HEAL_ON_EAT: 6,               // 식물 섭취 시 즉시 회복량 (5~8 사이)
 };
 
 export const pumanConfig: CharacterConfig = {
@@ -39,12 +41,12 @@ export const pumanConfig: CharacterConfig = {
   attackPower: SKILL_CONSTANTS.BASE_ATK,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
-  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +1 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS})과 스택x2 만큼의 즉시 체력 회복을 얻습니다. 상대방이 식물과 접촉하면 식물이 소멸하며 푸만의 현재 스택x2 만큼의 피해를 입힙니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택x2 만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +${SKILL_CONSTANTS.ATK_PER_STACK} 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS}회)과 ${SKILL_CONSTANTS.HEAL_ON_EAT} 만큼의 즉시 체력 회복을 얻습니다. 상대방이 식물과 접촉하면 식물이 소멸하며 푸만의 현재 스택x${SKILL_CONSTANTS.ATK_PER_STACK} 만큼의 피해를 입힙니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택x${SKILL_CONSTANTS.HEAL_ON_EAT} 만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,
   color: '#008000', // 포레스트 그린
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'B',
   role: 'Juggernaut',
-  detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시와 기본 공격 적중 시 스택에 비례한 높은 체력 회복(스택x2)을 통해 초반 라인전 유지력을 보완합니다. 또한 식물이 상대방에게 밟힐 경우 스택x2 만큼의 트랩 피해를 선사합니다.`,
+  detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시 ${SKILL_CONSTANTS.HEAL_ON_EAT} 회복 및 기본 공격 적중 시 소모한 스택x${SKILL_CONSTANTS.HEAL_ON_EAT} 체력 회복을 통해 초반 라인전 유지력을 보완합니다. 또한 식물이 상대방에게 밟힐 경우 스택x${SKILL_CONSTANTS.ATK_PER_STACK} 만큼의 트랩 피해를 선사합니다.`,
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 액티브 사용 즉시 스킬 쿨타임 재충전 시작하도록 제어
@@ -83,9 +85,9 @@ export const pumanConfig: CharacterConfig = {
   onBasicAttack(char: CharacterState, _opponent: CharacterState, ctx) {
     const pm = char as PumanState;
     if (pm.pumanStacks && pm.pumanStacks > 0) {
-      // 보유한 모든 스택 소모 후 소모한 수 * 2 만큼 체력 회복
+      // 보유한 모든 스택 소모 후 소모한 수 * HEAL_ON_EAT 만큼 체력 회복
       const consumedStacks = pm.pumanStacks;
-      const healAmt = consumedStacks * 2;
+      const healAmt = consumedStacks * SKILL_CONSTANTS.HEAL_ON_EAT;
       pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
       
       ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 ${consumedStacks}스택 소모)`, '#39ff14', 1.5);
@@ -130,11 +132,11 @@ export const pumanConfig: CharacterConfig = {
         // 푸만이 먹은 경우
         if (pm.pumanStacks! < SKILL_CONSTANTS.MAX_STACKS) {
           pm.pumanStacks! += 1;
-          pm.attackPower = SKILL_CONSTANTS.BASE_ATK + pm.pumanStacks!;
+          pm.attackPower = SKILL_CONSTANTS.BASE_ATK + pm.pumanStacks! * SKILL_CONSTANTS.ATK_PER_STACK;
         }
         
-        // 섭취 시 스택 * 2만큼 즉시 회복 (초반 체력 관리)
-        const healAmt = pm.pumanStacks! * 2;
+        // 섭취 시 HEAL_ON_EAT만큼 즉시 회복 (초반 체력 관리)
+        const healAmt = SKILL_CONSTANTS.HEAL_ON_EAT;
         pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
 
         ctx.addFloatingText(pm.x, pm.y - 50, `🌱 섭취 (+1스택, +${healAmt} HP)`, '#00ff00', 0.9);
@@ -155,8 +157,8 @@ export const pumanConfig: CharacterConfig = {
       }
 
       if (hitEnemy) {
-        // 적이 접촉했을 경우: 사라지며 스택 * 2 피해
-        const dmg = pm.pumanStacks! * 2;
+        // 적이 접촉했을 경우: 사라지며 스택 * ATK_PER_STACK 피해
+        const dmg = pm.pumanStacks! * SKILL_CONSTANTS.ATK_PER_STACK;
         if (dmg > 0) {
           ctx.dealDamage(pm, hitEnemy, dmg, '🌱 식물 가시!');
           ctx.createExplosion(plant.x, plant.y, '#22aa22', 8);
