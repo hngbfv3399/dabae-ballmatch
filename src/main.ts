@@ -1552,21 +1552,17 @@ function initModeSelection() {
 function initRandomModeRadioListeners() {
   const radioButtons = document.querySelectorAll('input[name="random-game-mode"]');
   const countSettingItem = document.getElementById('random-count-setting-item');
-  const playerCountSelect = document.getElementById('random-player-count') as HTMLSelectElement;
 
   radioButtons.forEach(radio => {
     radio.addEventListener('change', (e) => {
       const targetVal = (e.target as HTMLInputElement).value;
-      if (countSettingItem && playerCountSelect) {
+      if (countSettingItem) {
         if (targetVal === 'solo') {
-          countSettingItem.style.opacity = '1';
-          countSettingItem.style.pointerEvents = 'auto';
-          playerCountSelect.disabled = false;
+          // 개인전일 때만 인원 선택기 활성화 및 노출
+          countSettingItem.style.display = 'flex';
         } else {
-          // 팀전/보스전 시 인원 선택기 비활성화 (팀전은 3vs3 6명, 보스전은 1vs3 4명으로 고정)
-          countSettingItem.style.opacity = '0.5';
-          countSettingItem.style.pointerEvents = 'none';
-          playerCountSelect.disabled = true;
+          // 팀전/보스전 시 인원수 고정이므로 아예 숨김
+          countSettingItem.style.display = 'none';
         }
       }
     });
