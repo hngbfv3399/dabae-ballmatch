@@ -8,22 +8,22 @@ export const eunsuConfig: CharacterConfig = {
   attackPower: 16,
   baseAttackRange: 45,
   skillName: '색욕의 도플갱어',
-  skillDescription: '10초 쿨타임. 스킬 사용 시 70% 확률로 자신과 비슷한 약체 분신(은수 분신)을 소환하고, 30% 확률로 실패합니다. 패시브: 적과 접촉 충돌 시 25% 확률로 상대를 0.8초간 기절시키며 "팡! 팡!" 연속 2연타 타격 대미지를 입힙니다.',
+  skillDescription: '10초 쿨타임. 스킬 사용 시 80% 확률로 자신과 비슷한 약체 분신(은수 분신)을 소환하고, 20% 확률로 실패합니다. 패시브: 적과 접촉 충돌 시 25% 확률로 상대를 0.8초간 기절시키며 "팡! 팡!" 연속 2연타 타격 대미지를 입힙니다.',
   color: '#ff007f', // 딥 마젠타
   skillChargeRate: 10, // 10초 쿨타임
   tier: 'A',
   role: 'Summoner',
-  detailedDescription: '은수는 다수의 분신을 실시간으로 생산하여 전장을 대혼란에 빠뜨리는 소환형 포지션의 캐릭터입니다. 70% 확률로 본체 사양의 약화 버전인 도플갱어 분신을 연속으로 생성해 대전 상대들의 공격 표적을 어지럽히며, 본체는 안전하게 숨은 채 분신들의 누적 타격과 기절 유도를 통해 교란 전술을 펼칩니다.',
+  detailedDescription: '은수는 다수의 분신을 실시간으로 생산하여 전장을 대혼란에 빠뜨리는 소환형 포지션의 캐릭터입니다. 80% 확률로 본체 사양의 약화 버전인 도플갱어 분신을 연속으로 생성해 대전 상대들의 공격 표적을 어지럽히며, 본체는 안전하게 숨은 채 분신들의 누적 타격과 기절 유도를 통해 교란 전술을 펼칩니다.',
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 쿨타임 즉시 재가동 설정
     char.skillActive = false;
     char.skillDurationLeft = 0;
 
-    // 30% 확률로 소환 실패
-    if (Math.random() < 0.3) {
+    // 20% 확률로 소환 실패
+    if (Math.random() < 0.2) {
       ctx.addFloatingText(char.x, char.y - 50, '⚠️ 분신 소환 실패!', '#888888', 1.5);
-      ctx.logMessage?.(`⚠️ [분신 실패] 은수 ➡️ 30% 소환 실패 확률을 뚫지 못했습니다.`, 'skill');
+      ctx.logMessage?.(`⚠️ [분신 실패] 은수 ➡️ 20% 소환 실패 확률을 뚫지 못했습니다.`, 'skill');
       return;
     }
 

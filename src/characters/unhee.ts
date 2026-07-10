@@ -1,24 +1,40 @@
 import type { CharacterConfig, CharacterState } from './character.interface';
 
+const SKILL_CONSTANTS = {
+  COOLDOWN: 10,
+  WORKOUT_DURATION: 2.0,       // 쇠질 채널링 시간 (2초)
+  BULKUP_DURATION: 7.0,        // 벌크업 버프 지속시간 (7초)
+  TOTAL_DURATION: 9.0,         // 총 스킬 지속 (2 + 7 = 9초)
+  HEAL_AMOUNT: 35,             // 쇠질 완료 시 회복량
+  ATK_MULTIPLIER: 2,           // 공격력 배율
+  BASE_ATK: 12,                // 기본 공격력
+  BULKUP_ATK: 24,              // 벌크업 공격력 (12 * 2)
+  BASE_SPEED: 1.5,             // 기본 이속
+  SPEED_REDUCTION_PCT: 30,     // 벌크업 이속 감소 비율 (%)
+  BULKUP_SPEED: 1.05,          // 벌크업 이속 (1.5 * 0.7 = 1.05)
+  SCALE: 1.6,                  // 덩치 확대 배율
+  DMG_REDUCTION_PCT: 50,       // 받는 피해 감소 비율
+};
+
 export const unheeConfig: CharacterConfig = {
   id: 'unhee',
   name: '운희',
   maxHp: 150,
-  speed: 1.5,
-  attackPower: 12,
+  speed: SKILL_CONSTANTS.BASE_SPEED,
+  attackPower: SKILL_CONSTANTS.BASE_ATK,
   baseAttackRange: 45,
   skillName: '벌크업 피트니스 (Bulk-up)',
-  skillDescription: '10초 쿨타임. 스킬 게이지가 100%가 되면 제자리에서 2.5초간 쇠질 운동을 시작합니다. 운동 중에는 움직일 수 없지만, 완료 시 체력을 35 즉시 회복하고 6초간 덩치가 1.6배 커지고 공격력이 2배(24) 증가하며 받는 피해가 50% 감소합니다. 대신 이동 속도가 40%(0.9) 느려집니다.',
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 게이지가 100%가 되면 제자리에서 ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 쇠질 운동을 시작합니다. 운동 중에는 움직일 수 없지만, 완료 시 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 즉시 회복하고 ${SKILL_CONSTANTS.BULKUP_DURATION}초간 덩치가 ${SKILL_CONSTANTS.SCALE}배 커지고 공격력이 ${SKILL_CONSTANTS.ATK_MULTIPLIER}배(${SKILL_CONSTANTS.BULKUP_ATK}) 증가하며 받는 피해가 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 감소합니다. 대신 이동 속도가 ${SKILL_CONSTANTS.SPEED_REDUCTION_PCT}%(${SKILL_CONSTANTS.BULKUP_SPEED}) 느려집니다.`,
   color: '#ff8c00', // 진한 오렌지 (쇠질 느낌)
-  skillChargeRate: 10, // 10초 쿨타임
+  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, // 10초 쿨타임
   tier: 'D',
   role: 'Juggernaut',
-  detailedDescription: '운희는 \'쇠질(웨이트 트레이닝)\'을 통해 비약적인 스탯 상승을 도모하는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 발동 시 2.5초간 자리에 멈춰 서서 쇠질을 마친 후 즉시 대량의 체력을 회복하고, 6초간 공격력을 2배 증가시키고 받는 대미지를 50% 반감시켜 엄청난 크기의 탱딜 하이브리드 거인으로 돌격합니다.',
+  detailedDescription: `운희는 '쇠질(웨이트 트레이닝)'을 통해 비약적인 스탯 상승을 도모하는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 발동 시 ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 자리에 멈춰 서서 쇠질을 마친 후 즉시 대량의 체력을 회복하고, ${SKILL_CONSTANTS.BULKUP_DURATION}초간 공격력을 ${SKILL_CONSTANTS.ATK_MULTIPLIER}배 증가시키고 받는 대미지를 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 반감시켜 엄청난 크기의 탱딜 하이브리드 거인으로 돌격합니다.`,
 
   // [1] 스킬 최초 시동 훅
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = 8.5; // 2.5초 쇠질 + 6초 벌크업 버프
+    char.skillDurationLeft = SKILL_CONSTANTS.TOTAL_DURATION; // 2초 쇠질 + 7초 벌크업 버프
     (char as any).workoutFinished = false;
     (char as any).unhwiBuffActive = false;
     
@@ -27,18 +43,18 @@ export const unheeConfig: CharacterConfig = {
     char.vy = 0;
 
     ctx.addFloatingText(char.x, char.y - 60, '🏋️ 쇠질 시작! (근비대 측정)', '#ff8c00', 1.5);
-    console.log(`🏋️ [쇠질 돌입] 운희 -> 2.5초간 운동 개시 (움직임 불가능)`);
-    ctx.logMessage?.(`🏋️ [쇠질 돌입] 운희 ➡️ 2.5초간 쇠질 운동 개시 (이동 불가)`, 'skill');
+    console.log(`🏋️ [쇠질 돌입] 운희 -> ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 운동 개시 (움직임 불가능)`);
+    ctx.logMessage?.(`🏋️ [쇠질 돌입] 운희 ➡️ ${SKILL_CONSTANTS.WORKOUT_DURATION}초간 쇠질 운동 개시 (이동 불가)`, 'skill');
   },
 
   // [2] 매 프레임 업데이트 훅
   onUpdate(char: CharacterState, dt: number, ctx) {
     if (char.skillActive) {
       char.skillDurationLeft -= dt;
-      const elapsed = 8.5 - char.skillDurationLeft; // 경과 시간
+      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft; // 경과 시간
 
-      // 1. 운동 중 (0.0 ~ 2.5초)
-      if (elapsed < 2.5) {
+      // 1. 운동 중 (0.0 ~ WORKOUT_DURATION초)
+      if (elapsed < SKILL_CONSTANTS.WORKOUT_DURATION) {
         char.vx = 0;
         char.vy = 0;
 
@@ -71,17 +87,17 @@ export const unheeConfig: CharacterConfig = {
           ctx.addFloatingText(char.x, char.y - 45, randQuote, '#ff8c00', 0.8);
         }
       } 
-      // 2. 운동 종료 및 벌크업 버프 돌입 시점 (2.5초 시점)
+      // 2. 운동 종료 및 벌크업 버프 돌입 시점 (WORKOUT_DURATION 시점)
       else if (!(char as any).workoutFinished) {
         (char as any).workoutFinished = true;
         (char as any).unhwiBuffActive = true;
 
-        char.scaleMultiplier = 1.6; // 덩치 확대
-        char.speed = 0.9;          // 이속 40% 감소 (1.5 -> 0.9)
-        char.attackPower = 24;     // 공격력 2배 (12 -> 24)
+        char.scaleMultiplier = SKILL_CONSTANTS.SCALE; // 덩치 확대
+        char.speed = SKILL_CONSTANTS.BULKUP_SPEED;    // 이속 30% 감소 (1.5 -> 1.05)
+        char.attackPower = SKILL_CONSTANTS.BULKUP_ATK; // 공격력 2배 (12 -> 24)
 
         // 체력 회복 35 즉시 수행
-        const healAmount = 35;
+        const healAmount = SKILL_CONSTANTS.HEAL_AMOUNT;
         char.hp = Math.min(char.maxHp, char.hp + healAmount);
         ctx.addFloatingText(char.x, char.y - 85, `💚 +${healAmount} HEAL`, '#39ff14', 1.8);
         ctx.createParticle(char.x, char.y, '#39ff14', 5, 20); // 초록색 힐 이펙트 파티클
@@ -94,16 +110,16 @@ export const unheeConfig: CharacterConfig = {
 
         ctx.createExplosion(char.x, char.y, '#ff8c00', 25);
         ctx.addFloatingText(char.x, char.y - 65, '💪 벌크업 완료! (공/방 폭발)', '#ff3300', 2.0);
-        console.log(`🏋️ [벌크업 성공] 운희 -> 체력 ${healAmount} 회복 및 6초간 벌크업 상태 돌입 (크기 1.6배, 공격 24, 방어 50% 증가, 속도 0.9)`);
-        ctx.logMessage?.(`🏋️ [벌크업 성공] 운희 ➡️ 체력 ${healAmount} 회복 및 6초 벌크업 (공격력 24, 피해감소 50%, 크기 1.6배)`, 'skill');
+        console.log(`🏋️ [벌크업 성공] 운희 -> 체력 ${healAmount} 회복 및 ${SKILL_CONSTANTS.BULKUP_DURATION}초간 벌크업 상태 돌입 (크기 ${SKILL_CONSTANTS.SCALE}배, 공격 ${SKILL_CONSTANTS.BULKUP_ATK}, 방어 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}% 증가, 속도 ${SKILL_CONSTANTS.BULKUP_SPEED})`);
+        ctx.logMessage?.(`🏋️ [벌크업 성공] 운희 ➡️ 체력 ${healAmount} 회복 및 ${SKILL_CONSTANTS.BULKUP_DURATION}초 벌크업 (공격력 ${SKILL_CONSTANTS.BULKUP_ATK}, 피해감소 ${SKILL_CONSTANTS.DMG_REDUCTION_PCT}%, 크기 ${SKILL_CONSTANTS.SCALE}배)`, 'skill');
       }
 
-      // 3. 스킬 지속 종료 처리 (8.5초 만료)
+      // 3. 스킬 지속 종료 처리 (TOTAL_DURATION 만료)
       if (char.skillDurationLeft <= 0) {
         char.skillActive = false;
         char.scaleMultiplier = 1.0;
-        char.speed = 1.5;          // 원래 스피드로 복귀
-        char.attackPower = 12;     // 원래 공격력 복귀
+        char.speed = SKILL_CONSTANTS.BASE_SPEED;    // 원래 스피드로 복귀
+        char.attackPower = SKILL_CONSTANTS.BASE_ATK; // 원래 공격력 복귀
         (char as any).unhwiBuffActive = false;
         (char as any).workoutFinished = false;
 
@@ -158,10 +174,10 @@ export const unheeConfig: CharacterConfig = {
   // [3] 캐릭터 고유 렌더링 확장 훅 (바벨 그리기 및 벌크업 오라)
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
     if (char.skillActive) {
-      const elapsed = 8.5 - char.skillDurationLeft;
+      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
 
       // A. 운동 중일 때 바벨(Barbell) 드로잉 연출
-      if (elapsed < 2.5) {
+      if (elapsed < SKILL_CONSTANTS.WORKOUT_DURATION) {
         canvasCtx.save();
         canvasCtx.strokeStyle = '#555555';
         canvasCtx.lineWidth = 4;

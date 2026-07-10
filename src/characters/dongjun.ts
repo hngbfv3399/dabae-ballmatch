@@ -24,13 +24,13 @@ const SKILL_CONSTANTS = {
 function getRankStats(rank: number) {
   switch (rank) {
     case 0: // 훈련병
-      return { attackPower: 10, speed: 0.9 };
+      return { attackPower: 12, speed: 1.0 };
     case 1: // 이병
-      return { attackPower: 13, speed: 1.1 };
+      return { attackPower: 14, speed: 1.1 };
     case 2: // 일병
-      return { attackPower: 16, speed: 1.3 };
+      return { attackPower: 17, speed: 1.3 };
     case 3: // 상병
-      return { attackPower: 20, speed: 1.5 };
+      return { attackPower: 21, speed: 1.5 };
     case 4: // 병장
     default:
       return { attackPower: 26, speed: 1.7 };
@@ -119,8 +119,8 @@ export const dongjunConfig: CharacterConfig = {
   id: 'dongjun',
   name: '동준',
   maxHp: 150, // 고정 최대 체력
-  speed: 0.9, // 훈련병 시작 속도
-  attackPower: 10, // 훈련병 시작 공격력
+  speed: 1.0, // 훈련병 시작 속도
+  attackPower: 12, // 훈련병 시작 공격력
   baseAttackRange: 45,
   skillName: '군기 충전 및 계급 추첨',
   skillDescription: `${SKILL_CONSTANTS.PROMOTION_COOLDOWN}초마다 랜덤 계급(훈련병~병장)을 새로 뽑습니다. 계급 변동 시 ${SKILL_CONSTANTS.DISCHARGE_CHANCE * 100}% 확률로 즉시 [전역]하여 주변 ${SKILL_CONSTANTS.DISCHARGE_AOE_RADIUS}px 적들에게 ${SKILL_CONSTANTS.DISCHARGE_AOE_DMG} 광역 피해와 넉백을 주고, ${SKILL_CONSTANTS.DISCHARGE_BUFF_DURATION}초간 [만기전역] 버프(이속 ${SKILL_CONSTANTS.DISCHARGE_SPEED}x, 공격력 ${SKILL_CONSTANTS.DISCHARGE_ATK})를 얻습니다. 액티브 발동 시 즉시 계급 추첨 및 ${SKILL_CONSTANTS.ACTIVE_SPEED_DURATION}초간 이동 속도가 ${SKILL_CONSTANTS.ACTIVE_SPEED_BUFF_PCT}% 증가합니다. (병장 진급 시 체력 ${SKILL_CONSTANTS.RANK_4_HEAL} 회복)`,

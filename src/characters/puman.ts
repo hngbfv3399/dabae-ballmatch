@@ -17,26 +17,36 @@ interface PlantEntity {
 
 interface PumanState extends CharacterState {
   pumanStacks?: number;
-  resetTimer?: number;
   projectiles?: VenomProjectile[];
   pumanPlants?: PlantEntity[];
   plantSpawnTimer?: number;
 }
+
+const SKILL_CONSTANTS = {
+  COOLDOWN: 4,
+  POISON_DURATION: 3.0,
+  POISON_DPS: 4,
+  MAX_STACKS: 15,
+  BASE_ATK: 15,
+  PLANT_SPAWN_INTERVAL: 2.5,
+  MAX_PLANTS: 6,
+  PLANT_LIFETIME: 12.0,
+};
 
 export const pumanConfig: CharacterConfig = {
   id: 'puman',
   name: '푸만',
   maxHp: 145,
   speed: 1.25,
-  attackPower: 15,
+  attackPower: SKILL_CONSTANTS.BASE_ATK,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
-  skillDescription: '4초 쿨타임. 뱀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 3초간 매초 2의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 스탯(공격력)이 쌓이고, 타격 시 스탯만큼 추가 대미지 및 체력 회복을 얻습니다. 5초간 식물 미섭취 및 적 미타격 시 스탯이 초기화됩니다.',
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입힙니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +1 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS})이 쌓입니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택 수만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,
   color: '#008000', // 포레스트 그린
-  skillChargeRate: 25.0, // 4초 쿨타임
+  skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'B',
   role: 'Juggernaut',
-  detailedDescription: '푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 무한하게 몸집을 불리는 성장형 돌격형 전사 캐릭터입니다. 뱀의 맹독 투사체를 날려 적에게 지속 독 대미지를 유발함과 동시에, 식물 섭취 시마다 중첩되는 물리적 스펙 보너스를 적 타격 시 추가 공격력 및 흡혈 회복 효과로 변환하여 끈질긴 장기 소모전에서 극강의 저력을 발휘합니다.',
+  detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시마다 중첩되는 공격력 스택을 기본 공격 적중 시 전량 소모하여 체력 회복 효과로 변환하는 성장-회수 사이클로 운영합니다.`,
 
   onSkillTrigger(char: CharacterState, ctx) {
     // 액티브 사용 즉시 스킬 쿨타임 재충전 시작하도록 제어
@@ -75,16 +85,20 @@ export const pumanConfig: CharacterConfig = {
   onBasicAttack(char: CharacterState, _opponent: CharacterState, ctx) {
     const pm = char as PumanState;
     if (pm.pumanStacks && pm.pumanStacks > 0) {
-      // 스탯만큼 추가 회복
-      const healAmt = pm.pumanStacks;
+      // 보유한 모든 스택 소모 후 소모한 수만큼 체력 회복
+      const consumedStacks = pm.pumanStacks;
+      const healAmt = consumedStacks;
       pm.hp = Math.min(pm.maxHp, pm.hp + healAmt);
       
-      ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 효과)`, '#39ff14', 1.5);
+      ctx.addFloatingText(pm.x, pm.y - 65, `💚 +${healAmt} HEAL (식물 ${consumedStacks}스택 소모)`, '#39ff14', 1.5);
       ctx.createParticle(pm.x, pm.y, '#39ff14', 4, 10);
-    }
+      console.log(`🌱 [스택 소모] 푸만 -> ${consumedStacks}스택 소모, ${healAmt} 체력 회복, 공격력 초기화`);
+      ctx.logMessage?.(`🌱 [스택 소모] 푸만 ➡️ ${consumedStacks}스택 소모 → ${healAmt} 회복, 공격력 초기화`, 'skill');
 
-    // 공격 성공 시 5초 타이머 갱신
-    pm.resetTimer = 5.0;
+      // 스택 초기화 및 공격력 기본값 복구
+      pm.pumanStacks = 0;
+      pm.attackPower = SKILL_CONSTANTS.BASE_ATK;
+    }
   },
 
   onUpdate(char: CharacterState, dt: number, ctx) {
@@ -92,21 +106,20 @@ export const pumanConfig: CharacterConfig = {
 
     // 변수 초기화
     if (pm.pumanStacks === undefined) pm.pumanStacks = 0;
-    if (pm.resetTimer === undefined) pm.resetTimer = 5.0;
     if (pm.projectiles === undefined) pm.projectiles = [];
     if (pm.pumanPlants === undefined) pm.pumanPlants = [];
-    if (pm.plantSpawnTimer === undefined) pm.plantSpawnTimer = 2.5; // 2.5초마다 생성 시도
+    if (pm.plantSpawnTimer === undefined) pm.plantSpawnTimer = SKILL_CONSTANTS.PLANT_SPAWN_INTERVAL;
 
     // 1. 실시간 게임 화면 식물 🌱 스포너 생성
     pm.plantSpawnTimer -= dt;
     if (pm.plantSpawnTimer <= 0) {
-      pm.plantSpawnTimer = 2.5;
-      if (pm.pumanPlants.length < 6) {
+      pm.plantSpawnTimer = SKILL_CONSTANTS.PLANT_SPAWN_INTERVAL;
+      if (pm.pumanPlants.length < SKILL_CONSTANTS.MAX_PLANTS) {
         pm.pumanPlants.push({
           x: 40 + Math.random() * 720,
           y: 40 + Math.random() * 520,
           radius: 10,
-          lifeTime: 12.0 // 12초간 안 먹으면 소멸
+          lifeTime: SKILL_CONSTANTS.PLANT_LIFETIME
         });
       }
     }
@@ -124,31 +137,17 @@ export const pumanConfig: CharacterConfig = {
         // 섭취 완료!
         pm.pumanPlants!.splice(idx, 1);
         
-        if (pm.pumanStacks! < 15) {
+        if (pm.pumanStacks! < SKILL_CONSTANTS.MAX_STACKS) {
           pm.pumanStacks! += 1;
-          pm.attackPower = 15 + pm.pumanStacks!;
+          pm.attackPower = SKILL_CONSTANTS.BASE_ATK + pm.pumanStacks!;
           ctx.addFloatingText(pm.x, pm.y - 50, `🌱 식물 섭취! (+${pm.pumanStacks})`, '#00ff00', 0.9);
           ctx.createParticle(plant.x, plant.y, '#39ff14', 3, 12);
         } else {
-          ctx.addFloatingText(pm.x, pm.y - 50, '🌱 스탯 최대 충전!', '#39ff14', 0.9);
+          ctx.addFloatingText(pm.x, pm.y - 50, '🌱 스택 최대 충전!', '#39ff14', 0.9);
         }
-
-        // 식물 섭취 시 5초 타이머 갱신
-        pm.resetTimer = 5.0;
       }
     });
 
-    // 3. 5초 식물 미섭취 & 미타격 시 스탯 초기화
-    if (pm.pumanStacks > 0) {
-      pm.resetTimer -= dt;
-      if (pm.resetTimer <= 0) {
-        pm.pumanStacks = 0;
-        pm.attackPower = 15; // 원래 수치로 원복
-        pm.resetTimer = 5.0;
-        ctx.addFloatingText(pm.x, pm.y - 55, '💨 스탯 초기화', '#888888', 1.0);
-        ctx.createExplosion(pm.x, pm.y, '#888888', 8);
-      }
-    }
 
     // 4. 독액 투사체 이동 및 피격 처리
     pm.projectiles.forEach((proj) => {
@@ -171,7 +170,7 @@ export const pumanConfig: CharacterConfig = {
 
         ctx.addFloatingText(target.x, target.y - 65, '🤢 맹독 중독!', '#00ff00', 1.8);
         ctx.createExplosion(target.x, target.y, '#00ff00', 15);
-        ctx.logMessage?.(`🤢 [독액 피격] 푸만 ➡️ ${target.name} | 3초간 지속 독성 대미지 (매초 2)`, 'skill');
+        ctx.logMessage?.(`🤢 [독액 피격] 푸만 ➡️ ${target.name} | ${SKILL_CONSTANTS.POISON_DURATION}초간 지속 독성 대미지 (매초 ${SKILL_CONSTANTS.POISON_DPS})`, 'skill');
       } else {
         const angle = Math.atan2(dy, dx);
         proj.x += Math.cos(angle) * proj.speed * dt * 60;
@@ -195,7 +194,7 @@ export const pumanConfig: CharacterConfig = {
 
       if (target.poisonDamageTimer <= 0) {
         target.poisonDamageTimer = 1.0;
-        ctx.dealDamage(char, enemy, 2, '🤢 POISON');
+        ctx.dealDamage(char, enemy, SKILL_CONSTANTS.POISON_DPS, '🤢 POISON');
         ctx.createExplosion(enemy.x, enemy.y, '#22aa22', 5);
       }
 
@@ -235,23 +234,13 @@ export const pumanConfig: CharacterConfig = {
       canvasCtx.restore();
     });
 
-    // 3. 식물 스택 상태 표시 및 시간 게이지 바
+    // 3. 식물 스택 상태 표시
     if (pm.pumanStacks && pm.pumanStacks > 0) {
       canvasCtx.save();
       canvasCtx.fillStyle = '#39ff14';
       canvasCtx.font = 'bold 9px Outfit, sans-serif';
       canvasCtx.textAlign = 'center';
       canvasCtx.fillText(`🌱 x${pm.pumanStacks}`, char.x, char.y - currentRadius - 14);
-
-      // 5초 타이머 게이지 시각화
-      const timerWidth = currentRadius * 1.5;
-      const ratio = Math.max(0, pm.resetTimer || 0) / 5.0;
-      canvasCtx.fillStyle = 'rgba(255,255,255,0.2)';
-      canvasCtx.fillRect(char.x - timerWidth / 2, char.y - currentRadius - 8, timerWidth, 2.5);
-      
-      canvasCtx.fillStyle = '#00ff00';
-      canvasCtx.fillRect(char.x - timerWidth / 2, char.y - currentRadius - 8, timerWidth * ratio, 2.5);
-
       canvasCtx.restore();
     }
   }

@@ -5,7 +5,7 @@ const SKILL_CONSTANTS = {
   SPLASH_RADIUS: 100,
   DMG_MULTIPLIER: 2.2,
   DMG_BASE: -5,
-  SHIELD_AMOUNT: 10,
+  SHIELD_AMOUNT: 6,
   SHIELD_DURATION: 3.0,
 };
 
@@ -17,12 +17,12 @@ export const doyunConfig: CharacterConfig = {
   attackPower: 13,
   baseAttackRange: 45,
   skillName: '불꽃 덩크슛 슬램',
-  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 가장 가까운 적에게 공중 도약(크기 확대) 후 유도 돌진하여 내리꽂아 반경 ${SKILL_CONSTANTS.SPLASH_RADIUS}px 내의 모든 적에게 광역 폭발 피해(공격력의 ${SKILL_CONSTANTS.DMG_MULTIPLIER}배 + ${SKILL_CONSTANTS.DMG_BASE})를 주고 밀쳐냅니다. 추가로 착지 시 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 대미지를 막아내는 실드를 획득합니다.`,
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 가장 가까운 적에게 공중 도약(크기 확대) 후 유도 돌진하여 내리꽂아 반경 ${SKILL_CONSTANTS.SPLASH_RADIUS}px 내의 모든 적에게 광역 폭발 피해(공격력의 ${SKILL_CONSTANTS.DMG_MULTIPLIER}배 + ${SKILL_CONSTANTS.DMG_BASE})를 주고 밀쳐냅니다. 돌진이 적에게 적중했을 경우에만 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 대미지를 막아내는 실드를 획득합니다.`,
   color: '#ff6600',       // 주황색
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'C',
   role: 'Guardian',
-  detailedDescription: `도윤은 뛰어난 군중 제어(CC)와 생존 장벽을 겸비한 수호형 캐릭터입니다. 스킬 사용 시 공중으로 도약한 뒤 적에게 내려꽂히는 유도 덩크슛 공격을 시전하여 주변 적들을 일시에 기절시키고 멀리 밀쳐냅니다. 착지 직후 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 피해를 막아주는 전용 보호막(Shield)을 생성해 난타전과 어그로 핑퐁에서 탁월한 저력을 발휘합니다.`,
+  detailedDescription: `도윤은 뛰어난 군중 제어(CC)와 생존 장벽을 겸비한 수호형 캐릭터입니다. 스킬 사용 시 공중으로 도약한 뒤 적에게 내려꽂히는 유도 덩크슛 공격을 시전하여 주변 적들을 일시에 기절시키고 멀리 밀쳐냅니다. 돌진이 적에게 적중했을 때에만 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 피해를 막아주는 전용 보호막(Shield)을 생성해, 정확한 판단이 요구되는 리스크-리턴형 캐릭터입니다.`,
 
   // [1] 스킬 최초 시동 시 훅
   onSkillTrigger(char: CharacterState, ctx) {
@@ -197,12 +197,8 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
   ctx.createExplosion(slamX, slamY, '#ffd700', 15);
   ctx.addFloatingText(slamX, slamY - 35, '🏀 SLAM DUNK!', '#ff6600', 1.6);
 
-  // 실드 부여 (10 실드, 3초 지속)
-  char.doyunShield = SKILL_CONSTANTS.SHIELD_AMOUNT;
-  char.doyunShieldTimeLeft = SKILL_CONSTANTS.SHIELD_DURATION;
-  ctx.addFloatingText(char.x, char.y - 65, `🛡️ SHIELD +${SKILL_CONSTANTS.SHIELD_AMOUNT}`, '#00ccff', 1.5);
-  console.log(`🛡️ [실드 획득] 도윤 -> 덩크슛 성공으로 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 보호막 획득`);
-  ctx.logMessage?.(`🛡️ [실드 획득] 도윤 ➡️ ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 흡수 실드 활성화`, 'skill');
+  // 적중 여부 판정: 광역 범위 내 적이 1명이라도 있어야 실드 획득
+  let hitEnemy = false;
 
   // 100px 내 광역 피해 및 강한 넉백
   ctx.characters.forEach((enemy: CharacterState) => {
@@ -211,6 +207,7 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
     if (dist <= SKILL_CONSTANTS.SPLASH_RADIUS) {
       const damage = Math.round(char.attackPower * SKILL_CONSTANTS.DMG_MULTIPLIER) + SKILL_CONSTANTS.DMG_BASE;
       ctx.dealDamage(char, enemy, damage, 'DUNK SLAM!');
+      hitEnemy = true;
 
       // 강한 넉백 각도
       const kAngle = Math.atan2(enemy.y - slamY, enemy.x - slamX);
@@ -226,6 +223,18 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
       }
     }
   });
+
+  // 적에게 적중한 경우에만 실드 부여
+  if (hitEnemy) {
+    char.doyunShield = SKILL_CONSTANTS.SHIELD_AMOUNT;
+    char.doyunShieldTimeLeft = SKILL_CONSTANTS.SHIELD_DURATION;
+    ctx.addFloatingText(char.x, char.y - 65, `🛡️ SHIELD +${SKILL_CONSTANTS.SHIELD_AMOUNT}`, '#00ccff', 1.5);
+    console.log(`🛡️ [실드 획득] 도윤 -> 덩크슛 적중으로 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 보호막 획득`);
+    ctx.logMessage?.(`🛡️ [실드 획득] 도윤 ➡️ ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 흡수 실드 활성화`, 'skill');
+  } else {
+    console.log(`🏀 [실드 미획득] 도윤 -> 덩크슛이 빗나가 실드를 획득하지 못했습니다.`);
+    ctx.addFloatingText(char.x, char.y - 65, '❌ MISS! 실드 없음', '#888888', 1.2);
+  }
 
   // 본인 속도 안정화
   const currentSpeed = Math.hypot(char.vx, char.vy);
