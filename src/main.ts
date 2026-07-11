@@ -1,6 +1,7 @@
 import './style.css';
-import { availableCharacters, createCharacterState } from './characterManager';
+import { availableBossCharacters, availableCharacters, createCharacterState } from './characterManager';
 import type { CharacterState } from './characters/character.interface';
+import { defaultArena, getArenaForMatch, type ArenaConfig, type TeamGameType } from './maps';
 import { GameLounge } from './maingame/gameLounge';
 import { initPatchNotesSubscription, convexClient } from './convexClient';
 import { api } from '../convex/_generated/api';
@@ -13,6 +14,12 @@ const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 const gameSpeedSelect = document.getElementById('game-speed') as HTMLSelectElement;
 const backToLobbyBtn = document.getElementById('back-to-lobby-btn') as HTMLButtonElement;
 const gameCanvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+
+function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
+  gameCanvas.width = arena.width;
+  gameCanvas.height = arena.height;
+  gameCanvas.style.backgroundColor = arena.backgroundColor;
+}
 const countdownOverlay = document.getElementById('countdown-overlay') as HTMLElement;
 const countdownNumber = document.getElementById('countdown-number') as HTMLElement;
 const gameStatusText = document.getElementById('game-status-text') as HTMLElement;
@@ -21,12 +28,14 @@ const totalCountEl = document.getElementById('total-count') as HTMLElement;
 const hudList = document.getElementById('hud-list') as HTMLElement;
 const randomStartBtn = document.getElementById('random-start-btn') as HTMLButtonElement;
 const randomPlayerCountSelect = document.getElementById('random-player-count') as HTMLSelectElement;
+const randomTeamGameTypeSelect = document.getElementById('random-team-game-type') as HTMLSelectElement;
+const randomTeamGameTypeSetting = document.getElementById('random-team-game-type-setting') as HTMLElement;
 const statsModeSelect = document.getElementById('stats-mode-select') as HTMLSelectElement;
 const tierListNotice = document.getElementById('tier-list-notice') as HTMLElement;
 const tierRowsWrapper = document.getElementById('tier-rows-wrapper') as HTMLElement;
 const totalSimGamesEl = document.getElementById('total-sim-games') as HTMLElement;
-const battleLogList = document.getElementById('battle-log-list') as HTMLElement;
-const logSimSpeed = document.getElementById('log-sim-speed') as HTMLElement;
+const teamGameTypeSelect = document.getElementById('team-game-type') as HTMLSelectElement;
+const teamGameTypeSetting = document.getElementById('team-game-type-setting') as HTMLElement;
 
 const openStatsBtn = document.getElementById('open-stats-btn') as HTMLButtonElement;
 const closeStatsBtn = document.getElementById('close-stats-btn') as HTMLButtonElement;
@@ -50,7 +59,13 @@ let isPracticeMode = false;
 
 // 게임 모드 상태 변수
 let currentMode: 'solo' | 'team' | 'boss' = 'solo';
+let teamGameType: TeamGameType = 'deathmatch';
 let bossCharacterId: string | null = null;
+const LARGE_SOLO_CHARACTER_RADIUS = 42;
+
+function updateTeamGameTypeVisibility() {
+  teamGameTypeSetting.classList.toggle('hidden', currentMode !== 'team');
+}
 
 // 아바타 HTML 렌더러 (이모지 대체)
 function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
@@ -266,12 +281,6 @@ async function recordCharacterDeath(victimId: string, killerId: string, playerCo
   } catch (err) {}
 }
 
-async function resetTierStats() {
-  try {
-    await convexClient.mutation(api.stats.resetStats, {});
-  } catch (err) {}
-}
-
 function renderTierList() {
   const statsAll = getStoredStats();
   const mode = statsModeSelect ? statsModeSelect.value : 'all';
@@ -372,7 +381,10 @@ function initLobby(preserveSelections = false) {
   renderTierList();
 
   // 역할군 필터 적용
-  const filteredChars = availableCharacters.filter(
+  const lobbyCharacters = currentMode === 'boss'
+    ? [...availableBossCharacters, ...availableCharacters]
+    : availableCharacters;
+  const filteredChars = lobbyCharacters.filter(
     (char) => currentRoleFilter === 'all' || char.role === currentRoleFilter
   );
 
@@ -390,6 +402,7 @@ function initLobby(preserveSelections = false) {
   }
 
   filteredChars.forEach((char) => {
+    const isBossCharacter = availableBossCharacters.some((boss) => boss.id === char.id);
     const statsAll = getStoredStats();
     const mode = statsModeSelect ? statsModeSelect.value : 'all';
     const stats = statsAll[mode] || {};
@@ -493,12 +506,13 @@ function initLobby(preserveSelections = false) {
         </div>
       `;
     } else if (currentMode === 'boss') {
-      const isBoss = bossCharacterId === char.id;
+      const isBoss = isBossCharacter && bossCharacterId === char.id;
       const isChallenger = selectedRedIds.has(char.id);
       teamSelectorHTML = `
         <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
-          <button class="boss-team-btn" style="flex: 1.2; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? '#ffd700' : 'rgba(255,255,255,0.1)'}; background: ${isBoss ? '#ffd700' : 'rgba(0,0,0,0.2)'}; color: ${isBoss ? '#000' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 BOSS</button>
-          <button class="challenger-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isChallenger ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isChallenger ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isChallenger ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">⚔️ 도전자</button>
+          ${isBossCharacter
+            ? `<button class="boss-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? '#ffd700' : 'rgba(255,255,255,0.1)'}; background: ${isBoss ? '#ffd700' : 'rgba(0,0,0,0.2)'}; color: ${isBoss ? '#000' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 BOSS</button>`
+            : `<button class="challenger-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isChallenger ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isChallenger ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isChallenger ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">⚔️ 도전자</button>`}
         </div>
       `;
     }
@@ -713,6 +727,10 @@ function startGame() {
 
   isPracticeMode = false; // 표준 대전 모드로 보정
 
+  const selectedConfigs = (currentMode === 'boss' ? [...availableBossCharacters, ...availableCharacters] : availableCharacters)
+    .filter((char) => selectedIds.has(char.id));
+  applyArenaToCanvas(getArenaForMatch(currentMode, selectedConfigs.length, teamGameType));
+
   lobbyView.classList.add('hidden');
   gameView.classList.remove('hidden');
 
@@ -728,23 +746,18 @@ function startGame() {
     else teamHeader.classList.add('hidden');
   }
 
-  const selectedConfigs = availableCharacters.filter((char) => selectedIds.has(char.id));
   const total = selectedConfigs.length;
+  const isLargeSoloMatch = currentMode === 'solo' && total >= 4;
   
   const initialStates = selectedConfigs.map((config, index) => {
     const state = createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height);
+    if (isLargeSoloMatch) state.radius = LARGE_SOLO_CHARACTER_RADIUS;
     
     // 모드별 스탯 및 팀 세팅
     if (currentMode === 'boss') {
       if (state.id === bossCharacterId) {
         state.isBoss = true;
         state.teamId = 2; // 보스는 2팀 (블루)
-        state.maxHp = config.maxHp * 2;
-        state.hp = state.maxHp;
-        if (state.attackPower > 0) state.attackPower = config.attackPower * 2;
-        state.radius = 35 * 1.6; // 기본 radius 35px 기준으로 1.6배 확장 (56px)
-        state.cooldownMultiplier = 2.0; // 스킬 쿨다운 2배
-        state.damageMultiplier = 2.0; // 가하는 대미지 2배
       } else {
         state.isBoss = false;
         state.teamId = 1; // 도전자들은 1팀 (레드)
@@ -768,6 +781,19 @@ function startGame() {
     return state;
   });
 
+  if (currentMode === 'team') {
+    const redTeam = initialStates.filter((state) => state.teamId === 1);
+    const blueTeam = initialStates.filter((state) => state.teamId === 2);
+    redTeam.forEach((state, index) => {
+      state.x = state.radius * 3;
+      state.y = ((index + 1) / (redTeam.length + 1)) * gameCanvas.height;
+    });
+    blueTeam.forEach((state, index) => {
+      state.x = gameCanvas.width - state.radius * 3;
+      state.y = ((index + 1) / (blueTeam.length + 1)) * gameCanvas.height;
+    });
+  }
+
   totalCountEl.textContent = total.toString();
   aliveCountEl.textContent = total.toString();
 
@@ -775,14 +801,7 @@ function startGame() {
   const gameModeStr = currentMode === 'team' ? 'team' : currentMode === 'boss' ? 'boss' : total.toString();
   recordGameStart(selectedConfigs.map((c) => c.id), gameModeStr);
 
-  // 배틀 로그 초기화
-  if (battleLogList) {
-    battleLogList.innerHTML = '<div style="color: #888888;">⚔️ 시뮬레이션 시작!</div>';
-  }
   const speedMultiplier = parseFloat(gameSpeedSelect.value);
-  if (logSimSpeed) {
-    logSimSpeed.textContent = `${speedMultiplier.toFixed(1)}x 배속`;
-  }
 
   if (!gameLounge) {
     gameLounge = new GameLounge(
@@ -790,12 +809,11 @@ function startGame() {
       updateHUD,
       showWinner,
       updateCountdown,
-      recordCharacterDeath,
-      appendBattleLog
+      recordCharacterDeath
     );
   }
 
-  gameLounge.init(initialStates, speedMultiplier);
+  gameLounge.init(initialStates, speedMultiplier, currentMode === 'team' ? teamGameType : 'deathmatch');
 }
 
 // Start Practice Game (Practice Mode)
@@ -803,6 +821,7 @@ function startPracticeGame() {
   if (selectedIds.size < 1) return;
 
   isPracticeMode = true;
+  applyArenaToCanvas();
 
   lobbyView.classList.add('hidden');
   gameView.classList.remove('hidden');
@@ -844,14 +863,7 @@ function startPracticeGame() {
   totalCountEl.textContent = total.toString();
   aliveCountEl.textContent = total.toString();
 
-  // 배틀 로그 초기화
-  if (battleLogList) {
-    battleLogList.innerHTML = '<div style="color: #00ddff;">🏋️ 연습모드 시작! (더미볼 소환됨)</div>';
-  }
   const speedMultiplier = parseFloat(gameSpeedSelect.value);
-  if (logSimSpeed) {
-    logSimSpeed.textContent = `${speedMultiplier.toFixed(1)}x 배속 (연습)`;
-  }
 
   if (!gameLounge) {
     gameLounge = new GameLounge(
@@ -859,8 +871,7 @@ function startPracticeGame() {
       updateHUD,
       showWinner,
       updateCountdown,
-      recordCharacterDeath,
-      appendBattleLog
+      recordCharacterDeath
     );
   }
 
@@ -922,6 +933,18 @@ function updateHUD(characters: CharacterState[]) {
     if (blueFill) blueFill.style.width = `${blueBarWidth}%`;
     if (redAliveEl) redAliveEl.textContent = redAlive.toString();
     if (blueAliveEl) blueAliveEl.textContent = blueAlive.toString();
+
+    const objectiveText = document.getElementById('team-objective-text');
+    const objective = gameLounge?.getTeamObjectiveState();
+    if (objectiveText && objective) {
+      if (objective.type === 'control') {
+        objectiveText.textContent = `점령전 · 🔴 ${Math.floor(objective.redScore)} / ${objective.scoreToWin}  |  🔵 ${Math.floor(objective.blueScore)} / ${objective.scoreToWin}`;
+      } else if (objective.type === 'siege') {
+        objectiveText.textContent = `왕 지키기 · 🔴 왕 공격  |  🔵 👑 ${Math.ceil(objective.royalKingHp)} / ${objective.royalKingMaxHp}`;
+      } else {
+        objectiveText.textContent = '데스매치 · 전원 섬멸';
+      }
+    }
   }
 
   // 분신(eunsu_clone)은 HUD 목록에서도 제외
@@ -994,34 +1017,6 @@ function updateCountdown(seconds: number) {
   }
 }
 
-function appendBattleLog(msg: string, type: string) {
-  if (!battleLogList) return;
-
-  const logRow = document.createElement('div');
-  logRow.style.margin = '2px 0';
-  logRow.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
-  logRow.style.paddingBottom = '2px';
-  
-  switch (type) {
-    case 'damage':
-      logRow.style.color = '#ffa233'; // 오렌지색
-      break;
-    case 'death':
-      logRow.style.color = '#ff4444'; // 붉은색
-      logRow.style.fontWeight = '700';
-      break;
-    case 'skill':
-      logRow.style.color = '#4dff4d'; // 초록색
-      logRow.style.fontWeight = '700';
-      break;
-    default:
-      logRow.style.color = '#d0d0d0';
-  }
-
-  logRow.textContent = msg;
-  battleLogList.appendChild(logRow);
-  battleLogList.scrollTop = battleLogList.scrollHeight;
-}
 
 // Game End & Show Winner
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
@@ -1204,12 +1199,13 @@ function startRandomGame() {
   // 탭 상태 비주얼 동기화 헬퍼
   const syncModeTabs = (mode: 'solo' | 'team' | 'boss') => {
     currentMode = mode;
+    updateTeamGameTypeVisibility();
     const modeTabs = document.querySelectorAll('.mode-tab');
     const modeDesc = document.getElementById('mode-desc');
     const modeDescriptions: Record<string, string> = {
       solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
       team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
-      boss: '👑 보스전: 선택된 보스(1명) vs 도전자들의 비대칭 대결! 보스는 크기 1.6배, HP 2배, 공격력 2배가 되지만, 스킬 쿨타임이 2배로 길어집니다.'
+      boss: '👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스 능력치는 각 보스 파일에서 독립적으로 정의됩니다.'
     };
     modeTabs.forEach(t => {
       t.classList.remove('active');
@@ -1228,6 +1224,8 @@ function startRandomGame() {
   };
 
   if (randMode === 'team') {
+    teamGameType = randomTeamGameTypeSelect.value as TeamGameType;
+    teamGameTypeSelect.value = teamGameType;
     // 팀전 랜덤 (무조건 6명)
     const selected = shuffled.slice(0, 6);
     selected.forEach((c, index) => {
@@ -1240,12 +1238,15 @@ function startRandomGame() {
     });
     syncModeTabs('team');
   } else if (randMode === 'boss') {
-    // 보스전 랜덤 (무조건 4명)
-    const selected = shuffled.slice(0, 4);
-    bossCharacterId = selected[0].id;
-    selectedIds.add(selected[0].id);
+    if (availableBossCharacters.length === 0) {
+      alert('👑 등록된 보스 캐릭터가 없습니다. characters/<name>/boss.ts를 추가한 뒤 등록해 주세요.');
+      return;
+    }
+    const boss = availableBossCharacters[Math.floor(Math.random() * availableBossCharacters.length)];
+    bossCharacterId = boss.id;
+    selectedIds.add(boss.id);
 
-    selected.slice(1).forEach(c => {
+    shuffled.slice(0, 3).forEach(c => {
       selectedIds.add(c.id);
       selectedRedIds.add(c.id); // 3명 도전자 (RED)
     });
@@ -1281,11 +1282,6 @@ if (practiceStartBtn) {
 statsModeSelect.addEventListener('change', () => {
   subscribeToGlobalData();
 });
-
-const resetTiersBtn = document.getElementById('reset-tiers-btn');
-if (resetTiersBtn) {
-  resetTiersBtn.addEventListener('click', resetTierStats);
-}
 
 if (openStatsBtn && statsCenterModal) {
   openStatsBtn.addEventListener('click', () => {
@@ -1571,7 +1567,7 @@ function initModeSelection() {
   const modeDescriptions: Record<string, string> = {
     solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
     team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
-    boss: '👑 보스전: 선택된 보스(1명) vs 도전자들의 비대칭 대결! 보스는 크기 1.6배, HP 2배, 공격력 2배가 되지만, 스킬 쿨타임이 2배로 길어집니다.'
+    boss: '👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스의 능력치와 스킬은 전용 파일에서 정의됩니다.'
   };
 
   modeTabs.forEach(tab => {
@@ -1588,6 +1584,7 @@ function initModeSelection() {
 
       const selectedMode = tab.getAttribute('data-mode') as 'solo' | 'team' | 'boss';
       currentMode = selectedMode;
+      updateTeamGameTypeVisibility();
 
       if (modeDesc) {
         modeDesc.textContent = modeDescriptions[selectedMode] || '';
@@ -1622,13 +1619,20 @@ function initRandomModeRadioListeners() {
           countSettingItem.style.display = 'none';
         }
       }
+      randomTeamGameTypeSetting.classList.toggle('hidden', targetVal !== 'team');
     });
   });
 }
 
+teamGameTypeSelect.addEventListener('change', () => {
+  teamGameType = teamGameTypeSelect.value as TeamGameType;
+  updateStartButtonState();
+});
+
 // Start APP
 initModeSelection();
 initRandomModeRadioListeners();
+updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
 initPatchNotesSubscription();

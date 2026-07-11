@@ -6,6 +6,11 @@ This document provides a high-level description of the system architecture for t
 - `src/main.ts` — Game UI initializer, event listeners, menu transitions, and DOM controls.
 - `src/characterManager.ts` — Registers `availableCharacters` list and maps configuration configurations to active game state instances (`createCharacterState`).
 - `src/maingame/physics.ts` — Specialized math functions for collision resolutions, boundary bounding, and friction limit speeds.
+- `src/maps/` — Arena definitions. Each map owns its dimensions and visual defaults independently.
+  - `soloLargeArena.ts` — Expanded arena automatically used for 4–6 player free-for-all matches.
+  - `teamArenas.ts` — Deathmatch, control, and royal-guard arena definitions.
+- `src/characters/<character-name>/normal.ts` — Normal playable character implementation.
+- `src/characters/<boss-name>/boss.ts` — Independently authored boss implementation; bosses are never runtime-scaled normal characters.
 
 ## Main Engine: `GameLounge` (`src/maingame/gameLounge.ts`)
 `GameLounge` is a lightweight game engine that runs the main execution loop (physics updates and main canvas rendering). 

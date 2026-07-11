@@ -1,4 +1,4 @@
-import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from '../character.interface';
 
 // ═══════════════════════════════════════════
 // #region TYPES
@@ -23,6 +23,15 @@ interface ArtilleryStrike {
 // #endregion TYPES
 
 // ═══════════════════════════════════════════
+// #region CONSTANTS — balance tuning values
+// ═══════════════════════════════════════════
+const SKILL_CONSTANTS = {
+  WARNING_DURATION: 1.5,
+  BOMBARDMENT_DURATION: 4.8,
+};
+// #endregion CONSTANTS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const chanikConfig: CharacterConfig = {
@@ -45,7 +54,9 @@ export const chanikConfig: CharacterConfig = {
   // #region SKILL_TRIGGER — request artillery strike
   // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
-    char.skillActive = false; // Ends skill immediately to restart cooldown
+    // Keep the skill active for the complete warning and bombardment sequence.
+    // The common engine only starts filling the gauge after this becomes false.
+    char.skillActive = true;
 
     ctx.addFloatingText(char.x, char.y - 45, '🚨 공습경보 발령!', '#ff3300', 1.5);
     console.log(`📻 [포격 요청] 찬익 -> 맵 전체 무차별 전탄 융단폭격 지원 요청! (공습경보 가동)`);
@@ -53,11 +64,11 @@ export const chanikConfig: CharacterConfig = {
 
     const activeStrikes = (char as any).activeStrikes || [];
     activeStrikes.push({
-      targetX: 400, // Center of map
-      targetY: 300,
-      radius: 1000, // Entire screen
-      delayLeft: 1.5, // Alert warning phase
-      durationLeft: 4.8, // Bombardment duration
+      targetX: ctx.arenaWidth / 2,
+      targetY: ctx.arenaHeight / 2,
+      radius: Math.hypot(ctx.arenaWidth, ctx.arenaHeight),
+      delayLeft: SKILL_CONSTANTS.WARNING_DURATION,
+      durationLeft: SKILL_CONSTANTS.BOMBARDMENT_DURATION,
       shellTimer: 0
     });
     (char as any).activeStrikes = activeStrikes;
@@ -110,7 +121,7 @@ export const chanikConfig: CharacterConfig = {
       if (strike.delayLeft > 0) {
         strike.delayLeft -= dt;
         if (Math.random() < 0.3) {
-          ctx.createParticle(Math.random() * 800, Math.random() * 600, '#ff3300', 2, 5);
+          ctx.createParticle(Math.random() * ctx.arenaWidth, Math.random() * ctx.arenaHeight, '#ff3300', 2, 5);
         }
       } else if (strike.durationLeft > 0) {
         strike.durationLeft -= dt;
@@ -118,8 +129,8 @@ export const chanikConfig: CharacterConfig = {
         if (strike.shellTimer <= 0) {
           strike.shellTimer = 0.15; // Shoot every 0.15s
           
-          const bombX = Math.random() * 800;
-          const bombY = Math.random() * 600;
+          const bombX = Math.random() * ctx.arenaWidth;
+          const bombY = Math.random() * ctx.arenaHeight;
 
           projectiles.push({
             startX: bombX - 100,
@@ -133,7 +144,8 @@ export const chanikConfig: CharacterConfig = {
       }
     });
 
-    // Clean up finished strikes
+    // Clean up finished strikes and start the cooldown only after the last
+    // projectile from this cast has resolved.
     (char as any).activeStrikes = activeStrikes.filter((s) => s.delayLeft > 0 || s.durationLeft > 0);
 
     // 2. Missile flight and explosions
@@ -175,6 +187,11 @@ export const chanikConfig: CharacterConfig = {
     });
 
     (char as any).projectiles = projectiles.filter((p) => p.progress < 1.0);
+
+    if (char.skillActive && (char as any).activeStrikes.length === 0 && (char as any).projectiles.length === 0) {
+      char.skillActive = false;
+      ctx.addFloatingText(char.x, char.y - 25, '📻 포격 종료 · 재충전 시작', '#00ffcc', 1.0);
+    }
 
     // Stun logic
     if (char.isStunned) {
@@ -219,16 +236,16 @@ export const chanikConfig: CharacterConfig = {
     // 1. Siren warnings and alert zone dashed lines
     canvasCtx.save();
     activeStrikes.forEach((strike) => {
-      if (strike.radius >= 1000) {
+      if (strike.radius >= Math.hypot(canvasCtx.canvas.width, canvasCtx.canvas.height)) {
         // Siren border lines
         canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.45)';
         canvasCtx.lineWidth = 10;
-        canvasCtx.strokeRect(0, 0, 800, 600);
+        canvasCtx.strokeRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
 
         // Slow flashing red overlay screen
         const pulse = Math.abs(Math.sin(Date.now() / 150)) * 0.08;
         canvasCtx.fillStyle = `rgba(255, 0, 0, ${pulse})`;
-        canvasCtx.fillRect(0, 0, 800, 600);
+        canvasCtx.fillRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
 
         // Big alert text during warning delay
         if (strike.delayLeft > 0) {
@@ -244,13 +261,13 @@ export const chanikConfig: CharacterConfig = {
           canvasCtx.textAlign = 'center';
           canvasCtx.textBaseline = 'middle';
           
-          canvasCtx.strokeText('🚨 공습경보!! 🚨', 400, 270);
-          canvasCtx.fillText('🚨 공습경보!! 🚨', 400, 270);
+          canvasCtx.strokeText('🚨 공습경보!! 🚨', canvasCtx.canvas.width / 2, canvasCtx.canvas.height / 2 - 30);
+          canvasCtx.fillText('🚨 공습경보!! 🚨', canvasCtx.canvas.width / 2, canvasCtx.canvas.height / 2 - 30);
           
           canvasCtx.font = 'bold 18px "Noto Sans KR", Arial, sans-serif';
           canvasCtx.fillStyle = '#ffffff';
-          canvasCtx.strokeText('대공 포격 지원이 즉시 실시됩니다!', 400, 330);
-          canvasCtx.fillText('대공 포격 지원이 즉시 실시됩니다!', 400, 330);
+          canvasCtx.strokeText('대공 포격 지원이 즉시 실시됩니다!', canvasCtx.canvas.width / 2, canvasCtx.canvas.height / 2 + 30);
+          canvasCtx.fillText('대공 포격 지원이 즉시 실시됩니다!', canvasCtx.canvas.width / 2, canvasCtx.canvas.height / 2 + 30);
           
           canvasCtx.restore();
         }

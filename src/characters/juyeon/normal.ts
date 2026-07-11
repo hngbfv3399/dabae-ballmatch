@@ -1,4 +1,4 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState } from '../character.interface';
 
 // ═══════════════════════════════════════════
 // #region TYPES
@@ -25,7 +25,7 @@ interface JuyeonState extends CharacterState {
 const SKILL_CONSTANTS = {
   COOLDOWN: 6,
   AMPOULE_SPEED: 9.5,
-  HEAL_AMOUNT: 25,
+  HEAL_AMOUNT: 15,
   SPEED_BUFF_PCT: 50,
   SPEED_BUFF_DURATION: 3.0,
   STUN_DURATION: 1.5,

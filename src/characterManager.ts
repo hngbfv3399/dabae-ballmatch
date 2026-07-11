@@ -1,19 +1,22 @@
 import type { CharacterConfig, CharacterState } from './characters/character.interface';
-import { doyunConfig } from './characters/doyun';
-import { jihoConfig } from './characters/jiho';
-import { suConfig } from './characters/su';
-import { chanikConfig } from './characters/chanik';
-import { chanhwiConfig } from './characters/chanhwi';
-import { nayutaConfig } from './characters/nayuta';
-import { unheeConfig } from './characters/unhee';
-import { dongjunConfig } from './characters/dongjun';
-import { seyeonConfig } from './characters/seyeon';
-import { pumanConfig } from './characters/puman';
-import { eunsuConfig } from './characters/eunsu';
-import { myeongseokConfig } from './characters/myeongseok';
-import { jujuConfig } from './characters/juju';
-import { juyeonConfig } from './characters/juyeon';
-import { sungjaeConfig } from './characters/sungjae';
+import { doyunConfig } from './characters/doyun/normal';
+import { jihoConfig } from './characters/jiho/normal';
+import { suConfig } from './characters/su/normal';
+import { chanikConfig } from './characters/chanik/normal';
+import { chanhwiConfig } from './characters/chanhwi/normal';
+import { nayutaConfig } from './characters/nayuta/normal';
+import { unheeConfig } from './characters/unhee/normal';
+import { dongjunConfig } from './characters/dongjun/normal';
+import { seyeonConfig } from './characters/seyeon/normal';
+import { pumanConfig } from './characters/puman/normal';
+import { eunsuConfig } from './characters/eunsu/normal';
+import { myeongseokConfig } from './characters/myeongseok/normal';
+import { jujuConfig } from './characters/juju/normal';
+import { juyeonConfig } from './characters/juyeon/normal';
+import { sungjaeConfig } from './characters/sungjae/normal';
+import { mongshilConfig } from './characters/mongshil/normal';
+import { seojunConfig } from './characters/seojun/normal';
+import { jiwooConfig } from './characters/jiwoo/normal';
 
 // 이용 가능한 캐릭터 목록
 export const availableCharacters: CharacterConfig[] = [
@@ -31,8 +34,18 @@ export const availableCharacters: CharacterConfig[] = [
   myeongseokConfig,
   jujuConfig,
   juyeonConfig,
-  sungjaeConfig
+  sungjaeConfig,
+  mongshilConfig,
+  seojunConfig,
+  jiwooConfig
 ];
+
+/**
+ * Bosses are independently authored characters. Never derive one by changing
+ * a normal character's runtime stats; register `characters/<name>/boss.ts`
+ * here once its mechanics are implemented.
+ */
+export const availableBossCharacters: CharacterConfig[] = [];
 
 /**
  * 캐릭터 설정을 게임 런타임 상태 객체로 변환합니다.

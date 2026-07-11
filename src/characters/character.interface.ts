@@ -3,7 +3,10 @@ export interface CharacterBehaviorContext {
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
   createExplosion: (x: number, y: number, color: string, count?: number) => void;
   dealDamage: (attacker: CharacterState, target: CharacterState, amount: number, customText?: string) => void;
+  applyConfusion: (target: CharacterState, duration: number, rerollInterval: number) => void;
   addFloatingText: (x: number, y: number, text: string, color: string, life?: number) => void;
+  arenaWidth: number;
+  arenaHeight: number;
   logMessage?: (msg: string, type: string) => void;
 }
 
@@ -85,6 +88,11 @@ export interface CharacterState extends CharacterConfig {
   poisonDamageTimer?: number; // 독성 대미지 틱 타이머 (초)
   isImmune?: boolean; // 주주 피해 무적 보호막 여부
   immuneTimeLeft?: number; // 무적 보호막 남은 시간 (초)
+  isConfused?: boolean; // 혼란 상태: 이동 방향이 무작위로 전환되고 공격/스킬 사용 불가
+  confusedTimeLeft?: number;
+  confusionRerollTimer?: number;
+  confusionRerollInterval?: number;
+  isCcImmune?: boolean;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

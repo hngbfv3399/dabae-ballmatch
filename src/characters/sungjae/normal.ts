@@ -1,4 +1,4 @@
-import type { CharacterConfig, CharacterState } from './character.interface';
+import type { CharacterConfig, CharacterState } from '../character.interface';
 
 // ═══════════════════════════════════════════
 // #region TYPES

@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 // Get the latest patch note
@@ -19,12 +19,12 @@ export const list = query({
     return await ctx.db
       .query("patchNotes")
       .order("desc")
-      .collect();
+      .take(50);
   },
 });
 
 // Create a new patch note (or seed data)
-export const create = mutation({
+export const create = internalMutation({
   args: {
     version: v.string(),
     title: v.string(),
@@ -51,14 +51,14 @@ export const create = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = internalMutation({
   args: { id: v.id("patchNotes") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
   },
 });
 
-export const update = mutation({
+export const update = internalMutation({
   args: {
     id: v.id("patchNotes"),
     version: v.optional(v.string()),
@@ -76,7 +76,7 @@ export const update = mutation({
   },
 });
 
-export const cleanOutdated = mutation({
+export const cleanOutdated = internalMutation({
   args: {},
   handler: async (ctx) => {
     const patches = await ctx.db.query("patchNotes").collect();

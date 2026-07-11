@@ -11,7 +11,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
 ---
 
 ## 1. Chanhwi (chanhwi)
-- **File**: `src/characters/chanhwi.ts`
+- **File**: `src/characters/chanhwi/normal.ts`
 - **Role**: Nuker | **Tier**: S
 - **Region Map**:
   - `CONSTANTS`: Timing durations (17.4s), quotes, scale multiplier, blast ranges.
@@ -22,7 +22,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Screen shake, overlay dark, text rendering, portal lines.
 
 ## 2. Su (su)
-- **File**: `src/characters/su.ts`
+- **File**: `src/characters/su/normal.ts`
 - **Role**: Sniper | **Tier**: C
 - **Region Map**:
   - `TYPES`: LaserTrail interface.
@@ -35,7 +35,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Draw laser trails, semi-transparency alpha, isTargetable check.
 
 ## 3. Jiho (jiho)
-- **File**: `src/characters/jiho.ts`
+- **File**: `src/characters/jiho/normal.ts`
 - **Role**: Specialist | **Tier**: A
 - **Region Map**:
   - `CONSTANTS`: Cooldown (5s), Compile success rate (65%), bug chance (40%).
@@ -47,7 +47,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Draw typing bar, green aura pre-render, stun stars.
 
 ## 4. Doyun (doyun)
-- **File**: `src/characters/doyun.ts`
+- **File**: `src/characters/doyun/normal.ts`
 - **Role**: Guardian | **Tier**: C
 - **Region Map**:
   - `CONSTANTS`: Cooldown (5s), Shield absorption (6), scale multiplier.
@@ -60,7 +60,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `HELPERS`: `executeDunkSlam` logic.
 
 ## 5. Unhee (unhee)
-- **File**: `src/characters/unhee.ts`
+- **File**: `src/characters/unhee/normal.ts`
 - **Role**: Juggernaut | **Tier**: D
 - **Region Map**:
   - `CONSTANTS`: Channeling time (2s), Bulkup duration (7s), stats multipliers.
@@ -72,7 +72,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Barbell drawing, flame aura ring.
 
 ## 6. Juju (juju)
-- **File**: `src/characters/juju.ts`
+- **File**: `src/characters/juju/normal.ts`
 - **Role**: Disabler | **Tier**: S
 - **Region Map**:
   - `TYPES`: SwapPortalEffect interface.
@@ -83,7 +83,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Swirl black hole cores, portal circles, grid lines.
 
 ## 7. Seyeon (seyeon)
-- **File**: `src/characters/seyeon.ts`
+- **File**: `src/characters/seyeon/normal.ts`
 - **Role**: Guardian | **Tier**: S
 - **Region Map**:
   - `TYPES`: SeyeonState interface.
@@ -94,10 +94,11 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Gradient pink aura, heart head decorations.
 
 ## 8. Chanik (chanik)
-- **File**: `src/characters/chanik.ts`
+- **File**: `src/characters/chanik/normal.ts`
 - **Role**: Nuker | **Tier**: A
 - **Region Map**:
   - `TYPES`: Projectile, ArtilleryStrike interfaces.
+  - `CONSTANTS`: Warning and bombardment durations.
   - `CONFIG`: Config description.
   - `SKILL_TRIGGER`: Queue active strike alert.
   - `UPDATE`: Enemy slow ticks, spawn falling shells, knockback damage.
@@ -105,17 +106,19 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Warning overlays, siren borders, missile lines.
 
 ## 9. Nayuta (nayuta)
-- **File**: `src/characters/nayuta.ts`
+- **File**: `src/characters/nayuta/normal.ts`
 - **Role**: Speedster | **Tier**: B
 - **Region Map**:
+  - `CONSTANTS`: Domination chance, duration, and contact effects.
   - `CONFIG`: Config description.
   - `SKILL_TRIGGER`: Cancel active skills of targets.
+  - `COLLISION`: Apply domination only to enemies.
   - `UPDATE`: Control targets, force ticks, check target ranges.
   - `DEATH`: Release dominated targets.
   - `RENDER`: Red collar rings on controlled enemies.
 
 ## 10. Eunsu (eunsu)
-- **File**: `src/characters/eunsu.ts`
+- **File**: `src/characters/eunsu/normal.ts`
 - **Role**: Summoner | **Tier**: A
 - **Region Map**:
   - `CONFIG`: Config description.
@@ -126,7 +129,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Glow rings.
 
 ## 11. Dongjun (dongjun)
-- **File**: `src/characters/dongjun.ts`
+- **File**: `src/characters/dongjun/normal.ts`
 - **Role**: Specialist | **Tier**: B
 - **Region Map**:
   - `TYPES`: DongjunState interface.
@@ -138,7 +141,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `HELPERS`: `promoteDongjun`, `getRankStats`.
 
 ## 12. Puman (puman)
-- **File**: `src/characters/puman.ts`
+- **File**: `src/characters/puman/normal.ts`
 - **Role**: Juggernaut | **Tier**: B
 - **Region Map**:
   - `TYPES`: VenomProjectile, PlantEntity, PumanState interfaces.
@@ -150,7 +153,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Draw plants, venom balls, stack counts.
 
 ## 13. Myeongseok (myeongseok)
-- **File**: `src/characters/myeongseok.ts`
+- **File**: `src/characters/myeongseok/normal.ts`
 - **Role**: Juggernaut | **Tier**: B
 - **Region Map**:
   - `TYPES`: BowlingBall, MyeongseokState.
@@ -161,11 +164,11 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Draw bowling balls and holes.
 
 ## 14. Juyeon (juyeon)
-- **File**: `src/characters/juyeon.ts`
+- **File**: `src/characters/juyeon/normal.ts`
 - **Role**: Specialist | **Tier**: A
 - **Region Map**:
   - `TYPES`: AmpouleProjectile, JuyeonState.
-  - `CONSTANTS`: Cooldown (6s), heal (25), buff/debuff rates.
+  - `CONSTANTS`: Cooldown (6s), heal (15), buff/debuff rates.
   - `CONFIG`: Config description.
   - `SKILL_TRIGGER`: Fire modeling ampoule syringe.
   - `UPDATE`: Projectile flight calculations, stun triggering, speed buff decays.
@@ -173,7 +176,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `RENDER`: Draw syringe projectiles, stack counts, and stun stars.
 
 ## 15. Sungjae (sungjae)
-- **File**: `src/characters/sungjae.ts`
+- **File**: `src/characters/sungjae/normal.ts`
 - **Role**: Juggernaut | **Tier**: S
 - **Region Map**:
   - `TYPES`: LaserBullet, SungjaeState.
@@ -185,4 +188,36 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `DAMAGE`: Double HP damage absorption and eject blast trigger.
   - `RENDER`: Draw laser bullets, railgun targeting lines, mecha visors.
 
+## 16. Mongshil (mongshil)
+- **File**: `src/characters/mongshil/normal.ts`
+- **Role**: Specialist | **Tier**: B
+- **Region Map**:
+  - `TYPES`: Thrown toxic bottle and magic residue runtime state.
+  - `CONSTANTS`: Heat DOT and toxic residue tuning.
+  - `SKILL_TRIGGER`: Throw toxic material at the nearest enemy.
+  - `UPDATE`: Move bottles, create residues on impact, and resolve effects.
+  - `BASIC_ATTACK`: Apply probabilistic magic-iron heat.
+  - `RENDER`: Draw residue zones.
 
+## 17. Seojun (seojun)
+- **File**: `src/characters/seojun/normal.ts`
+- **Role**: Speedster | **Tier**: A
+- **Region Map**:
+  - `TYPES`: Time anchor, path, rewind and buff state.
+  - `CONSTANTS`: Two-stage cooldown, rewind, collision damage, and stack tuning.
+  - `SKILL_TRIGGER`: Create a time anchor or initiate rewind.
+  - `UPDATE`: Record the route, rewind safely, and expire buffs.
+  - `DAMAGE`: Rewind immunity and hit-based damage buff.
+  - `RENDER`: Draw the recorded time path and anchor.
+
+## 18. Jiwoo (jiwoo)
+- **File**: `src/characters/jiwoo/normal.ts`
+- **Role**: Disabler | **Tier**: A
+- **Region Map**:
+  - `TYPES`: One-time passive, return point, and attacker memory state.
+  - `CONSTANTS`: Vanity duration, recovery, return damage, and confusion tuning.
+  - `SKILL_TRIGGER`: Store the return point and become a phantom.
+  - `UPDATE`: Return, damage, confuse, teleport a recent attacker, and expire fracture marks.
+  - `BASIC_ATTACK`: Detonate a reality-fracture mark.
+  - `DAMAGE`: Passive reality rewrite, active invulnerability, and one-time-per-attacker damage reflection.
+  - `RENDER`: Phantom transparency and untargetability.

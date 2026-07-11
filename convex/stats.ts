@@ -1,10 +1,26 @@
-import { query, mutation } from "./_generated/server";
+import { internalMutation, query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+
+const CHARACTER_IDS = new Set([
+  "doyun", "jiho", "su", "chanik", "chanhwi", "nayuta", "unhee", "dongjun", "seyeon", "puman",
+  "eunsu", "myeongseok", "juju", "juyeon", "sungjae", "mongshil", "seojun", "jiwoo",
+]);
+const MODES = new Set(["all", "2", "3", "4", "5", "6", "team", "boss"]);
+const MAX_PARTICIPANTS = 6;
+
+function assertCharacterId(characterId: string): void {
+  if (!CHARACTER_IDS.has(characterId)) throw new Error("Unknown character ID");
+}
+
+function assertMode(mode: string): void {
+  if (!MODES.has(mode)) throw new Error("Unknown game mode");
+}
 
 // 1. Get all character stats for a specific mode
 export const getStats = query({
   args: { mode: v.string() },
   handler: async (ctx, args) => {
+    assertMode(args.mode);
     return await ctx.db
       .query("globalStats")
       .withIndex("by_mode_and_char", (q) => q.eq("mode", args.mode))
@@ -16,6 +32,7 @@ export const getStats = query({
 export const getCounters = query({
   args: { mode: v.string() },
   handler: async (ctx, args) => {
+    assertMode(args.mode);
     return await ctx.db
       .query("globalCounters")
       .withIndex("by_mode_victim_and_killer", (q) => q.eq("mode", args.mode))
@@ -30,6 +47,14 @@ export const recordGameStart = mutation({
     mode: v.string(),
   },
   handler: async (ctx, args) => {
+    if (args.participantIds.length === 0 || args.participantIds.length > MAX_PARTICIPANTS) {
+      throw new Error(`participantIds must contain between 1 and ${MAX_PARTICIPANTS} characters`);
+    }
+    if (new Set(args.participantIds).size !== args.participantIds.length) {
+      throw new Error("participantIds must not contain duplicates");
+    }
+    args.participantIds.forEach(assertCharacterId);
+    assertMode(args.mode);
     const modes = ["all", args.mode];
     for (const mode of modes) {
       for (const charId of args.participantIds) {
@@ -77,6 +102,15 @@ export const recordGameEnd = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    if (args.allChars.length === 0 || args.allChars.length > MAX_PARTICIPANTS) {
+      throw new Error(`allChars must contain between 1 and ${MAX_PARTICIPANTS} characters`);
+    }
+    if (new Set(args.allChars.map((char) => char.characterId)).size !== args.allChars.length) {
+      throw new Error("allChars must not contain duplicate characters");
+    }
+    if (args.winnerId !== "draw") assertCharacterId(args.winnerId);
+    assertMode(args.mode);
+    args.allChars.forEach((char) => assertCharacterId(char.characterId));
     const modes = ["all", args.mode];
     for (const mode of modes) {
       // Increment win for winner (if valid character)
@@ -151,6 +185,9 @@ export const recordCharacterDeath = mutation({
     mode: v.string(),
   },
   handler: async (ctx, args) => {
+    assertCharacterId(args.victimId);
+    assertCharacterId(args.killerId);
+    assertMode(args.mode);
     const modes = ["all", args.mode];
     for (const mode of modes) {
       const existing = await ctx.db
@@ -177,7 +214,7 @@ export const recordCharacterDeath = mutation({
 });
 
 // 6. Reset all global stats and counters
-export const resetStats = mutation({
+export const resetStats = internalMutation({
   args: {},
   handler: async (ctx) => {
     const allStats = await ctx.db.query("globalStats").collect();
@@ -195,6 +232,7 @@ export const resetStats = mutation({
 export const getDamageRanking = query({
   args: { mode: v.string() },
   handler: async (ctx, args) => {
+    assertMode(args.mode);
     const stats = await ctx.db
       .query("globalStats")
       .withIndex("by_mode_and_char", (q) => q.eq("mode", args.mode))
@@ -227,6 +265,7 @@ export const updateOneOnOneTier = mutation({
     tier: v.string(),
   },
   handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
     const existing = await ctx.db
       .query("oneOnOneTiers")
       .withIndex("by_char", (q) => q.eq("characterId", args.characterId))

@@ -18,7 +18,7 @@ When an agent needs to adjust variables (damage, speed, range, cooldowns):
 To add a new playable character to the game, follow these four steps:
 
 ### Step 2.1: Implement the Character File
-Create a new file under `src/characters/[character_id].ts`. You MUST use the exact skeleton template below, maintaining the `#region` structures.
+Create a new file under `src/characters/[character_id]/normal.ts`. Boss-only characters use `src/characters/[character_id]/boss.ts`; do not derive them by scaling a normal character at runtime. You MUST use the exact skeleton template below, maintaining the `#region` structures.
 
 ```typescript
 import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
@@ -109,11 +109,11 @@ Open `src/characterManager.ts` and perform two modifications:
    ```typescript
    import { customCharConfig } from './characters/custom_id';
    ```
-2. Add it to the export array:
+2. Add it to the appropriate export array:
    ```typescript
    export const availableCharacters: CharacterConfig[] = [
      // ...
-     customCharConfig
+     customCharConfig // normal character
    ];
    ```
 
@@ -186,5 +186,4 @@ Once the new feature/character is verified and TypeScript compilation succeeds, 
 - **Backend Schema Sync**: If character parameters, databases, or game states are backed by Convex, ensure that any changes are immediately synced.
 - **Commands**: Proactively run `npx convex dev` to push changes to the local development sandbox, or `npx convex deploy` to sync remote server functions.
 - **Verification**: Ensure no backend deployment warnings or database constraints fail after the frontend logic updates.
-
 

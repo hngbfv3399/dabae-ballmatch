@@ -1,5 +1,6 @@
 import type { CharacterState, CharacterBehaviorContext } from '../characters/character.interface';
 import { checkWallCollision, resolveCollision, limitMinSpeed } from './physics';
+import type { TeamGameType } from '../maps';
 
 interface Particle {
   x: number;
@@ -20,31 +21,14 @@ interface FloatingText {
   life: number; // 0 ~ 1
 }
 
-function applyNayutaControl(_nayuta: CharacterState, target: CharacterState, game: any) {
-  if (target.id === 'nayuta' || target.isDead || target.nayutaControlled) return;
-  // 40% 확률로 지배 상태 돌입 (10초)
-  if (Math.random() < 0.40) {
-    target.nayutaControlled = true;
-    target.nayutaControlTimeLeft = 10.0;
-    game.createParticle(target.x, target.y, '#e52b50', 4, 15);
-    game.floatingTexts.push({
-      x: target.x,
-      y: target.y - 45,
-      text: '👁️ 지배당함!',
-      color: '#e52b50',
-      life: 1.2
-    });
-    // 지배 즉시 스킬 취소 + 게이지 초기화
-    if (target.skillActive) {
-      target.skillActive = false;
-      target.skillDurationLeft = 0;
-      console.log(`🚫 [지배 스킬 취소] ${target.name}의 스킬이 지배로 인해 즉시 취소되었습니다.`);
-      game.onLogMessage?.(`🚫 [지배 스킬 취소] ${target.name}의 스킬이 즉시 캔슬되었습니다.`, 'skill');
-    }
-    target.skillGauge = 0;
-    console.log(`👁️ [지배 수립] 나유타 -> ${target.name} | 10초 지배 개시`);
-    game.onLogMessage?.(`👁️ [지배 수립] 나유타 ➡️ ${target.name} | 10초간 스킬 게이지 충전 불가 및 조종`, 'skill');
-  }
+/** 왕 지키기 전용 목표물. 캐릭터 목록과 분리해 모든 캐릭터/트랩 공격의 대상에서 제외한다. */
+interface RoyalKing {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  hp: number;
+  maxHp: number;
 }
 
 export class GameLounge {
@@ -68,6 +52,17 @@ export class GameLounge {
   private winnerCharacter: CharacterState | null = null;
   private eliminationCount: number = 0;
   private eliminationOrder: string[] = [];
+  private teamGameType: TeamGameType = 'deathmatch';
+  private controlScores = { red: 0, blue: 0 };
+  private royalKing: RoyalKing | null = null;
+  private readonly objectiveScoreToWin = 100;
+  private readonly objectiveRespawnTime = 3;
+  private readonly controlRadius = 150;
+  private readonly royalKingRadius = 42;
+  private readonly royalKingHp = 500;
+  private readonly royalKingSpeed = 1.2;
+  private readonly royalKingDamageRange = 78;
+  private readonly royalKingDamageMultiplier = 0.18;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -117,6 +112,13 @@ export class GameLounge {
       dealDamage: (attacker: CharacterState, target: CharacterState, amount: number, customText?: string) => {
         this.dealDamage(attacker, target, amount, customText);
       },
+      applyConfusion: (target: CharacterState, duration: number, rerollInterval: number) => {
+        if (target.isCcImmune) return;
+        target.isConfused = true;
+        target.confusedTimeLeft = duration;
+        target.confusionRerollTimer = 0;
+        target.confusionRerollInterval = rerollInterval;
+      },
       addFloatingText: (x: number, y: number, text: string, color: string, life?: number) => {
         this.floatingTexts.push({
           x,
@@ -126,16 +128,97 @@ export class GameLounge {
           life: life !== undefined ? life : 1.0
         });
       },
+      arenaWidth: this.canvas.width,
+      arenaHeight: this.canvas.height,
       logMessage: (msg: string, type: string) => {
         this.onLogMessage?.(msg, type);
       }
     };
   }
 
+  public getTeamObjectiveState() {
+    return {
+      type: this.teamGameType,
+      redScore: this.controlScores.red,
+      blueScore: this.controlScores.blue,
+      scoreToWin: this.objectiveScoreToWin,
+      royalKingHp: this.royalKing?.hp ?? 0,
+      royalKingMaxHp: this.royalKing?.maxHp ?? this.royalKingHp,
+    };
+  }
+
+  private isObjectiveTeamMode(): boolean {
+    return this.teamGameType === 'control' || this.teamGameType === 'siege';
+  }
+
+  private finishTeamObjective(winningTeam: 1 | 2) {
+    this.isGameOver = true;
+    this.gameOverTimer = 2;
+    this.winnerCharacter = this.characters.find((char) => char.teamId === winningTeam && !char.id.includes('clone')) || null;
+  }
+
+  private respawnObjectivePlayers(dt: number) {
+    if (!this.isObjectiveTeamMode()) return;
+    this.characters.forEach((char) => {
+      const state = char as CharacterState & { respawnTimeLeft?: number };
+      if (!char.isDead || state.respawnTimeLeft === undefined) return;
+      state.respawnTimeLeft -= dt;
+      if (state.respawnTimeLeft > 0) return;
+      char.isDead = false;
+      char.opacity = 1;
+      char.hp = char.maxHp;
+      char.skillGauge = 0;
+      const spawnX = char.teamId === 1 ? char.radius * 3 : this.canvas.width - char.radius * 3;
+      char.x = spawnX;
+      char.y = char.radius * 2 + Math.random() * (this.canvas.height - char.radius * 4);
+      const travelAngle = char.teamId === 1 ? 0 : Math.PI;
+      const travelSpeed = 3.5 * char.speed;
+      char.vx = Math.cos(travelAngle) * travelSpeed;
+      char.vy = Math.sin(travelAngle) * travelSpeed;
+      state.respawnTimeLeft = undefined;
+      this.floatingTexts.push({ x: char.x, y: char.y - 45, text: '♻️ 부활!', color: '#ffffff', life: 1 });
+    });
+  }
+
+  private updateTeamObjective(dt: number) {
+    if (!this.isObjectiveTeamMode() || this.isGameOver) return;
+    const players = this.characters.filter((char) => !char.isDead && !char.id.includes('clone'));
+    if (this.teamGameType === 'control') {
+      const centerX = this.canvas.width / 2;
+      const centerY = this.canvas.height / 2;
+      const redCount = players.filter((char) => char.teamId === 1 && Math.hypot(char.x - centerX, char.y - centerY) <= this.controlRadius).length;
+      const blueCount = players.filter((char) => char.teamId === 2 && Math.hypot(char.x - centerX, char.y - centerY) <= this.controlRadius).length;
+      if (redCount > 0 && blueCount === 0) this.controlScores.red = Math.min(this.objectiveScoreToWin, this.controlScores.red + dt * 10);
+      if (blueCount > 0 && redCount === 0) this.controlScores.blue = Math.min(this.objectiveScoreToWin, this.controlScores.blue + dt * 10);
+      if (this.controlScores.red >= this.objectiveScoreToWin) this.finishTeamObjective(1);
+      if (this.controlScores.blue >= this.objectiveScoreToWin) this.finishTeamObjective(2);
+      return;
+    }
+
+    const king = this.royalKing;
+    if (!king) return;
+
+    // 왕은 블루 진영을 천천히 순찰한다. 경계에 닿으면 방향을 반전한다.
+    king.x += king.vx * dt;
+    king.y += king.vy * dt;
+    const padding = this.royalKingRadius + 24;
+    if (king.x < this.canvas.width * 0.58 + padding || king.x > this.canvas.width - padding) king.vx *= -1;
+    if (king.y < padding || king.y > this.canvas.height - padding) king.vy *= -1;
+    king.x = Math.max(this.canvas.width * 0.58 + padding, Math.min(this.canvas.width - padding, king.x));
+    king.y = Math.max(padding, Math.min(this.canvas.height - padding, king.y));
+
+    // 왕은 CharacterState가 아니므로 투사체/트랩/아군 공격의 대상이 될 수 없다.
+    // 레드팀만 왕의 호위 반경 안에서 직접 공성 피해를 줄 수 있다.
+    const attackers = players.filter((char) => char.teamId === 1 && Math.hypot(char.x - king.x, char.y - king.y) <= this.royalKingDamageRange + char.radius);
+    const damagePerSecond = attackers.reduce((total, char) => total + char.attackPower, 0) * this.royalKingDamageMultiplier;
+    king.hp = Math.max(0, king.hp - damagePerSecond * dt);
+    if (king.hp <= 0) this.finishTeamObjective(1);
+  }
+
   /**
    * 게임을 초기화하고 준비 단계를 시작합니다.
    */
-  public init(selectedCharacters: CharacterState[], simulationSpeed: number = 1.0) {
+  public init(selectedCharacters: CharacterState[], simulationSpeed: number = 1.0, teamGameType: TeamGameType = 'deathmatch') {
     this.characters = JSON.parse(JSON.stringify(selectedCharacters)); // 딥카피로 초기 상태 보존
     this.simulationSpeed = simulationSpeed;
     this.particles = [];
@@ -150,6 +233,18 @@ export class GameLounge {
     this.roundTimer = 90.0;
     this.eliminationOrder = [];
     this.eliminationCount = 0;
+    this.teamGameType = teamGameType;
+    this.controlScores = { red: 0, blue: 0 };
+    this.royalKing = teamGameType === 'siege'
+      ? {
+          x: this.canvas.width * 0.78,
+          y: this.canvas.height / 2,
+          vx: this.royalKingSpeed,
+          vy: this.royalKingSpeed * 0.55,
+          hp: this.royalKingHp,
+          maxHp: this.royalKingHp,
+        }
+      : null;
 
     // 캐릭터 내부의 함수 객체(훅)들은 JSON.parse(JSON.stringify()) 과정에서 손실되므로,
     // 원본 selectedCharacters 리스트에서 함수들을 다시 찾아와 연결 복원
@@ -253,6 +348,8 @@ export class GameLounge {
       return;
     }
 
+    this.respawnObjectivePlayers(dt);
+
     // 사망 캐릭터 데스 애니메이션 타임 업데이트
     this.characters.forEach((char) => {
       if (char.isDead && (char as any).deathAnimationTime > 0) {
@@ -288,9 +385,15 @@ export class GameLounge {
         this.isGameOver = true;
         this.gameOverTimer = 2.0;
 
-        // 판정: 체력 낮은 캐릭터 사망
-        const sortedAlive = [...aliveRealPlayers].sort((a, b) => b.hp - a.hp);
-        if (sortedAlive.length > 0) {
+        if (this.teamGameType === 'control') {
+          const winningTeam = this.controlScores.red === this.controlScores.blue ? null : this.controlScores.red > this.controlScores.blue ? 1 : 2;
+          this.winnerCharacter = winningTeam ? this.characters.find((char) => char.teamId === winningTeam) || null : null;
+        } else if (this.teamGameType === 'siege') {
+          this.winnerCharacter = this.characters.find((char) => char.teamId === 2) || null;
+        } else {
+          // 판정: 체력 낮은 캐릭터 사망
+          const sortedAlive = [...aliveRealPlayers].sort((a, b) => b.hp - a.hp);
+          if (sortedAlive.length > 0) {
           const topHp = sortedAlive[0].hp;
           const topPlayers = sortedAlive.filter(p => p.hp === topHp);
 
@@ -315,9 +418,10 @@ export class GameLounge {
               }
             }
           });
-        } else {
-          this.winnerCharacter = null;
-          this.onLogMessage?.(`⏱️ [시간초과] 생존자가 없어 무승부 처리되었습니다!`, 'default');
+          } else {
+            this.winnerCharacter = null;
+            this.onLogMessage?.(`⏱️ [시간초과] 생존자가 없어 무승부 처리되었습니다!`, 'default');
+          }
         }
       }
     }
@@ -346,7 +450,7 @@ export class GameLounge {
             this.onLogMessage?.(`⚔️ [보스 레이드 종료] 동시 처치로 무승부 처리되었습니다!`, 'default');
           }
         }
-      } else if (isTeamGame) {
+      } else if (isTeamGame && !this.isObjectiveTeamMode()) {
         const redTeamAlive = aliveRealPlayers.some(p => p.teamId === 1);
         const blueTeamAlive = aliveRealPlayers.some(p => p.teamId === 2);
 
@@ -365,7 +469,7 @@ export class GameLounge {
             this.onLogMessage?.(`⚔️ [팀전 종료] 양 팀 동시 전멸로 무승부 처리되었습니다!`, 'default');
           }
         }
-      } else {
+      } else if (!isTeamGame) {
         if (aliveRealPlayers.length <= 1) {
           this.isGameOver = true;
           this.gameOverTimer = 2.0; // 2초간 슬로우 모션 및 데스 애니메이션 연출
@@ -456,11 +560,28 @@ export class GameLounge {
       }
     }
 
+    this.updateTeamObjective(dt);
+
     const context = this.getBehaviorContext();
 
     aliveCharacters.forEach((char) => {
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
+
+      if (char.isConfused) {
+        char.confusedTimeLeft = (char.confusedTimeLeft ?? 0) - dt;
+        char.confusionRerollTimer = (char.confusionRerollTimer ?? 0) - dt;
+        if (char.confusedTimeLeft <= 0) {
+          char.isConfused = false;
+          char.confusedTimeLeft = 0;
+        } else if (char.confusionRerollTimer <= 0) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3.5 * char.speed;
+          char.vx = Math.cos(angle) * speed;
+          char.vy = Math.sin(angle) * speed;
+          char.confusionRerollTimer = char.confusionRerollInterval ?? 0;
+        }
+      }
 
       // 2-C. 기절 지속 시간 차감 및 속도 복원 (신규 캐릭터 포함 공통 엔진화)
       if (char.isStunned && char.stunTimeLeft !== undefined && char.stunTimeLeft > 0) {
@@ -508,7 +629,7 @@ export class GameLounge {
       }
 
       // 스킬 게이지 충전 및 100% 도달 시 즉시 발동 검사 (기절 중에는 게이지 충전 불가, 지배당한 적도 충전 불가)
-      if (!char.skillActive && !char.isStunned && !char.nayutaControlled) {
+      if (!char.skillActive && !char.isStunned && !char.isConfused && !char.nayutaControlled) {
         let canCharge = true;
         if (char.id === 'nayuta') {
           const hasControlled = this.characters.some((c) => !c.isDead && c.nayutaControlled);
@@ -543,7 +664,7 @@ export class GameLounge {
       }
 
       // 기본 공격 사거리 내 적 감지 및 자동 공격 (기절 중에는 공격 불가)
-      if (char.baseAttackCooldown <= 0 && !char.isStunned) {
+      if (char.baseAttackCooldown <= 0 && !char.isStunned && !char.isConfused) {
         let closestEnemy: CharacterState | null = null;
         let minDist = Infinity;
 
@@ -597,14 +718,6 @@ export class GameLounge {
           if (!c2.skillActive && !c2.isStunned && !c2.isTyping && !c2.nayutaControlled) {
             const mult = c2.cooldownMultiplier !== undefined ? (1.0 / c2.cooldownMultiplier) : 1.0;
             c2.skillGauge = Math.min(100, c2.skillGauge + 5 * mult);
-          }
-
-          // 나유타 접촉 지배 판정
-          if (c1.id === 'nayuta' && !c2.isDead) {
-            applyNayutaControl(c1, c2, this);
-          }
-          if (c2.id === 'nayuta' && !c1.isDead) {
-            applyNayutaControl(c2, c1, this);
           }
 
           // 캐릭터 고유 충돌 효과 위임
@@ -757,6 +870,9 @@ export class GameLounge {
       target.hp = 0;
       target.isDead = true;
       target.opacity = 0.8;
+      if (this.isObjectiveTeamMode() && target.teamId !== undefined && !target.id.includes('clone')) {
+        (target as CharacterState & { respawnTimeLeft?: number }).respawnTimeLeft = this.objectiveRespawnTime;
+      }
       (target as any).deathAnimationTime = 1.5; // 1.5초 데스 애니메이션 타이머
 
       this.eliminationCount++;
@@ -885,6 +1001,62 @@ export class GameLounge {
     this.ctx.strokeStyle = 'rgba(127, 0, 255, 0.2)';
     this.ctx.lineWidth = 6;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.teamGameType === 'control') {
+      const centerX = this.canvas.width / 2;
+      const centerY = this.canvas.height / 2;
+      this.ctx.save();
+      this.ctx.fillStyle = 'rgba(255, 215, 0, 0.12)';
+      this.ctx.strokeStyle = '#ffd700';
+      this.ctx.lineWidth = 4;
+      this.ctx.setLineDash([10, 8]);
+      this.ctx.lineDashOffset = -performance.now() / 35;
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, this.controlRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+      const clockAngle = -Math.PI / 2 + (performance.now() / 1000) * (Math.PI / 3);
+      this.ctx.strokeStyle = 'rgba(255, 215, 0, 0.72)';
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.moveTo(centerX, centerY);
+      this.ctx.lineTo(centerX + Math.cos(clockAngle) * (this.controlRadius - 24), centerY + Math.sin(clockAngle) * (this.controlRadius - 24));
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, 9, 0, Math.PI * 2);
+      this.ctx.fillStyle = '#ffd700';
+      this.ctx.fill();
+      this.ctx.fillStyle = '#ffd700';
+      this.ctx.font = 'bold 18px Orbit';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('CAPTURE', centerX, centerY + 40);
+      this.ctx.restore();
+    }
+    if (this.teamGameType === 'siege' && this.royalKing) {
+      const king = this.royalKing;
+      const healthRatio = king.hp / king.maxHp;
+      this.ctx.save();
+      this.ctx.fillStyle = 'rgba(0, 122, 255, 0.28)';
+      this.ctx.strokeStyle = '#00c6ff';
+      this.ctx.lineWidth = 5;
+      this.ctx.beginPath();
+      this.ctx.arc(king.x, king.y, this.royalKingRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '28px sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('👑', king.x, king.y + 10);
+      this.ctx.fillStyle = '#07111f';
+      this.ctx.fillRect(king.x - 48, king.y - 62, 96, 10);
+      this.ctx.fillStyle = '#00c6ff';
+      this.ctx.fillRect(king.x - 48, king.y - 62, 96 * healthRatio, 10);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = 'bold 13px Orbit';
+      this.ctx.fillText(`BLUE KING ${Math.ceil(king.hp)}/${king.maxHp}`, king.x, king.y - 72);
+      this.ctx.restore();
+    }
 
     // 90초 타이머 그리기 (연습모드 제외하고 항상 작동)
     const isPractice = this.characters.some(c => c.id === 'dummy');

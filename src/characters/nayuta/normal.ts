@@ -1,4 +1,16 @@
-import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from '../character.interface';
+
+// ═══════════════════════════════════════════
+// #region CONSTANTS — balance tuning values
+// ═══════════════════════════════════════════
+const SKILL_CONSTANTS = {
+  CONTROL_CHANCE: 0.4,
+  CONTROL_DURATION: 10,
+  CONTACT_PARTICLE_SIZE: 4,
+  CONTACT_PARTICLE_LIFE: 15,
+  CONTACT_TEXT_LIFE: 1.2,
+};
+// #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
@@ -48,6 +60,33 @@ export const nayutaConfig: CharacterConfig = {
     });
   },
   // #endregion SKILL_TRIGGER
+
+  // ═══════════════════════════════════════════
+  // #region COLLISION — apply domination on contact
+  // ═══════════════════════════════════════════
+  onCollisionWithTarget(char: CharacterState, target: CharacterState, ctx: CharacterBehaviorContext) {
+    if (target.id === char.id || target.isDead || target.nayutaControlled) return;
+    // Free-for-all characters have no team. In team and boss modes, allies
+    // must never be selected for domination.
+    if (char.teamId !== undefined && target.teamId !== undefined && char.teamId === target.teamId) return;
+    if (Math.random() >= SKILL_CONSTANTS.CONTROL_CHANCE) return;
+
+    target.nayutaControlled = true;
+    target.nayutaControlTimeLeft = SKILL_CONSTANTS.CONTROL_DURATION;
+    ctx.createParticle(target.x, target.y, char.color, SKILL_CONSTANTS.CONTACT_PARTICLE_SIZE, SKILL_CONSTANTS.CONTACT_PARTICLE_LIFE);
+    ctx.addFloatingText(target.x, target.y - 45, '👁️ 지배당함!', char.color, SKILL_CONSTANTS.CONTACT_TEXT_LIFE);
+
+    if (target.skillActive) {
+      target.skillActive = false;
+      target.skillDurationLeft = 0;
+      console.log(`🚫 [지배 스킬 취소] ${target.name}의 스킬이 지배로 인해 즉시 취소되었습니다.`);
+      ctx.logMessage?.(`🚫 [지배 스킬 취소] ${target.name}의 스킬이 즉시 캔슬되었습니다.`, 'skill');
+    }
+    target.skillGauge = 0;
+    console.log(`👁️ [지배 수립] 나유타 -> ${target.name} | ${SKILL_CONSTANTS.CONTROL_DURATION}초 지배 개시`);
+    ctx.logMessage?.(`👁️ [지배 수립] 나유타 ➡️ ${target.name} | ${SKILL_CONSTANTS.CONTROL_DURATION}초간 스킬 게이지 충전 불가 및 조종`, 'skill');
+  },
+  // #endregion COLLISION
 
   // ═══════════════════════════════════════════
   // #region UPDATE — control dominated enemies, deal DOT, handle timers

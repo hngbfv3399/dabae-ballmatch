@@ -14,6 +14,16 @@ const lobbyVersionBadge = document.getElementById("lobby-version-badge") as HTML
 
 let latestVersion = "";
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  })[character] ?? character);
+}
+
 // Render all patch notes in a stacked list
 function renderPatchHistory(patches: any[]) {
   if (!patchHistoryListEl) return;
@@ -39,7 +49,7 @@ function renderPatchHistory(patches: any[]) {
         <div style="margin-top: 0.8rem;">
           <div style="color: #4dff4d; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">🔥 버프 (Buff)</div>
           <ul class="patch-bullet-list" style="margin: 0; padding: 0;">
-            ${patch.buffs.map((item: string) => `<li>${item}</li>`).join("")}
+            ${patch.buffs.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
           </ul>
         </div>
       `;
@@ -50,7 +60,7 @@ function renderPatchHistory(patches: any[]) {
         <div style="margin-top: 0.8rem;">
           <div style="color: #ff4444; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">❄️ 너프 (Nerf)</div>
           <ul class="patch-bullet-list" style="margin: 0; padding: 0;">
-            ${patch.nerfs.map((item: string) => `<li>${item}</li>`).join("")}
+            ${patch.nerfs.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
           </ul>
         </div>
       `;
@@ -61,7 +71,7 @@ function renderPatchHistory(patches: any[]) {
         <div style="margin-top: 0.8rem;">
           <div style="color: #ffd700; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">⚡ 스킬 및 버그 조정 (Adjustment)</div>
           <ul class="patch-bullet-list" style="margin: 0; padding: 0;">
-            ${patch.adjustments.map((item: string) => `<li>${item}</li>`).join("")}
+            ${patch.adjustments.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
           </ul>
         </div>
       `;
@@ -72,7 +82,7 @@ function renderPatchHistory(patches: any[]) {
         <div style="margin-top: 0.8rem;">
           <div style="color: #00f2fe; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">📢 전체 수정 내용 (General)</div>
           <ul class="patch-bullet-list" style="margin: 0; padding: 0;">
-            ${patch.general.map((item: string) => `<li>${item}</li>`).join("")}
+            ${patch.general.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
           </ul>
         </div>
       `;
@@ -82,7 +92,7 @@ function renderPatchHistory(patches: any[]) {
     if (!sectionsHTML && patch.content && patch.content.length > 0) {
       sectionsHTML = `
         <ul class="patch-bullet-list" style="margin: 0.5rem 0 0 0; padding: 0;">
-          ${patch.content.map((item: string) => `<li>${item}</li>`).join("")}
+          ${patch.content.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
       `;
     }
@@ -90,7 +100,7 @@ function renderPatchHistory(patches: any[]) {
     patchCard.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
         <div style="display: flex; align-items: center; gap: 0.6rem;">
-          <span style="font-size: 1.2rem; font-weight: 800; color: #fff; font-family: 'Outfit', sans-serif;">${patch.version}</span>
+          <span style="font-size: 1.2rem; font-weight: 800; color: #fff; font-family: 'Outfit', sans-serif;">${escapeHtml(patch.version)}</span>
           ${
             patch.isImportant
               ? `<span style="font-size: 0.7rem; color: #fff; background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">IMPORTANT</span>`
@@ -99,7 +109,7 @@ function renderPatchHistory(patches: any[]) {
         </div>
         <span style="font-size: 0.8rem; color: var(--text-secondary, #888);">${formattedDate}</span>
       </div>
-      <h4 style="font-size: 1.05rem; color: var(--neon-yellow, #ffd700); margin: 0 0 0.8rem 0; font-weight: 700; text-align: left;">${patch.title}</h4>
+      <h4 style="font-size: 1.05rem; color: var(--neon-yellow, #ffd700); margin: 0 0 0.8rem 0; font-weight: 700; text-align: left;">${escapeHtml(patch.title)}</h4>
       ${sectionsHTML}
     `;
 

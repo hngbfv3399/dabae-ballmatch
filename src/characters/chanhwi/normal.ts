@@ -1,4 +1,4 @@
-import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from './character.interface';
+import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from '../character.interface';
 
 // ═══════════════════════════════════════════
 // #region CONSTANTS
