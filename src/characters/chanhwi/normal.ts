@@ -9,8 +9,6 @@ const SKILL_CONSTANTS = {
   CASTING_DURATION: 15.0,     // casting phase with quotes
   BLAST_DURATION: 0.4,        // shockwave expansion
   BLAST_TRIGGER_TIME: 17.0,   // when blast fires (TOTAL - BLAST)
-  CENTER_X: 400,
-  CENTER_Y: 300,
   DMG_REDUCTION: 0.03,        // 97% reduction = only 3% taken
   // Distance-based HP ratio thresholds
   CLOSE_RANGE: 200,           // <= 200px
@@ -50,7 +48,7 @@ export const chanhwiConfig: CharacterConfig = {
   attackPower: 25,
   baseAttackRange: 45,
   skillName: '신라천정 (Shinra Tensei)',
-  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 화면 중앙(400, 300)으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 일본어 발음으로 화면 중앙에 렌더링합니다. 이후 전장의 모든 적들의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 사방 외벽으로 튕겨 날려보냅니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
+  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 전장의 모든 적들의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 사방 외벽으로 튕겨 날려보냅니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
   color: '#8a2be2', // 보라색
   skillChargeRate: 16.67,
   tier: 'S',
@@ -86,12 +84,14 @@ export const chanhwiConfig: CharacterConfig = {
       char.vy = 0;
 
       const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
+      const centerX = ctx.arenaWidth / 2;
+      const centerY = ctx.arenaHeight / 2;
 
       // Phase 1: Teleport slide (0.0 ~ 2.0s)
       if (elapsed < SKILL_CONSTANTS.SLIDE_DURATION) {
         const t = elapsed / SKILL_CONSTANTS.SLIDE_DURATION;
-        char.x = (char as any).preX + (SKILL_CONSTANTS.CENTER_X - (char as any).preX) * t;
-        char.y = (char as any).preY + (SKILL_CONSTANTS.CENTER_Y - (char as any).preY) * t;
+        char.x = (char as any).preX + (centerX - (char as any).preX) * t;
+        char.y = (char as any).preY + (centerY - (char as any).preY) * t;
 
         // Trail particles
         if (Math.random() < 0.6) {
@@ -100,8 +100,8 @@ export const chanhwiConfig: CharacterConfig = {
         (char as any).currentQuotes = undefined;
       } else {
         // Lock at center after slide
-        char.x = SKILL_CONSTANTS.CENTER_X;
-        char.y = SKILL_CONSTANTS.CENTER_Y;
+        char.x = centerX;
+        char.y = centerY;
 
         // Phase 2: Quote display
         const quoteElapsed = elapsed - SKILL_CONSTANTS.SLIDE_DURATION;
@@ -280,12 +280,12 @@ export const chanhwiConfig: CharacterConfig = {
       if (isFinalBlast) {
         canvasCtx.font = 'bold 46px "Noto Sans KR", Arial, sans-serif';
         canvasCtx.fillStyle = '#ffcc00';
-        canvasCtx.strokeText(lines[0], SKILL_CONSTANTS.CENTER_X, SKILL_CONSTANTS.CENTER_Y);
-        canvasCtx.fillText(lines[0], SKILL_CONSTANTS.CENTER_X, SKILL_CONSTANTS.CENTER_Y);
+        canvasCtx.strokeText(lines[0], canvasWidth / 2, canvasHeight / 2);
+        canvasCtx.fillText(lines[0], canvasWidth / 2, canvasHeight / 2);
       } else {
         const currentLine = lines[lines.length - 1];
-        canvasCtx.strokeText(currentLine, SKILL_CONSTANTS.CENTER_X, SKILL_CONSTANTS.CENTER_Y);
-        canvasCtx.fillText(currentLine, SKILL_CONSTANTS.CENTER_X, SKILL_CONSTANTS.CENTER_Y);
+        canvasCtx.strokeText(currentLine, canvasWidth / 2, canvasHeight / 2);
+        canvasCtx.fillText(currentLine, canvasWidth / 2, canvasHeight / 2);
       }
       canvasCtx.restore();
     }

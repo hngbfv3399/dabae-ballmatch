@@ -58,9 +58,9 @@ export class GameLounge {
   private readonly objectiveScoreToWin = 100;
   private readonly objectiveRespawnTime = 3;
   private readonly controlRadius = 150;
-  private readonly royalKingRadius = 42;
-  private readonly royalKingHp = 500;
-  private readonly royalKingSpeed = 1.2;
+  private readonly royalKingRadius = 70;
+  private readonly royalKingHp = 300;
+  private readonly royalKingSpeed = 105;
   private readonly royalKingDamageRange = 78;
   private readonly royalKingDamageMultiplier = 0.18;
 
@@ -197,6 +197,12 @@ export class GameLounge {
 
     const king = this.royalKing;
     if (!king) return;
+
+    // 왕을 처단하는 레드팀이 전멸하면 블루가 즉시 왕을 지킨 것으로 판정한다.
+    if (!players.some((char) => char.teamId === 1)) {
+      this.finishTeamObjective(2);
+      return;
+    }
 
     // 왕은 블루 진영을 천천히 순찰한다. 경계에 닿으면 방향을 반전한다.
     king.x += king.vx * dt;
@@ -1045,16 +1051,16 @@ export class GameLounge {
       this.ctx.fill();
       this.ctx.stroke();
       this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = '28px sans-serif';
+      this.ctx.font = '44px sans-serif';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText('👑', king.x, king.y + 10);
+      this.ctx.fillText('👑', king.x, king.y + 16);
       this.ctx.fillStyle = '#07111f';
-      this.ctx.fillRect(king.x - 48, king.y - 62, 96, 10);
+      this.ctx.fillRect(king.x - 66, king.y - 92, 132, 12);
       this.ctx.fillStyle = '#00c6ff';
-      this.ctx.fillRect(king.x - 48, king.y - 62, 96 * healthRatio, 10);
+      this.ctx.fillRect(king.x - 66, king.y - 92, 132 * healthRatio, 12);
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = 'bold 13px Orbit';
-      this.ctx.fillText(`BLUE KING ${Math.ceil(king.hp)}/${king.maxHp}`, king.x, king.y - 72);
+      this.ctx.fillText(`BLUE KING ${Math.ceil(king.hp)}/${king.maxHp}`, king.x, king.y - 104);
       this.ctx.restore();
     }
 
