@@ -1,54 +1,107 @@
-import './style.css';
-import { availableBossCharacters, availableCharacters, createCharacterState } from './characterManager';
-import type { CharacterState } from './characters/character.interface';
-import { defaultArena, getArenaForMatch, type ArenaConfig, type TeamGameType } from './maps';
-import { GameLounge } from './maingame/gameLounge';
-import { initPatchNotesSubscription, convexClient } from './convexClient';
-import { api } from '../convex/_generated/api';
+import "./style.css";
+import {
+  availableBossCharacters,
+  availableCharacters,
+  createCharacterState,
+} from "./characterManager";
+import type { CharacterState } from "./characters/character.interface";
+import {
+  defaultArena,
+  getArenaForMatch,
+  type ArenaConfig,
+  type TeamGameType,
+} from "./maps";
+import { GameLounge } from "./maingame/gameLounge";
+import { initPatchNotesSubscription, convexClient } from "./convexClient";
+import { api } from "../convex/_generated/api";
 
 // DOM Elements
-const lobbyView = document.getElementById('lobby-view') as HTMLElement;
-const gameView = document.getElementById('game-view') as HTMLElement;
-const characterListContainer = document.getElementById('character-list') as HTMLElement;
-const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
-const gameSpeedSelect = document.getElementById('game-speed') as HTMLSelectElement;
-const backToLobbyBtn = document.getElementById('back-to-lobby-btn') as HTMLButtonElement;
-const gameCanvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+const lobbyView = document.getElementById("lobby-view") as HTMLElement;
+const gameView = document.getElementById("game-view") as HTMLElement;
+const characterListContainer = document.getElementById(
+  "character-list",
+) as HTMLElement;
+const startBtn = document.getElementById("start-btn") as HTMLButtonElement;
+const gameSpeedSelect = document.getElementById(
+  "game-speed",
+) as HTMLSelectElement;
+const backToLobbyBtn = document.getElementById(
+  "back-to-lobby-btn",
+) as HTMLButtonElement;
+const gameCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 
 function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
   gameCanvas.width = arena.width;
   gameCanvas.height = arena.height;
   gameCanvas.style.backgroundColor = arena.backgroundColor;
 }
-const countdownOverlay = document.getElementById('countdown-overlay') as HTMLElement;
-const countdownNumber = document.getElementById('countdown-number') as HTMLElement;
-const gameStatusText = document.getElementById('game-status-text') as HTMLElement;
-const aliveCountEl = document.getElementById('alive-count') as HTMLElement;
-const totalCountEl = document.getElementById('total-count') as HTMLElement;
-const hudList = document.getElementById('hud-list') as HTMLElement;
-const randomStartBtn = document.getElementById('random-start-btn') as HTMLButtonElement;
-const randomPlayerCountSelect = document.getElementById('random-player-count') as HTMLSelectElement;
-const randomTeamGameTypeSelect = document.getElementById('random-team-game-type') as HTMLSelectElement;
-const randomTeamGameTypeSetting = document.getElementById('random-team-game-type-setting') as HTMLElement;
-const statsModeSelect = document.getElementById('stats-mode-select') as HTMLSelectElement;
-const tierListNotice = document.getElementById('tier-list-notice') as HTMLElement;
-const tierRowsWrapper = document.getElementById('tier-rows-wrapper') as HTMLElement;
-const totalSimGamesEl = document.getElementById('total-sim-games') as HTMLElement;
-const teamGameTypeSelect = document.getElementById('team-game-type') as HTMLSelectElement;
-const teamGameTypeSetting = document.getElementById('team-game-type-setting') as HTMLElement;
+const countdownOverlay = document.getElementById(
+  "countdown-overlay",
+) as HTMLElement;
+const countdownNumber = document.getElementById(
+  "countdown-number",
+) as HTMLElement;
+const gameStatusText = document.getElementById(
+  "game-status-text",
+) as HTMLElement;
+const aliveCountEl = document.getElementById("alive-count") as HTMLElement;
+const totalCountEl = document.getElementById("total-count") as HTMLElement;
+const hudList = document.getElementById("hud-list") as HTMLElement;
+const randomStartBtn = document.getElementById(
+  "random-start-btn",
+) as HTMLButtonElement;
+const randomPlayerCountSelect = document.getElementById(
+  "random-player-count",
+) as HTMLSelectElement;
+const randomTeamGameTypeSelect = document.getElementById(
+  "random-team-game-type",
+) as HTMLSelectElement;
+const randomTeamGameTypeSetting = document.getElementById(
+  "random-team-game-type-setting",
+) as HTMLElement;
+const statsModeSelect = document.getElementById(
+  "stats-mode-select",
+) as HTMLSelectElement;
+const tierListNotice = document.getElementById(
+  "tier-list-notice",
+) as HTMLElement;
+const tierRowsWrapper = document.getElementById(
+  "tier-rows-wrapper",
+) as HTMLElement;
+const totalSimGamesEl = document.getElementById(
+  "total-sim-games",
+) as HTMLElement;
+const teamGameTypeSelect = document.getElementById(
+  "team-game-type",
+) as HTMLSelectElement;
+const teamGameTypeSetting = document.getElementById(
+  "team-game-type-setting",
+) as HTMLElement;
 
-const openStatsBtn = document.getElementById('open-stats-btn') as HTMLButtonElement;
-const closeStatsBtn = document.getElementById('close-stats-btn') as HTMLButtonElement;
-const statsCenterModal = document.getElementById('stats-center-modal') as HTMLElement;
-const damageRankingWrapper = document.getElementById('damage-ranking-wrapper') as HTMLElement;
-const emptyRoleNotice = document.getElementById('empty-role-notice') as HTMLElement;
+const openStatsBtn = document.getElementById(
+  "open-stats-btn",
+) as HTMLButtonElement;
+const closeStatsBtn = document.getElementById(
+  "close-stats-btn",
+) as HTMLButtonElement;
+const statsCenterModal = document.getElementById(
+  "stats-center-modal",
+) as HTMLElement;
+const damageRankingWrapper = document.getElementById(
+  "damage-ranking-wrapper",
+) as HTMLElement;
+const emptyRoleNotice = document.getElementById(
+  "empty-role-notice",
+) as HTMLElement;
 let lobbyTotalGames = 0;
-let currentRoleFilter = 'all';
+let currentRoleFilter = "all";
 
 // Winner Modal Elements
-const winnerModal = document.getElementById('winner-modal') as HTMLElement;
-const winnerInfo = document.getElementById('winner-info') as HTMLElement;
-const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonElement;
+const winnerModal = document.getElementById("winner-modal") as HTMLElement;
+const winnerInfo = document.getElementById("winner-info") as HTMLElement;
+const modalCloseBtn = document.getElementById(
+  "modal-close-btn",
+) as HTMLButtonElement;
 
 // Selected characters state
 const selectedIds: Set<string> = new Set();
@@ -58,17 +111,21 @@ let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
 
 // 게임 모드 상태 변수
-let currentMode: 'solo' | 'team' | 'boss' = 'solo';
-let teamGameType: TeamGameType = 'deathmatch';
+let currentMode: "solo" | "team" | "boss" = "solo";
+let teamGameType: TeamGameType = "deathmatch";
 let bossCharacterId: string | null = null;
-const LARGE_SOLO_CHARACTER_RADIUS = 42;
+const LARGE_SOLO_CHARACTER_RADIUS = 53;
 
 function updateTeamGameTypeVisibility() {
-  teamGameTypeSetting.classList.toggle('hidden', currentMode !== 'team');
+  teamGameTypeSetting.classList.toggle("hidden", currentMode !== "team");
 }
 
 // 아바타 HTML 렌더러 (이모지 대체)
-function getAvatarHTML(name: string, image?: string, customClass: string = ''): string {
+function getAvatarHTML(
+  name: string,
+  image?: string,
+  customClass: string = "",
+): string {
   if (image) {
     return `<img class="avatar-img ${customClass}" src="${image}" alt="${name}" />`;
   }
@@ -89,20 +146,20 @@ interface CharacterStats {
   mvpCount?: number;
 }
 
-const DEFAULT_TIERS: Record<string, 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'> = {
-  chanhwi: 'S',
-  juju: 'S',
-  seyeon: 'A',
-  eunsu: 'A',
-  jiho: 'A',
-  chanik: 'B',
-  dongjun: 'B',
-  myeongseok: 'C',
-  puman: 'C',
-  unhee: 'D',
-  nayuta: 'D',
-  doyun: 'E',
-  su: 'F'
+const DEFAULT_TIERS: Record<string, "S" | "A" | "B" | "C" | "D" | "E" | "F"> = {
+  chanhwi: "S",
+  juju: "S",
+  seyeon: "A",
+  eunsu: "A",
+  jiho: "A",
+  chanik: "B",
+  dongjun: "B",
+  myeongseok: "C",
+  puman: "C",
+  unhee: "D",
+  nayuta: "D",
+  doyun: "E",
+  su: "F",
 };
 
 // 키구조: { [mode]: { [charId]: CharacterStats } }
@@ -116,17 +173,17 @@ let currentGlobalDamageRanking: any[] = [];
 
 function getStoredStats(): Record<string, Record<string, CharacterStats>> {
   const record: Record<string, Record<string, CharacterStats>> = {};
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const mode = statsModeSelect ? statsModeSelect.value : "all";
   record[mode] = {};
 
-  currentGlobalStats.forEach(item => {
+  currentGlobalStats.forEach((item) => {
     record[mode][item.characterId] = {
       wins: item.wins,
       games: item.games,
       damageDealt: item.damageDealt,
       damageTaken: item.damageTaken,
       rankSum: item.rankSum,
-      mvpCount: item.mvpCount
+      mvpCount: item.mvpCount,
     };
   });
   return record;
@@ -134,13 +191,13 @@ function getStoredStats(): Record<string, Record<string, CharacterStats>> {
 
 function calculateDynamicTiers() {
   const statsAll = getStoredStats();
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const mode = statsModeSelect ? statsModeSelect.value : "all";
   const stats = statsAll[mode] || {};
-  
+
   let totalGames = (stats as any).totalGames || 0;
   if (totalGames === 0) {
     const maxCharGames = Object.values(stats)
-      .map((s: any) => typeof s === 'object' && s !== null ? (s.games || 0) : 0)
+      .map((s: any) => (typeof s === "object" && s !== null ? s.games || 0 : 0))
       .reduce((max, g) => Math.max(max, g), 0);
     totalGames = maxCharGames;
   }
@@ -152,16 +209,21 @@ function calculateDynamicTiers() {
 
   // 플레이어 요구에 맞추어 판수 제한 잠금 완전히 제거
   if (tierListNotice && tierRowsWrapper) {
-    tierListNotice.classList.add('hidden');
-    tierRowsWrapper.classList.remove('hidden');
+    tierListNotice.classList.add("hidden");
+    tierRowsWrapper.classList.remove("hidden");
   }
 
-  const charScores = availableCharacters.map(char => {
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-    
+  const charScores = availableCharacters.map((char) => {
+    const s = stats[char.id] || {
+      wins: 0,
+      games: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+    };
+
     let kills = 0;
     let deaths = 0;
-    currentGlobalCounters.forEach(item => {
+    currentGlobalCounters.forEach((item) => {
       if (item.mode === mode) {
         if (item.killerId === char.id) kills += item.count;
         if (item.victimId === char.id) deaths += item.count;
@@ -171,34 +233,35 @@ function calculateDynamicTiers() {
     const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
     const avgDmgDealt = s.games > 0 ? s.damageDealt / s.games : 0;
     const avgDmgTaken = s.games > 0 ? s.damageTaken / s.games : 0;
-    
-    // 팀전 전용 기여도 공식
-    const contribution = (winRate * 2.5) + (avgDmgDealt * 0.15) + (kills * 8) - (avgDmgTaken * 0.05);
 
-    return { 
-      id: char.id, 
-      winRate, 
-      contribution, 
-      wins: s.wins, 
+    // 팀전 전용 기여도 공식
+    const contribution =
+      winRate * 2.5 + avgDmgDealt * 0.15 + kills * 8 - avgDmgTaken * 0.05;
+
+    return {
+      id: char.id,
+      winRate,
+      contribution,
+      wins: s.wins,
       games: s.games,
       kills,
-      deaths
+      deaths,
     };
   });
 
   // 정렬 규칙 분기
   charScores.sort((a, b) => {
-    if (mode === 'team') {
+    if (mode === "team") {
       return b.contribution - a.contribution;
-    } else if (mode === 'boss') {
+    } else if (mode === "boss") {
       return b.winRate - a.winRate;
     } else {
       if (a.winRate !== b.winRate) {
         return b.winRate - a.winRate;
       }
       const tierOrder = { S: 7, A: 6, B: 5, C: 4, D: 3, E: 2, F: 1 };
-      const tierA = DEFAULT_TIERS[a.id] || 'F';
-      const tierB = DEFAULT_TIERS[b.id] || 'F';
+      const tierA = DEFAULT_TIERS[a.id] || "F";
+      const tierB = DEFAULT_TIERS[b.id] || "F";
       if (tierOrder[tierA] !== tierOrder[tierB]) {
         return tierOrder[tierB] - tierOrder[tierA];
       }
@@ -208,16 +271,16 @@ function calculateDynamicTiers() {
 
   // 13개 캐릭터 분배: 1위 S, 2~3위 A, 4~5위 B, 6~7위 C, 8~9위 D, 10~11위 E, 12~13위 F
   charScores.forEach((item, index) => {
-    let tier: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' = 'F';
-    if (index === 0) tier = 'S';
-    else if (index <= 2) tier = 'A';
-    else if (index <= 4) tier = 'B';
-    else if (index <= 6) tier = 'C';
-    else if (index <= 8) tier = 'D';
-    else if (index <= 10) tier = 'E';
-    else tier = 'F';
+    let tier: "S" | "A" | "B" | "C" | "D" | "E" | "F" = "F";
+    if (index === 0) tier = "S";
+    else if (index <= 2) tier = "A";
+    else if (index <= 4) tier = "B";
+    else if (index <= 6) tier = "C";
+    else if (index <= 8) tier = "D";
+    else if (index <= 10) tier = "E";
+    else tier = "F";
 
-    const charConfig = availableCharacters.find(c => c.id === item.id);
+    const charConfig = availableCharacters.find((c) => c.id === item.id);
     if (charConfig) {
       charConfig.tier = tier;
     }
@@ -229,38 +292,45 @@ async function recordGameStart(participantIds: string[], mode: string) {
   try {
     await convexClient.mutation(api.stats.recordGameStart, {
       participantIds,
-      mode
+      mode,
     });
   } catch (err) {}
 }
 
-async function recordGameEnd(winnerId: string, allChars: CharacterState[], mode: string) {
+async function recordGameEnd(
+  winnerId: string,
+  allChars: CharacterState[],
+  mode: string,
+) {
   if (isPracticeMode) return;
-  const finalWinnerId = winnerId.includes('clone') ? 'eunsu' : winnerId;
-  const realChars = allChars.filter(char => !char.id.includes('clone'));
+  const finalWinnerId = winnerId.includes("clone") ? "eunsu" : winnerId;
+  const realChars = allChars.filter((char) => !char.id.includes("clone"));
 
   try {
     await convexClient.mutation(api.stats.recordGameEnd, {
       winnerId: finalWinnerId,
       mode,
-      allChars: realChars.map(char => ({
+      allChars: realChars.map((char) => ({
         characterId: char.id,
         damageDealt: char.totalDamageDealt || 0,
         damageTaken: char.totalDamageTaken || 0,
         rank: (char as any).rank || 1,
-        isMvp: !!(char as any).isMvp
-      }))
+        isMvp: !!(char as any).isMvp,
+      })),
     });
   } catch (err) {}
 }
 
 // 카운터 킬/데스 기록용 로직
-function getStoredCounters(): Record<string, Record<string, Record<string, number>>> {
+function getStoredCounters(): Record<
+  string,
+  Record<string, Record<string, number>>
+> {
   const record: Record<string, Record<string, Record<string, number>>> = {};
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const mode = statsModeSelect ? statsModeSelect.value : "all";
   record[mode] = {};
 
-  currentGlobalCounters.forEach(item => {
+  currentGlobalCounters.forEach((item) => {
     if (!record[mode][item.victimId]) {
       record[mode][item.victimId] = {};
     }
@@ -269,43 +339,62 @@ function getStoredCounters(): Record<string, Record<string, Record<string, numbe
   return record;
 }
 
-async function recordCharacterDeath(victimId: string, killerId: string, playerCount: number) {
+async function recordCharacterDeath(
+  victimId: string,
+  killerId: string,
+  playerCount: number,
+) {
   if (isPracticeMode) return;
-  if (victimId.includes('clone') || killerId.includes('clone')) return;
+  if (victimId.includes("clone") || killerId.includes("clone")) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
       victimId,
       killerId,
-      mode: playerCount.toString()
+      mode: playerCount.toString(),
     });
   } catch (err) {}
 }
 
 function renderTierList() {
   const statsAll = getStoredStats();
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const mode = statsModeSelect ? statsModeSelect.value : "all";
   const stats = statsAll[mode] || {};
 
-  const tiers = ['s', 'a', 'b', 'c', 'd', 'e', 'f'] as const;
+  const tiers = ["s", "a", "b", "c", "d", "e", "f"] as const;
   tiers.forEach((t) => {
     const container = document.getElementById(`tier-chars-${t}`);
     if (container) {
-      container.innerHTML = '';
-      const tierChars = availableCharacters.filter(c => (c.tier || 'F').toLowerCase() === t);
-      
+      container.innerHTML = "";
+      const tierChars = availableCharacters.filter(
+        (c) => (c.tier || "F").toLowerCase() === t,
+      );
+
       // 내부 정렬 규칙
       const sortedTierChars = [...tierChars].sort((a, b) => {
-        const sA = stats[a.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-        const sB = stats[b.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
-        
+        const sA = stats[a.id] || {
+          wins: 0,
+          games: 0,
+          damageDealt: 0,
+          damageTaken: 0,
+        };
+        const sB = stats[b.id] || {
+          wins: 0,
+          games: 0,
+          damageDealt: 0,
+          damageTaken: 0,
+        };
+
         const wrA = sA.games > 0 ? sA.wins / sA.games : -1;
         const wrB = sB.games > 0 ? sB.wins / sB.games : -1;
 
-        if (mode === 'team') {
+        if (mode === "team") {
           // 팀전: 기여도 기반
-          let kA = 0, kB = 0, dA = 0, dB = 0;
-          currentGlobalCounters.forEach(item => {
-            if (item.mode === 'team') {
+          let kA = 0,
+            kB = 0,
+            dA = 0,
+            dB = 0;
+          currentGlobalCounters.forEach((item) => {
+            if (item.mode === "team") {
               if (item.killerId === a.id) kA += item.count;
               if (item.killerId === b.id) kB += item.count;
               if (item.victimId === a.id) dA += item.count;
@@ -317,45 +406,52 @@ function renderTierList() {
           const avgDmgTakenA = sA.games > 0 ? sA.damageTaken / sA.games : 0;
           const avgDmgTakenB = sB.games > 0 ? sB.damageTaken / sB.games : 0;
 
-          const scoreA = (wrA * 250) + (avgDmgA * 0.15) + (kA * 8) - (avgDmgTakenA * 0.05);
-          const scoreB = (wrB * 250) + (avgDmgB * 0.15) + (kB * 8) - (avgDmgTakenB * 0.05);
+          const scoreA =
+            wrA * 250 + avgDmgA * 0.15 + kA * 8 - avgDmgTakenA * 0.05;
+          const scoreB =
+            wrB * 250 + avgDmgB * 0.15 + kB * 8 - avgDmgTakenB * 0.05;
           return scoreB - scoreA;
         } else {
           return wrB - wrA;
         }
       });
 
-      sortedTierChars.forEach(char => {
-        const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0 };
+      sortedTierChars.forEach((char) => {
+        const s = stats[char.id] || {
+          wins: 0,
+          games: 0,
+          damageDealt: 0,
+          damageTaken: 0,
+        };
         const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
-        
-        let subText = '';
-        if (mode === 'team') {
+
+        let subText = "";
+        if (mode === "team") {
           // KDA 및 기여도 노출
           let kills = 0;
           let deaths = 0;
-          currentGlobalCounters.forEach(item => {
-            if (item.mode === 'team') {
+          currentGlobalCounters.forEach((item) => {
+            if (item.mode === "team") {
               if (item.killerId === char.id) kills += item.count;
               if (item.victimId === char.id) deaths += item.count;
             }
           });
           const assists = Math.floor(s.damageDealt / 250);
           subText = `<span style="color: var(--neon-cyan);">${kills}K / ${deaths}D / ${assists}A</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
-        } else if (mode === 'boss') {
+        } else if (mode === "boss") {
           // 보스 난이도 노출
           subText = `<span style="color: var(--neon-yellow);">보스승률 ${winRate.toFixed(0)}%</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
         } else {
           subText = `<span>승률 ${winRate.toFixed(0)}%</span> <span style="font-size: 0.65rem; opacity: 0.5;">(${s.games}판)</span>`;
         }
-        
-        const chip = document.createElement('div');
+
+        const chip = document.createElement("div");
         chip.className = `tier-char-chip-premium tier-chip-${t}`;
         chip.style.border = `1px solid ${char.color}40`;
         chip.style.boxShadow = `0 0 6px ${char.color}15`;
         chip.innerHTML = `
           <div class="tier-char-avatar">
-            ${getAvatarHTML(char.name, char.image, 'tier-avatar-img')}
+            ${getAvatarHTML(char.name, char.image, "tier-avatar-img")}
           </div>
           <div class="tier-char-info">
             <span class="tier-char-name" style="color: ${char.color};">${char.name}</span>
@@ -371,7 +467,7 @@ function renderTierList() {
 // Initialize Lobby character list
 function initLobby(preserveSelections = false) {
   calculateDynamicTiers(); // 로비 갱신 시 실시간 계산
-  characterListContainer.innerHTML = '';
+  characterListContainer.innerHTML = "";
   if (!preserveSelections) {
     selectedIds.clear();
   }
@@ -381,32 +477,42 @@ function initLobby(preserveSelections = false) {
   renderTierList();
 
   // 역할군 필터 적용
-  const lobbyCharacters = currentMode === 'boss'
-    ? [...availableBossCharacters, ...availableCharacters]
-    : availableCharacters;
+  const lobbyCharacters =
+    currentMode === "boss"
+      ? [...availableBossCharacters, ...availableCharacters]
+      : availableCharacters;
   const filteredChars = lobbyCharacters.filter(
-    (char) => currentRoleFilter === 'all' || char.role === currentRoleFilter
+    (char) => currentRoleFilter === "all" || char.role === currentRoleFilter,
   );
 
   // 공석 안내 처리
   if (filteredChars.length === 0) {
     if (emptyRoleNotice) {
-      emptyRoleNotice.classList.remove('hidden');
-      emptyRoleNotice.style.display = 'flex';
+      emptyRoleNotice.classList.remove("hidden");
+      emptyRoleNotice.style.display = "flex";
     }
   } else {
     if (emptyRoleNotice) {
-      emptyRoleNotice.classList.add('hidden');
-      emptyRoleNotice.style.display = 'none';
+      emptyRoleNotice.classList.add("hidden");
+      emptyRoleNotice.style.display = "none";
     }
   }
 
   filteredChars.forEach((char) => {
-    const isBossCharacter = availableBossCharacters.some((boss) => boss.id === char.id);
+    const isBossCharacter = availableBossCharacters.some(
+      (boss) => boss.id === char.id,
+    );
     const statsAll = getStoredStats();
-    const mode = statsModeSelect ? statsModeSelect.value : 'all';
+    const mode = statsModeSelect ? statsModeSelect.value : "all";
     const stats = statsAll[mode] || {};
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0, rankSum: 0, mvpCount: 0 };
+    const s = stats[char.id] || {
+      wins: 0,
+      games: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+      rankSum: 0,
+      mvpCount: 0,
+    };
     const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
     const winRateStr = `${winRate.toFixed(1)}%`;
     const games = s.games;
@@ -415,7 +521,7 @@ function initLobby(preserveSelections = false) {
     const dmgTaken = s.damageTaken;
     const rankSum = s.rankSum || 0;
     const mvpCount = s.mvpCount || 0;
-    const avgRank = games > 0 ? (rankSum / games).toFixed(1) : '-';
+    const avgRank = games > 0 ? (rankSum / games).toFixed(1) : "-";
 
     // 카운터 데이터 가공 (현재 선택된 모드 기준)
     const countersAll = getStoredCounters();
@@ -423,7 +529,7 @@ function initLobby(preserveSelections = false) {
 
     // 1. 천적 (나를 가장 많이 죽인 적)
     const myDeathRecords = modeCounters[char.id] || {};
-    let worstKillerId = '';
+    let worstKillerId = "";
     let worstKillerCount = 0;
     for (const [kId, count] of Object.entries(myDeathRecords)) {
       if (count > worstKillerCount) {
@@ -431,11 +537,15 @@ function initLobby(preserveSelections = false) {
         worstKillerId = kId;
       }
     }
-    const worstKillerName = worstKillerId ? (availableCharacters.find(c => c.id === worstKillerId)?.name || '없음') : '없음';
-    const worstKillerStr = worstKillerId ? `${worstKillerName} (${worstKillerCount}데스)` : '없음';
+    const worstKillerName = worstKillerId
+      ? availableCharacters.find((c) => c.id === worstKillerId)?.name || "없음"
+      : "없음";
+    const worstKillerStr = worstKillerId
+      ? `${worstKillerName} (${worstKillerCount}데스)`
+      : "없음";
 
     // 2. 먹잇감 (내가 가장 많이 죽인 적)
-    let bestVictimId = '';
+    let bestVictimId = "";
     let bestVictimCount = 0;
     for (const [victimId, killerRecords] of Object.entries(modeCounters)) {
       const killedByMe = killerRecords[char.id] || 0;
@@ -444,49 +554,53 @@ function initLobby(preserveSelections = false) {
         bestVictimId = victimId;
       }
     }
-    const bestVictimName = bestVictimId ? (availableCharacters.find(c => c.id === bestVictimId)?.name || '없음') : '없음';
-    const bestVictimStr = bestVictimId ? `${bestVictimName} (${bestVictimCount}킬)` : '없음';
+    const bestVictimName = bestVictimId
+      ? availableCharacters.find((c) => c.id === bestVictimId)?.name || "없음"
+      : "없음";
+    const bestVictimStr = bestVictimId
+      ? `${bestVictimName} (${bestVictimCount}킬)`
+      : "없음";
 
-    const card = document.createElement('div');
-    card.className = 'character-card card';
-    
+    const card = document.createElement("div");
+    card.className = "character-card card";
+
     // 모드별 카드 테두리 및 선택 스타일 적용
-    if (currentMode === 'solo') {
+    if (currentMode === "solo") {
       if (selectedIds.has(char.id)) {
-        card.classList.add('selected');
+        card.classList.add("selected");
       }
-    } else if (currentMode === 'team') {
+    } else if (currentMode === "team") {
       if (selectedRedIds.has(char.id)) {
-        card.classList.add('selected');
-        card.classList.add('team-indicator-1'); // RED 테두리
+        card.classList.add("selected");
+        card.classList.add("team-indicator-1"); // RED 테두리
       } else if (selectedBlueIds.has(char.id)) {
-        card.classList.add('selected');
-        card.classList.add('team-indicator-2'); // BLUE 테두리
+        card.classList.add("selected");
+        card.classList.add("team-indicator-2"); // BLUE 테두리
       }
-    } else if (currentMode === 'boss') {
+    } else if (currentMode === "boss") {
       if (bossCharacterId === char.id) {
-        card.classList.add('selected');
-        card.classList.add('boss-selected'); // BOSS 황금 테두리
+        card.classList.add("selected");
+        card.classList.add("boss-selected"); // BOSS 황금 테두리
       } else if (selectedRedIds.has(char.id)) {
-        card.classList.add('selected');
-        card.classList.add('team-indicator-1'); // 도전자 RED 테두리
+        card.classList.add("selected");
+        card.classList.add("team-indicator-1"); // 도전자 RED 테두리
       }
     }
     card.dataset.id = char.id;
 
-    let crownHTML = '';
-    if (currentMode === 'boss' && bossCharacterId === char.id) {
+    let crownHTML = "";
+    if (currentMode === "boss" && bossCharacterId === char.id) {
       crownHTML = `<div class="boss-crown-badge" style="background: #ffd700; color: #000; border-color: #ffd700;" title="현재 보스">👑</div>`;
     }
 
-    let modeBadgeHTML = '';
-    if (currentMode === 'team') {
+    let modeBadgeHTML = "";
+    if (currentMode === "team") {
       if (selectedRedIds.has(char.id)) {
         modeBadgeHTML = `<div class="mode-card-badge" style="background: #ff3b30; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔴 RED</div>`;
       } else if (selectedBlueIds.has(char.id)) {
         modeBadgeHTML = `<div class="mode-card-badge" style="background: #007aff; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔵 BLUE</div>`;
       }
-    } else if (currentMode === 'boss') {
+    } else if (currentMode === "boss") {
       if (bossCharacterId === char.id) {
         modeBadgeHTML = `<div class="mode-card-badge" style="background: #ffd700; color: #000; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">👑 BOSS</div>`;
       } else if (selectedRedIds.has(char.id)) {
@@ -495,29 +609,31 @@ function initLobby(preserveSelections = false) {
     }
 
     // 카드 하단 모드별 팀 지정기 UI 추가
-    let teamSelectorHTML = '';
-    if (currentMode === 'team') {
+    let teamSelectorHTML = "";
+    if (currentMode === "team") {
       const isRed = selectedRedIds.has(char.id);
       const isBlue = selectedBlueIds.has(char.id);
       teamSelectorHTML = `
         <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
-          <button class="red-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isRed ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isRed ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isRed ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔴 RED</button>
-          <button class="blue-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBlue ? '#007aff' : 'rgba(255,255,255,0.1)'}; background: ${isBlue ? '#007aff' : 'rgba(0,0,0,0.2)'}; color: ${isBlue ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔵 BLUE</button>
+          <button class="red-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isRed ? "#ff3b30" : "rgba(255,255,255,0.1)"}; background: ${isRed ? "#ff3b30" : "rgba(0,0,0,0.2)"}; color: ${isRed ? "#fff" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔴 RED</button>
+          <button class="blue-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBlue ? "#007aff" : "rgba(255,255,255,0.1)"}; background: ${isBlue ? "#007aff" : "rgba(0,0,0,0.2)"}; color: ${isBlue ? "#fff" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔵 BLUE</button>
         </div>
       `;
-    } else if (currentMode === 'boss') {
+    } else if (currentMode === "boss") {
       const isBoss = isBossCharacter && bossCharacterId === char.id;
       const isChallenger = selectedRedIds.has(char.id);
       teamSelectorHTML = `
         <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
-          ${isBossCharacter
-            ? `<button class="boss-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? '#ffd700' : 'rgba(255,255,255,0.1)'}; background: ${isBoss ? '#ffd700' : 'rgba(0,0,0,0.2)'}; color: ${isBoss ? '#000' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 BOSS</button>`
-            : `<button class="challenger-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isChallenger ? '#ff3b30' : 'rgba(255,255,255,0.1)'}; background: ${isChallenger ? '#ff3b30' : 'rgba(0,0,0,0.2)'}; color: ${isChallenger ? '#fff' : '#888'}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">⚔️ 도전자</button>`}
+          ${
+            isBossCharacter
+              ? `<button class="boss-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? "#ffd700" : "rgba(255,255,255,0.1)"}; background: ${isBoss ? "#ffd700" : "rgba(0,0,0,0.2)"}; color: ${isBoss ? "#000" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 BOSS</button>`
+              : `<button class="challenger-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isChallenger ? "#ff3b30" : "rgba(255,255,255,0.1)"}; background: ${isChallenger ? "#ff3b30" : "rgba(0,0,0,0.2)"}; color: ${isChallenger ? "#fff" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">⚔️ 도전자</button>`
+          }
         </div>
       `;
     }
 
-    const currentTier = char.tier || 'C';
+    const currentTier = char.tier || "C";
     card.innerHTML = `
       ${crownHTML}
       ${modeBadgeHTML}
@@ -540,7 +656,7 @@ function initLobby(preserveSelections = false) {
         </div>
       </div>
       <div class="char-history">
-        <div class="history-title">📊 전적 기록 (${mode === 'all' ? '전체' : `${mode}인전`})</div>
+        <div class="history-title">📊 전적 기록 (${mode === "all" ? "전체" : `${mode}인전`})</div>
         <div class="stat-row">
           <span>승률</span>
           <span class="stat-val text-neon-yellow">${winRateStr} (${wins}승/${games}판)</span>
@@ -566,20 +682,20 @@ function initLobby(preserveSelections = false) {
     `;
 
     // 상세 정보 버튼 이벤트 리스너 바인딩
-    const detailBtn = card.querySelector('.char-detail-trigger-btn');
+    const detailBtn = card.querySelector(".char-detail-trigger-btn");
     if (detailBtn) {
-      detailBtn.addEventListener('click', (e) => {
+      detailBtn.addEventListener("click", (e) => {
         e.stopPropagation(); // 카드 선택 차단
         openCharacterDetail(char.id);
       });
     }
 
     // 모드별 수동 지정 버튼 이벤트 바인딩
-    if (currentMode === 'team') {
-      const redBtn = card.querySelector('.red-team-btn');
-      const blueBtn = card.querySelector('.blue-team-btn');
+    if (currentMode === "team") {
+      const redBtn = card.querySelector(".red-team-btn");
+      const blueBtn = card.querySelector(".blue-team-btn");
 
-      redBtn?.addEventListener('click', (e) => {
+      redBtn?.addEventListener("click", (e) => {
         e.stopPropagation(); // 카드 자체 클릭 차단
         if (selectedRedIds.has(char.id)) {
           selectedRedIds.delete(char.id);
@@ -587,7 +703,7 @@ function initLobby(preserveSelections = false) {
         } else {
           // 인원 체크: 레드팀 3명 제한
           if (selectedRedIds.size >= 3) {
-            alert('🔴 레드팀은 최대 3명까지만 선택할 수 있습니다!');
+            alert("🔴 레드팀은 최대 3명까지만 선택할 수 있습니다!");
             return;
           }
           selectedRedIds.add(char.id);
@@ -597,7 +713,7 @@ function initLobby(preserveSelections = false) {
         initLobby(true); // UI 실시간 업데이트
       });
 
-      blueBtn?.addEventListener('click', (e) => {
+      blueBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (selectedBlueIds.has(char.id)) {
           selectedBlueIds.delete(char.id);
@@ -605,7 +721,7 @@ function initLobby(preserveSelections = false) {
         } else {
           // 인원 체크: 블루팀 3명 제한
           if (selectedBlueIds.size >= 3) {
-            alert('🔵 블루팀은 최대 3명까지만 선택할 수 있습니다!');
+            alert("🔵 블루팀은 최대 3명까지만 선택할 수 있습니다!");
             return;
           }
           selectedBlueIds.add(char.id);
@@ -614,11 +730,11 @@ function initLobby(preserveSelections = false) {
         }
         initLobby(true);
       });
-    } else if (currentMode === 'boss') {
-      const bossBtn = card.querySelector('.boss-team-btn');
-      const challengerBtn = card.querySelector('.challenger-team-btn');
+    } else if (currentMode === "boss") {
+      const bossBtn = card.querySelector(".boss-team-btn");
+      const challengerBtn = card.querySelector(".challenger-team-btn");
 
-      bossBtn?.addEventListener('click', (e) => {
+      bossBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (bossCharacterId === char.id) {
           bossCharacterId = null;
@@ -636,7 +752,7 @@ function initLobby(preserveSelections = false) {
         initLobby(true);
       });
 
-      challengerBtn?.addEventListener('click', (e) => {
+      challengerBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (selectedRedIds.has(char.id)) {
           selectedRedIds.delete(char.id);
@@ -644,7 +760,7 @@ function initLobby(preserveSelections = false) {
         } else {
           // 도전자 3명 제한
           if (selectedRedIds.size >= 3) {
-            alert('⚔️ 도전자는 최대 3명까지만 선택할 수 있습니다!');
+            alert("⚔️ 도전자는 최대 3명까지만 선택할 수 있습니다!");
             return;
           }
           if (bossCharacterId === char.id) {
@@ -657,15 +773,15 @@ function initLobby(preserveSelections = false) {
       });
     }
 
-    card.addEventListener('click', () => {
-      if (currentMode !== 'solo') return; // 팀/보스전은 하단 전용 버튼으로만 지정
-      
+    card.addEventListener("click", () => {
+      if (currentMode !== "solo") return; // 팀/보스전은 하단 전용 버튼으로만 지정
+
       if (selectedIds.has(char.id)) {
         selectedIds.delete(char.id);
-        card.classList.remove('selected');
+        card.classList.remove("selected");
       } else {
         selectedIds.add(char.id);
-        card.classList.add('selected');
+        card.classList.add("selected");
       }
       updateStartButtonState();
     });
@@ -677,12 +793,12 @@ function initLobby(preserveSelections = false) {
 function updateStartButtonState() {
   let canStart = false;
 
-  if (currentMode === 'boss') {
+  if (currentMode === "boss") {
     // 보스전 (1vs3): 보스 1명 및 도전자 3명 합쳐서 4명일 때 활성화
-    canStart = (bossCharacterId !== null) && (selectedRedIds.size === 3);
-  } else if (currentMode === 'team') {
+    canStart = bossCharacterId !== null && selectedRedIds.size === 3;
+  } else if (currentMode === "team") {
     // 팀전 (3vs3): 레드 3명 & 블루 3명 합쳐서 6명일 때 활성화
-    canStart = (selectedRedIds.size === 3) && (selectedBlueIds.size === 3);
+    canStart = selectedRedIds.size === 3 && selectedBlueIds.size === 3;
   } else {
     // 개인전: 최소 2명 이상 선택 시 시작 가능
     canStart = selectedIds.size >= 2;
@@ -690,17 +806,17 @@ function updateStartButtonState() {
 
   if (canStart) {
     startBtn.disabled = false;
-    startBtn.classList.add('active');
+    startBtn.classList.add("active");
   } else {
     startBtn.disabled = true;
-    startBtn.classList.remove('active');
+    startBtn.classList.remove("active");
   }
 
   // 게임 시작 버튼 문구에 가이드 메시지 실시간 노출
-  let startBtnText = '게임 시작하기';
-  if (currentMode === 'team') {
+  let startBtnText = "게임 시작하기";
+  if (currentMode === "team") {
     startBtnText = `게임 시작 (팀전 RED ${selectedRedIds.size}/3 | BLUE ${selectedBlueIds.size}/3)`;
-  } else if (currentMode === 'boss') {
+  } else if (currentMode === "boss") {
     startBtnText = `게임 시작 (보스전 BOSS ${bossCharacterId ? 1 : 0}/1 | 도전자 ${selectedRedIds.size}/3)`;
   } else {
     startBtnText = `게임 시작 (개인전 ${selectedIds.size}명 선택됨)`;
@@ -708,14 +824,16 @@ function updateStartButtonState() {
   startBtn.textContent = startBtnText;
 
   // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요, 연습은 모드 무관)
-  const practiceStartBtn = document.getElementById('practice-start-btn') as HTMLButtonElement;
+  const practiceStartBtn = document.getElementById(
+    "practice-start-btn",
+  ) as HTMLButtonElement;
   if (practiceStartBtn) {
     if (selectedIds.size >= 1) {
       practiceStartBtn.disabled = false;
-      practiceStartBtn.classList.add('active');
+      practiceStartBtn.classList.add("active");
     } else {
       practiceStartBtn.disabled = true;
-      practiceStartBtn.classList.remove('active');
+      practiceStartBtn.classList.remove("active");
     }
   }
 }
@@ -723,38 +841,49 @@ function updateStartButtonState() {
 // Start Simulator
 function startGame() {
   if (selectedIds.size < 2) return;
-  if (currentMode === 'boss' && !bossCharacterId) return;
+  if (currentMode === "boss" && !bossCharacterId) return;
 
   isPracticeMode = false; // 표준 대전 모드로 보정
 
-  const selectedConfigs = (currentMode === 'boss' ? [...availableBossCharacters, ...availableCharacters] : availableCharacters)
-    .filter((char) => selectedIds.has(char.id));
-  applyArenaToCanvas(getArenaForMatch(currentMode, selectedConfigs.length, teamGameType));
+  const selectedConfigs = (
+    currentMode === "boss"
+      ? [...availableBossCharacters, ...availableCharacters]
+      : availableCharacters
+  ).filter((char) => selectedIds.has(char.id));
+  applyArenaToCanvas(
+    getArenaForMatch(currentMode, selectedConfigs.length, teamGameType),
+  );
 
-  lobbyView.classList.add('hidden');
-  gameView.classList.remove('hidden');
+  lobbyView.classList.add("hidden");
+  gameView.classList.remove("hidden");
 
   // 보스전과 팀전 전용 헤더 UI 토글
-  const bossHeader = document.getElementById('boss-battle-header');
-  const teamHeader = document.getElementById('team-battle-header');
+  const bossHeader = document.getElementById("boss-battle-header");
+  const teamHeader = document.getElementById("team-battle-header");
   if (bossHeader) {
-    if (currentMode === 'boss') bossHeader.classList.remove('hidden');
-    else bossHeader.classList.add('hidden');
+    if (currentMode === "boss") bossHeader.classList.remove("hidden");
+    else bossHeader.classList.add("hidden");
   }
   if (teamHeader) {
-    if (currentMode === 'team') teamHeader.classList.remove('hidden');
-    else teamHeader.classList.add('hidden');
+    if (currentMode === "team") teamHeader.classList.remove("hidden");
+    else teamHeader.classList.add("hidden");
   }
 
   const total = selectedConfigs.length;
-  const isLargeSoloMatch = currentMode === 'solo' && total >= 4;
-  
+  const isLargeSoloMatch = currentMode === "solo" && total >= 4;
+
   const initialStates = selectedConfigs.map((config, index) => {
-    const state = createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height);
+    const state = createCharacterState(
+      config,
+      index,
+      total,
+      gameCanvas.width,
+      gameCanvas.height,
+    );
     if (isLargeSoloMatch) state.radius = LARGE_SOLO_CHARACTER_RADIUS;
-    
+
     // 모드별 스탯 및 팀 세팅
-    if (currentMode === 'boss') {
+    if (currentMode === "boss") {
       if (state.id === bossCharacterId) {
         state.isBoss = true;
         state.teamId = 2; // 보스는 2팀 (블루)
@@ -764,7 +893,7 @@ function startGame() {
         state.cooldownMultiplier = 1.0;
         state.damageMultiplier = 1.0;
       }
-    } else if (currentMode === 'team') {
+    } else if (currentMode === "team") {
       // 수동 지정된 팀 배정 (1: 레드, 2: 블루)
       state.teamId = selectedRedIds.has(state.id) ? 1 : 2;
       state.isBoss = false;
@@ -781,7 +910,7 @@ function startGame() {
     return state;
   });
 
-  if (currentMode === 'team') {
+  if (currentMode === "team") {
     const redTeam = initialStates.filter((state) => state.teamId === 1);
     const blueTeam = initialStates.filter((state) => state.teamId === 2);
     redTeam.forEach((state, index) => {
@@ -798,8 +927,16 @@ function startGame() {
   aliveCountEl.textContent = total.toString();
 
   // 게임 시작 기록 (참여 판수 증가)
-  const gameModeStr = currentMode === 'team' ? 'team' : currentMode === 'boss' ? 'boss' : total.toString();
-  recordGameStart(selectedConfigs.map((c) => c.id), gameModeStr);
+  const gameModeStr =
+    currentMode === "team"
+      ? "team"
+      : currentMode === "boss"
+        ? "boss"
+        : total.toString();
+  recordGameStart(
+    selectedConfigs.map((c) => c.id),
+    gameModeStr,
+  );
 
   const speedMultiplier = parseFloat(gameSpeedSelect.value);
 
@@ -809,11 +946,15 @@ function startGame() {
       updateHUD,
       showWinner,
       updateCountdown,
-      recordCharacterDeath
+      recordCharacterDeath,
     );
   }
 
-  gameLounge.init(initialStates, speedMultiplier, currentMode === 'team' ? teamGameType : 'deathmatch');
+  gameLounge.init(
+    initialStates,
+    speedMultiplier,
+    currentMode === "team" ? teamGameType : "deathmatch",
+  );
 }
 
 // Start Practice Game (Practice Mode)
@@ -823,25 +964,29 @@ function startPracticeGame() {
   isPracticeMode = true;
   applyArenaToCanvas();
 
-  lobbyView.classList.add('hidden');
-  gameView.classList.remove('hidden');
+  lobbyView.classList.add("hidden");
+  gameView.classList.remove("hidden");
 
-  const selectedConfigs = availableCharacters.filter((char) => selectedIds.has(char.id));
-  
+  const selectedConfigs = availableCharacters.filter((char) =>
+    selectedIds.has(char.id),
+  );
+
   // 더미볼 설정 정의
   const dummyConfig = {
-    id: 'dummy',
-    name: '더미볼',
+    id: "dummy",
+    name: "더미볼",
     maxHp: 999999,
     speed: 0.8, // 기본 이속 부여
     attackPower: 0,
     baseAttackRange: 0,
-    skillName: '움직이는 표적',
-    skillDescription: '대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.',
-    color: '#7f8c8d',
+    skillName: "움직이는 표적",
+    skillDescription:
+      "대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.",
+    color: "#7f8c8d",
     skillChargeRate: 0,
-    role: 'Supporter' as const,
-    detailedDescription: '대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.',
+    role: "Supporter" as const,
+    detailedDescription:
+      "대미지 측정용 무한 체력 샌드백입니다. 맵을 둥둥 떠다닙니다.",
     onUpdate(char: CharacterState) {
       char.hp = char.maxHp;
       // 속도가 일정 이하로 느려지면 지속해서 표류하도록 속도 보충
@@ -851,13 +996,19 @@ function startPracticeGame() {
         char.vx = Math.cos(angle) * 2.2;
         char.vy = Math.sin(angle) * 2.2;
       }
-    }
+    },
   };
 
   const allConfigs = [...selectedConfigs, dummyConfig];
   const total = allConfigs.length;
-  const initialStates = allConfigs.map((config, index) => 
-    createCharacterState(config, index, total, gameCanvas.width, gameCanvas.height)
+  const initialStates = allConfigs.map((config, index) =>
+    createCharacterState(
+      config,
+      index,
+      total,
+      gameCanvas.width,
+      gameCanvas.height,
+    ),
   );
 
   totalCountEl.textContent = total.toString();
@@ -871,47 +1022,60 @@ function startPracticeGame() {
       updateHUD,
       showWinner,
       updateCountdown,
-      recordCharacterDeath
+      recordCharacterDeath,
     );
   }
 
   gameLounge.init(initialStates, speedMultiplier);
 }
 
-
-
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
   // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
-  const aliveCount = characters.filter((c) => !c.isDead && !c.id.includes('eunsu_clone')).length;
+  const aliveCount = characters.filter(
+    (c) => !c.isDead && !c.id.includes("eunsu_clone"),
+  ).length;
   aliveCountEl.textContent = aliveCount.toString();
 
   // === 모드별 헤더 UI 실시간 업데이트 ===
-  if (currentMode === 'boss') {
-    const boss = characters.find(c => c.isBoss && !c.id.includes('eunsu_clone'));
-    const bossHpFill = document.getElementById('boss-hp-fill');
-    const bossHpRatio = document.getElementById('boss-hp-ratio');
-    const bossNameLabel = document.getElementById('boss-name-label');
+  if (currentMode === "boss") {
+    const boss = characters.find(
+      (c) => c.isBoss && !c.id.includes("eunsu_clone"),
+    );
+    const bossHpFill = document.getElementById("boss-hp-fill");
+    const bossHpRatio = document.getElementById("boss-hp-ratio");
+    const bossNameLabel = document.getElementById("boss-name-label");
 
     if (boss) {
       const hpRatio = boss.hp / boss.maxHp;
       const hpPercent = Math.max(0, Math.min(100, hpRatio * 100));
       if (bossHpFill) bossHpFill.style.width = `${hpPercent}%`;
-      if (bossHpRatio) bossHpRatio.textContent = `${hpPercent.toFixed(1)}% (${boss.hp}/${boss.maxHp})`;
+      if (bossHpRatio)
+        bossHpRatio.textContent = `${hpPercent.toFixed(1)}% (${boss.hp}/${boss.maxHp})`;
       if (bossNameLabel) bossNameLabel.textContent = `👑 BOSS (${boss.name})`;
     } else {
-      if (bossHpFill) bossHpFill.style.width = '0%';
-      if (bossHpRatio) bossHpRatio.textContent = '0% (처치됨)';
+      if (bossHpFill) bossHpFill.style.width = "0%";
+      if (bossHpRatio) bossHpRatio.textContent = "0% (처치됨)";
     }
-  } else if (currentMode === 'team') {
-    const redTeam = characters.filter(c => c.teamId === 1 && !c.id.includes('eunsu_clone'));
-    const blueTeam = characters.filter(c => c.teamId === 2 && !c.id.includes('eunsu_clone'));
+  } else if (currentMode === "team") {
+    const redTeam = characters.filter(
+      (c) => c.teamId === 1 && !c.id.includes("eunsu_clone"),
+    );
+    const blueTeam = characters.filter(
+      (c) => c.teamId === 2 && !c.id.includes("eunsu_clone"),
+    );
 
-    const redAlive = redTeam.filter(c => !c.isDead).length;
-    const blueAlive = blueTeam.filter(c => !c.isDead).length;
+    const redAlive = redTeam.filter((c) => !c.isDead).length;
+    const blueAlive = blueTeam.filter((c) => !c.isDead).length;
 
-    const redCurrentHp = redTeam.reduce((sum, c) => sum + (c.isDead ? 0 : c.hp), 0);
-    const blueCurrentHp = blueTeam.reduce((sum, c) => sum + (c.isDead ? 0 : c.hp), 0);
+    const redCurrentHp = redTeam.reduce(
+      (sum, c) => sum + (c.isDead ? 0 : c.hp),
+      0,
+    );
+    const blueCurrentHp = blueTeam.reduce(
+      (sum, c) => sum + (c.isDead ? 0 : c.hp),
+      0,
+    );
 
     const totalCurrentHp = redCurrentHp + blueCurrentHp;
     let redBarWidth = 50;
@@ -924,59 +1088,64 @@ function updateHUD(characters: CharacterState[]) {
       blueBarWidth = 0;
     }
 
-    const redFill = document.getElementById('team-hp-fill-1');
-    const blueFill = document.getElementById('team-hp-fill-2');
-    const redAliveEl = document.getElementById('team-alive-1');
-    const blueAliveEl = document.getElementById('team-alive-2');
+    const redFill = document.getElementById("team-hp-fill-1");
+    const blueFill = document.getElementById("team-hp-fill-2");
+    const redAliveEl = document.getElementById("team-alive-1");
+    const blueAliveEl = document.getElementById("team-alive-2");
 
     if (redFill) redFill.style.width = `${redBarWidth}%`;
     if (blueFill) blueFill.style.width = `${blueBarWidth}%`;
     if (redAliveEl) redAliveEl.textContent = redAlive.toString();
     if (blueAliveEl) blueAliveEl.textContent = blueAlive.toString();
 
-    const objectiveText = document.getElementById('team-objective-text');
+    const objectiveText = document.getElementById("team-objective-text");
     const objective = gameLounge?.getTeamObjectiveState();
     if (objectiveText && objective) {
-      if (objective.type === 'control') {
+      if (objective.type === "control") {
         objectiveText.textContent = `점령전 · 🔴 ${Math.floor(objective.redScore)} / ${objective.scoreToWin}  |  🔵 ${Math.floor(objective.blueScore)} / ${objective.scoreToWin}`;
-      } else if (objective.type === 'siege') {
+      } else if (objective.type === "siege") {
         objectiveText.textContent = `왕 지키기 · 🔴 왕 공격  |  🔵 👑 ${Math.ceil(objective.royalKingHp)} / ${objective.royalKingMaxHp}`;
       } else {
-        objectiveText.textContent = '데스매치 · 전원 섬멸';
+        objectiveText.textContent = "데스매치 · 전원 섬멸";
       }
     }
   }
 
   // 분신(eunsu_clone)은 HUD 목록에서도 제외
-  const sorted = [...characters].filter((c) => !c.id.includes('eunsu_clone')).sort((a, b) => {
-    if (a.isDead && !b.isDead) return 1;
-    if (!a.isDead && b.isDead) return -1;
-    if (!a.isDead && !b.isDead) {
-      return (b.hp / b.maxHp) - (a.hp / a.maxHp);
-    }
-    return 0;
-  });
+  const sorted = [...characters]
+    .filter((c) => !c.id.includes("eunsu_clone"))
+    .sort((a, b) => {
+      if (a.isDead && !b.isDead) return 1;
+      if (!a.isDead && b.isDead) return -1;
+      if (!a.isDead && !b.isDead) {
+        return b.hp / b.maxHp - a.hp / a.maxHp;
+      }
+      return 0;
+    });
 
-  hudList.innerHTML = '';
+  hudList.innerHTML = "";
   sorted.forEach((char) => {
     const hpPercent = (char.hp / char.maxHp) * 100;
     const skillPercent = char.skillGauge;
     const isSkillReady = char.skillGauge >= 100;
 
-    const item = document.createElement('div');
-    item.className = `hud-item ${char.isDead ? 'dead' : ''}`;
-    
+    const item = document.createElement("div");
+    item.className = `hud-item ${char.isDead ? "dead" : ""}`;
+
     if (char.skillActive && !char.isDead) {
       item.style.borderColor = char.color;
       item.style.boxShadow = `0 0 10px ${char.color}`;
     }
 
     // 팀 식별 비주얼 오프셋
-    let teamIndicatorClass = '';
-    if (currentMode === 'team') {
-      teamIndicatorClass = char.teamId === 1 ? 'team-indicator-1' : 'team-indicator-2';
-    } else if (currentMode === 'boss') {
-      teamIndicatorClass = char.isBoss ? 'team-indicator-2' : 'team-indicator-1';
+    let teamIndicatorClass = "";
+    if (currentMode === "team") {
+      teamIndicatorClass =
+        char.teamId === 1 ? "team-indicator-1" : "team-indicator-2";
+    } else if (currentMode === "boss") {
+      teamIndicatorClass = char.isBoss
+        ? "team-indicator-2"
+        : "team-indicator-1";
     }
 
     item.innerHTML = `
@@ -985,20 +1154,20 @@ function updateHUD(characters: CharacterState[]) {
       </div>
       <div class="hud-info">
         <div class="hud-name-row">
-          <span style="color: ${char.color}">${char.name}${char.isBoss ? ' (👑)' : ''}</span>
-          <span class="hud-hp-text">${char.isDead ? '탈락' : `${char.hp}/${char.maxHp}`}</span>
+          <span style="color: ${char.color}">${char.name}${char.isBoss ? " (👑)" : ""}</span>
+          <span class="hud-hp-text">${char.isDead ? "탈락" : `${char.hp}/${char.maxHp}`}</span>
         </div>
         <!-- HP Bar -->
         <div class="bar-container" style="margin-bottom: 4px;">
-          <div class="bar bar-hp" style="width: ${hpPercent}%; background: ${char.isDead ? '#333' : ''};"></div>
+          <div class="bar bar-hp" style="width: ${hpPercent}%; background: ${char.isDead ? "#333" : ""};"></div>
         </div>
         <!-- Skill Bar -->
         <div class="bar-container">
-          <div class="bar bar-skill" style="width: ${skillPercent}%; background: ${char.isDead ? '#333' : isSkillReady ? '#ffd700' : ''};"></div>
+          <div class="bar bar-skill" style="width: ${skillPercent}%; background: ${char.isDead ? "#333" : isSkillReady ? "#ffd700" : ""};"></div>
         </div>
       </div>
-      ${isSkillReady && !char.isDead ? '<div class="skill-indicator">READY</div>' : ''}
-      ${char.skillActive && !char.isDead ? '<div class="skill-indicator" style="color: #ff3366;">ACTIVE</div>' : ''}
+      ${isSkillReady && !char.isDead ? '<div class="skill-indicator">READY</div>' : ""}
+      ${char.skillActive && !char.isDead ? '<div class="skill-indicator" style="color: #ff3366;">ACTIVE</div>' : ""}
     `;
 
     hudList.appendChild(item);
@@ -1008,28 +1177,32 @@ function updateHUD(characters: CharacterState[]) {
 // Countdown handler
 function updateCountdown(seconds: number) {
   if (seconds > 0) {
-    countdownOverlay.classList.remove('hidden');
+    countdownOverlay.classList.remove("hidden");
     countdownNumber.textContent = seconds.toString();
-    gameStatusText.textContent = '전투 준비 중...';
+    gameStatusText.textContent = "전투 준비 중...";
   } else {
-    countdownOverlay.classList.add('hidden');
-    gameStatusText.textContent = 'BATTLE!';
+    countdownOverlay.classList.add("hidden");
+    gameStatusText.textContent = "BATTLE!";
   }
 }
 
-
 // Game End & Show Winner
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
-  gameStatusText.textContent = '게임 종료';
-  
+  gameStatusText.textContent = "게임 종료";
+
   // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
-  const gameModeStr = currentMode === 'team' ? 'team' : currentMode === 'boss' ? 'boss' : allChars.length.toString();
+  const gameModeStr =
+    currentMode === "team"
+      ? "team"
+      : currentMode === "boss"
+        ? "boss"
+        : allChars.length.toString();
   recordGameEnd(winner ? winner.id : "draw", allChars, gameModeStr);
 
-
-
   if (isPracticeMode) {
-    const player = allChars.find(c => c.id !== 'dummy' && !c.id.includes('clone'));
+    const player = allChars.find(
+      (c) => c.id !== "dummy" && !c.id.includes("clone"),
+    );
     if (player) {
       winnerInfo.innerHTML = `
         <div class="win-avatar">
@@ -1045,20 +1218,24 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
         </div>
       `;
     }
-    winnerModal.classList.remove('hidden');
+    winnerModal.classList.remove("hidden");
     return;
   }
 
-  const realChars = allChars.filter(char => !char.id.includes('clone') && char.id !== 'dummy');
-  const mvp = realChars.find(c => (c as any).isMvp) || winner || realChars[0];
-  const sorted = [...realChars].sort((a, b) => ((a as any).rank || 99) - ((b as any).rank || 99));
+  const realChars = allChars.filter(
+    (char) => !char.id.includes("clone") && char.id !== "dummy",
+  );
+  const mvp = realChars.find((c) => (c as any).isMvp) || winner || realChars[0];
+  const sorted = [...realChars].sort(
+    (a, b) => ((a as any).rank || 99) - ((b as any).rank || 99),
+  );
 
   // 모드별 팀 승리 배너 정의
-  let modeWinnerBanner = '';
-  if (currentMode === 'team') {
-    const redAlive = realChars.some(c => c.teamId === 1 && !c.isDead);
-    const blueAlive = realChars.some(c => c.teamId === 2 && !c.isDead);
-    
+  let modeWinnerBanner = "";
+  if (currentMode === "team") {
+    const redAlive = realChars.some((c) => c.teamId === 1 && !c.isDead);
+    const blueAlive = realChars.some((c) => c.teamId === 2 && !c.isDead);
+
     if (redAlive && !blueAlive) {
       modeWinnerBanner = `
         <div style="background: rgba(255,59,48,0.15); border: 2.5px solid #ff3b30; color: #ff3b30; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(255,59,48,0.4); box-shadow: 0 0 20px rgba(255,59,48,0.15);">
@@ -1078,10 +1255,10 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
         </div>
       `;
     }
-  } else if (currentMode === 'boss') {
-    const boss = realChars.find(c => c.isBoss);
+  } else if (currentMode === "boss") {
+    const boss = realChars.find((c) => c.isBoss);
     const bossDead = boss ? boss.isDead : true;
-    
+
     if (bossDead) {
       modeWinnerBanner = `
         <div style="background: rgba(255,59,48,0.15); border: 2.5px solid #ff3b30; color: #ff3b30; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.75rem; border-radius: 10px; margin-bottom: 1.2rem; font-family: 'Orbit', sans-serif; text-shadow: 0 0 8px rgba(255,59,48,0.4); box-shadow: 0 0 20px rgba(255,59,48,0.15);">
@@ -1098,17 +1275,19 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   }
 
   // Build MVP card HTML
-  const mvpScore = (mvp as any).mvpScore ? Math.round((mvp as any).mvpScore) : 0;
+  const mvpScore = (mvp as any).mvpScore
+    ? Math.round((mvp as any).mvpScore)
+    : 0;
   const mvpKills = (mvp as any).kills || 0;
   const mvpDmg = mvp.totalDamageDealt || 0;
-  
+
   let html = `
     ${modeWinnerBanner}
     <!-- MVP Spotlight Section -->
     <div class="mvp-spotlight-card" style="width: 100%; border: 1px solid ${mvp.color}40; box-shadow: 0 0 15px ${mvp.color}20;">
       <div class="mvp-badge" style="background: ${mvp.color}; color: #000; box-shadow: 0 0 10px ${mvp.color}80;">🎖️ MATCH MVP</div>
       <div class="mvp-avatar-container">
-        ${getAvatarHTML(mvp.name, mvp.image, 'mvp-avatar')}
+        ${getAvatarHTML(mvp.name, mvp.image, "mvp-avatar")}
       </div>
       <div class="mvp-name" style="color: ${mvp.color}">${mvp.name}</div>
       <div class="mvp-stats-grid">
@@ -1131,19 +1310,29 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     <div class="standings-container">
       <div class="standings-header">🏆 최종 순위 결과</div>
       <div class="standings-list">
-        ${sorted.map((char, index) => {
-          const rank = (char as any).rank || (index + 1);
-          const isWinner = rank === 1;
-          const rankBadgeClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : 'rank-normal';
-          const kills = (char as any).kills || 0;
-          const damage = char.totalDamageDealt || 0;
-          const hpStatus = char.isDead ? '<span style="color: #ff3366;">탈락</span>' : `<span style="color: #39ff14;">${char.hp} HP</span>`;
+        ${sorted
+          .map((char, index) => {
+            const rank = (char as any).rank || index + 1;
+            const isWinner = rank === 1;
+            const rankBadgeClass =
+              rank === 1
+                ? "rank-gold"
+                : rank === 2
+                  ? "rank-silver"
+                  : rank === 3
+                    ? "rank-bronze"
+                    : "rank-normal";
+            const kills = (char as any).kills || 0;
+            const damage = char.totalDamageDealt || 0;
+            const hpStatus = char.isDead
+              ? '<span style="color: #ff3366;">탈락</span>'
+              : `<span style="color: #39ff14;">${char.hp} HP</span>`;
 
-          return `
-            <div class="standing-item ${isWinner ? 'winner-item' : ''}">
+            return `
+            <div class="standing-item ${isWinner ? "winner-item" : ""}">
               <div class="standing-rank-badge ${rankBadgeClass}">${rank}</div>
               <div class="standing-avatar">
-                ${getAvatarHTML(char.name, char.image, 'standing-avatar-img')}
+                ${getAvatarHTML(char.name, char.image, "standing-avatar-img")}
               </div>
               <div class="standing-name-col">
                 <span class="standing-name" style="color: ${char.color}">${char.name}</span>
@@ -1155,18 +1344,19 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
               </div>
             </div>
           `;
-        }).join('')}
+          })
+          .join("")}
       </div>
     </div>
   `;
 
   winnerInfo.innerHTML = html;
-  winnerModal.classList.remove('hidden');
+  winnerModal.classList.remove("hidden");
 }
 
 // Close Winner Modal and go to Lobby
 function closeWinnerModal() {
-  winnerModal.classList.add('hidden');
+  winnerModal.classList.add("hidden");
   goBackToLobby();
 }
 
@@ -1175,14 +1365,16 @@ function goBackToLobby() {
   if (gameLounge) {
     gameLounge.stop();
   }
-  gameView.classList.add('hidden');
-  lobbyView.classList.remove('hidden');
+  gameView.classList.add("hidden");
+  lobbyView.classList.remove("hidden");
   initLobby();
 }
 
 function startRandomGame() {
-  const modeRadio = document.querySelector('input[name="random-game-mode"]:checked') as HTMLInputElement;
-  const randMode = modeRadio ? modeRadio.value : 'solo';
+  const modeRadio = document.querySelector(
+    'input[name="random-game-mode"]:checked',
+  ) as HTMLInputElement;
+  const randMode = modeRadio ? modeRadio.value : "solo";
 
   // 피셔-예이츠 셔플 알고리즘을 사용해 완전한 무작위 보장
   const shuffled = [...availableCharacters];
@@ -1197,33 +1389,35 @@ function startRandomGame() {
   bossCharacterId = null;
 
   // 탭 상태 비주얼 동기화 헬퍼
-  const syncModeTabs = (mode: 'solo' | 'team' | 'boss') => {
+  const syncModeTabs = (mode: "solo" | "team" | "boss") => {
     currentMode = mode;
     updateTeamGameTypeVisibility();
-    const modeTabs = document.querySelectorAll('.mode-tab');
-    const modeDesc = document.getElementById('mode-desc');
+    const modeTabs = document.querySelectorAll(".mode-tab");
+    const modeDesc = document.getElementById("mode-desc");
     const modeDescriptions: Record<string, string> = {
-      solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
-      team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
-      boss: '👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스 능력치는 각 보스 파일에서 독립적으로 정의됩니다.'
+      solo: "⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)",
+      team: "🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.",
+      boss: "👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스 능력치는 각 보스 파일에서 독립적으로 정의됩니다.",
     };
-    modeTabs.forEach(t => {
-      t.classList.remove('active');
-      (t as HTMLElement).style.background = 'transparent';
-      (t as HTMLElement).style.color = '#888';
+    modeTabs.forEach((t) => {
+      t.classList.remove("active");
+      (t as HTMLElement).style.background = "transparent";
+      (t as HTMLElement).style.color = "#888";
     });
-    const targetTab = document.querySelector(`.mode-tab[data-mode="${mode}"]`) as HTMLElement;
+    const targetTab = document.querySelector(
+      `.mode-tab[data-mode="${mode}"]`,
+    ) as HTMLElement;
     if (targetTab) {
-      targetTab.classList.add('active');
-      targetTab.style.background = 'rgba(255, 255, 255, 0.1)';
-      targetTab.style.color = '#fff';
+      targetTab.classList.add("active");
+      targetTab.style.background = "rgba(255, 255, 255, 0.1)";
+      targetTab.style.color = "#fff";
     }
     if (modeDesc) {
-      modeDesc.textContent = modeDescriptions[mode] || '';
+      modeDesc.textContent = modeDescriptions[mode] || "";
     }
   };
 
-  if (randMode === 'team') {
+  if (randMode === "team") {
     teamGameType = randomTeamGameTypeSelect.value as TeamGameType;
     teamGameTypeSelect.value = teamGameType;
     // 팀전 랜덤 (무조건 6명)
@@ -1236,28 +1430,33 @@ function startRandomGame() {
         selectedBlueIds.add(c.id); // 3명 BLUE
       }
     });
-    syncModeTabs('team');
-  } else if (randMode === 'boss') {
+    syncModeTabs("team");
+  } else if (randMode === "boss") {
     if (availableBossCharacters.length === 0) {
-      alert('👑 등록된 보스 캐릭터가 없습니다. characters/<name>/boss.ts를 추가한 뒤 등록해 주세요.');
+      alert(
+        "👑 등록된 보스 캐릭터가 없습니다. characters/<name>/boss.ts를 추가한 뒤 등록해 주세요.",
+      );
       return;
     }
-    const boss = availableBossCharacters[Math.floor(Math.random() * availableBossCharacters.length)];
+    const boss =
+      availableBossCharacters[
+        Math.floor(Math.random() * availableBossCharacters.length)
+      ];
     bossCharacterId = boss.id;
     selectedIds.add(boss.id);
 
-    shuffled.slice(0, 3).forEach(c => {
+    shuffled.slice(0, 3).forEach((c) => {
       selectedIds.add(c.id);
       selectedRedIds.add(c.id); // 3명 도전자 (RED)
     });
-    syncModeTabs('boss');
+    syncModeTabs("boss");
   } else {
     // 개인전 랜덤 (지정 인원)
     const count = parseInt(randomPlayerCountSelect.value, 10);
     if (isNaN(count) || count < 1 || count > 6) return;
     const selected = shuffled.slice(0, count);
-    selected.forEach(c => selectedIds.add(c.id));
-    syncModeTabs('solo');
+    selected.forEach((c) => selectedIds.add(c.id));
+    syncModeTabs("solo");
   }
 
   // 로비 카드 및 시작 버튼 갱신 후 플레이 개시
@@ -1267,32 +1466,30 @@ function startRandomGame() {
 }
 
 // Listeners
-startBtn.addEventListener('click', startGame);
-backToLobbyBtn.addEventListener('click', goBackToLobby);
-modalCloseBtn.addEventListener('click', closeWinnerModal);
-randomStartBtn.addEventListener('click', startRandomGame);
+startBtn.addEventListener("click", startGame);
+backToLobbyBtn.addEventListener("click", goBackToLobby);
+modalCloseBtn.addEventListener("click", closeWinnerModal);
+randomStartBtn.addEventListener("click", startRandomGame);
 
-const practiceStartBtn = document.getElementById('practice-start-btn');
+const practiceStartBtn = document.getElementById("practice-start-btn");
 if (practiceStartBtn) {
-  practiceStartBtn.addEventListener('click', startPracticeGame);
+  practiceStartBtn.addEventListener("click", startPracticeGame);
 }
 
-
-
-statsModeSelect.addEventListener('change', () => {
+statsModeSelect.addEventListener("change", () => {
   subscribeToGlobalData();
 });
 
 if (openStatsBtn && statsCenterModal) {
-  openStatsBtn.addEventListener('click', () => {
-    statsCenterModal.classList.remove('hidden');
+  openStatsBtn.addEventListener("click", () => {
+    statsCenterModal.classList.remove("hidden");
     renderTierList();
   });
 }
 
 if (closeStatsBtn && statsCenterModal) {
-  closeStatsBtn.addEventListener('click', () => {
-    statsCenterModal.classList.add('hidden');
+  closeStatsBtn.addEventListener("click", () => {
+    statsCenterModal.classList.add("hidden");
   });
 }
 
@@ -1301,47 +1498,69 @@ function subscribeToGlobalData() {
   if (countersUnsubscribe) countersUnsubscribe();
   if (damageRankingUnsubscribe) damageRankingUnsubscribe();
 
-  const mode = statsModeSelect ? statsModeSelect.value : 'all';
+  const mode = statsModeSelect ? statsModeSelect.value : "all";
 
-  statsUnsubscribe = convexClient.onUpdate(api.stats.getStats, { mode }, (statsList) => {
-    currentGlobalStats = statsList;
-    updateLobbyUI();
-  });
+  statsUnsubscribe = convexClient.onUpdate(
+    api.stats.getStats,
+    { mode },
+    (statsList) => {
+      currentGlobalStats = statsList;
+      updateLobbyUI();
+    },
+  );
 
-  countersUnsubscribe = convexClient.onUpdate(api.stats.getCounters, { mode }, (countersList) => {
-    currentGlobalCounters = countersList;
-    updateLobbyUI();
-  });
+  countersUnsubscribe = convexClient.onUpdate(
+    api.stats.getCounters,
+    { mode },
+    (countersList) => {
+      currentGlobalCounters = countersList;
+      updateLobbyUI();
+    },
+  );
 
-  damageRankingUnsubscribe = convexClient.onUpdate(api.stats.getDamageRanking, { mode }, (rankingList) => {
-    currentGlobalDamageRanking = rankingList;
-    updateLobbyUI();
-  });
+  damageRankingUnsubscribe = convexClient.onUpdate(
+    api.stats.getDamageRanking,
+    { mode },
+    (rankingList) => {
+      currentGlobalDamageRanking = rankingList;
+      updateLobbyUI();
+    },
+  );
 }
 
 function updateLobbyUI() {
   calculateDynamicTiers();
-  
+
   // 티어표 채우기
   renderTierList();
 
   // 평균 가한 피해량 랭킹 채우기 (Convex 서버에서 계산 및 정렬 완료된 데이터를 직접 렌더링)
   if (damageRankingWrapper) {
-    damageRankingWrapper.innerHTML = '';
-    
+    damageRankingWrapper.innerHTML = "";
+
     // 최대 평균 피해량을 계산해 바 비례 너비 산출
-    const maxAvgDmg = currentGlobalDamageRanking.reduce((max, item) => Math.max(max, item.avgDamageDealt), 1);
-    
+    const maxAvgDmg = currentGlobalDamageRanking.reduce(
+      (max, item) => Math.max(max, item.avgDamageDealt),
+      1,
+    );
+
     currentGlobalDamageRanking.forEach((item, index) => {
-      const char = availableCharacters.find(c => c.id === item.characterId);
+      const char = availableCharacters.find((c) => c.id === item.characterId);
       if (!char) return;
 
       const rank = index + 1;
-      const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
+      const rankClass =
+        rank === 1
+          ? "first"
+          : rank === 2
+            ? "second"
+            : rank === 3
+              ? "third"
+              : "";
       const percent = (item.avgDamageDealt / maxAvgDmg) * 100;
-      
-      const rankItem = document.createElement('div');
-      rankItem.className = 'dmg-rank-item';
+
+      const rankItem = document.createElement("div");
+      rankItem.className = "dmg-rank-item";
       rankItem.innerHTML = `
         <span class="dmg-rank-num ${rankClass}">${rank}</span>
         <span class="dmg-rank-name" style="color: ${char.color};">${char.name}</span>
@@ -1356,50 +1575,57 @@ function updateLobbyUI() {
 
   // 티어표 가시성 토글
   if (lobbyTotalGames < 10) {
-    if (tierListNotice) tierListNotice.classList.remove('hidden');
-    if (tierRowsWrapper) tierRowsWrapper.classList.add('hidden');
+    if (tierListNotice) tierListNotice.classList.remove("hidden");
+    if (tierRowsWrapper) tierRowsWrapper.classList.add("hidden");
   } else {
-    if (tierListNotice) tierListNotice.classList.add('hidden');
-    if (tierRowsWrapper) tierRowsWrapper.classList.remove('hidden');
+    if (tierListNotice) tierListNotice.classList.add("hidden");
+    if (tierRowsWrapper) tierRowsWrapper.classList.remove("hidden");
   }
 
   // 캐릭터 카드들 내용 실시간 갱신 (승률, 전적 수치 등)
   const cards = Array.from(characterListContainer.children) as HTMLElement[];
-  cards.forEach(card => {
+  cards.forEach((card) => {
     const charId = card.dataset.id;
     if (!charId) return;
-    const char = availableCharacters.find(c => c.id === charId);
+    const char = availableCharacters.find((c) => c.id === charId);
     if (!char) return;
 
     // 티어 뱃지 갱신
-    const currentTier = char.tier || 'C';
-    const badge = card.querySelector('.tier-card-badge') as HTMLElement;
+    const currentTier = char.tier || "C";
+    const badge = card.querySelector(".tier-card-badge") as HTMLElement;
     if (badge) {
       badge.className = `tier-card-badge tier-badge-${currentTier.toLowerCase()}`;
       badge.textContent = currentTier;
     }
 
     const statsRecord = getStoredStats();
-    const mode = statsModeSelect ? statsModeSelect.value : 'all';
+    const mode = statsModeSelect ? statsModeSelect.value : "all";
     const stats = statsRecord[mode] || {};
-    const s = stats[char.id] || { wins: 0, games: 0, damageDealt: 0, damageTaken: 0, rankSum: 0, mvpCount: 0 };
+    const s = stats[char.id] || {
+      wins: 0,
+      games: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+      rankSum: 0,
+      mvpCount: 0,
+    };
     const winRate = s.games > 0 ? (s.wins / s.games) * 100 : 0;
-    
+
     // 승률 및 전적 판수 갱신
-    const winRateVal = card.querySelector('.text-neon-yellow') as HTMLElement;
+    const winRateVal = card.querySelector(".text-neon-yellow") as HTMLElement;
     if (winRateVal) {
       winRateVal.textContent = `${winRate.toFixed(1)}% (${s.wins}승/${s.games}판)`;
     }
 
     const rankSum = s.rankSum || 0;
     const mvpCount = s.mvpCount || 0;
-    const avgRank = s.games > 0 ? (rankSum / s.games).toFixed(1) : '-';
+    const avgRank = s.games > 0 ? (rankSum / s.games).toFixed(1) : "-";
 
-    const avgRankVal = card.querySelector('.avg-rank-val') as HTMLElement;
+    const avgRankVal = card.querySelector(".avg-rank-val") as HTMLElement;
     if (avgRankVal) {
       avgRankVal.textContent = `${avgRank}위`;
     }
-    const mvpCountVal = card.querySelector('.mvp-count-val') as HTMLElement;
+    const mvpCountVal = card.querySelector(".mvp-count-val") as HTMLElement;
     if (mvpCountVal) {
       mvpCountVal.textContent = `${mvpCount}회`;
     }
@@ -1409,7 +1635,7 @@ function updateLobbyUI() {
     const modeCounters = countersAll[mode] || {};
 
     const myDeathRecords = modeCounters[char.id] || {};
-    let worstKillerId = '';
+    let worstKillerId = "";
     let worstKillerCount = 0;
     for (const [kId, count] of Object.entries(myDeathRecords)) {
       if (count > worstKillerCount) {
@@ -1417,10 +1643,14 @@ function updateLobbyUI() {
         worstKillerId = kId;
       }
     }
-    const worstKillerName = worstKillerId ? (availableCharacters.find(c => c.id === worstKillerId)?.name || '없음') : '없음';
-    const worstKillerStr = worstKillerId ? `${worstKillerName} (${worstKillerCount}데스)` : '없음';
+    const worstKillerName = worstKillerId
+      ? availableCharacters.find((c) => c.id === worstKillerId)?.name || "없음"
+      : "없음";
+    const worstKillerStr = worstKillerId
+      ? `${worstKillerName} (${worstKillerCount}데스)`
+      : "없음";
 
-    let bestVictimId = '';
+    let bestVictimId = "";
     let bestVictimCount = 0;
     for (const [victimId, killerRecords] of Object.entries(modeCounters)) {
       const killedByMe = killerRecords[char.id] || 0;
@@ -1429,11 +1659,15 @@ function updateLobbyUI() {
         bestVictimId = victimId;
       }
     }
-    const bestVictimName = bestVictimId ? (availableCharacters.find(c => c.id === bestVictimId)?.name || '없음') : '없음';
-    const bestVictimStr = bestVictimId ? `${bestVictimName} (${bestVictimCount}킬)` : '없음';
+    const bestVictimName = bestVictimId
+      ? availableCharacters.find((c) => c.id === bestVictimId)?.name || "없음"
+      : "없음";
+    const bestVictimStr = bestVictimId
+      ? `${bestVictimName} (${bestVictimCount}킬)`
+      : "없음";
 
-    const greenEls = card.querySelectorAll('.char-history .text-neon-green');
-    const redEls = card.querySelectorAll('.char-history .text-neon-red');
+    const greenEls = card.querySelectorAll(".char-history .text-neon-green");
+    const redEls = card.querySelectorAll(".char-history .text-neon-red");
 
     // 1. Damage Dealt (1st green)
     if (greenEls[0]) greenEls[0].textContent = s.damageDealt.toString();
@@ -1450,29 +1684,29 @@ function updateLobbyUI() {
 // ==========================================
 // 캐릭터 상세 모달 및 역할군 필터 이벤트 핸들링
 // ==========================================
-const detailCloseBtn = document.getElementById('detail-close-btn');
-const charDetailModal = document.getElementById('char-detail-modal');
+const detailCloseBtn = document.getElementById("detail-close-btn");
+const charDetailModal = document.getElementById("char-detail-modal");
 
 if (detailCloseBtn && charDetailModal) {
-  detailCloseBtn.addEventListener('click', () => {
-    charDetailModal.classList.add('hidden');
+  detailCloseBtn.addEventListener("click", () => {
+    charDetailModal.classList.add("hidden");
   });
 
   // 모달 영역 외 바깥 클릭 시 닫기
-  charDetailModal.addEventListener('click', (e) => {
+  charDetailModal.addEventListener("click", (e) => {
     if (e.target === charDetailModal) {
-      charDetailModal.classList.add('hidden');
+      charDetailModal.classList.add("hidden");
     }
   });
 }
 
 // 역할군 필터 탭 바인딩
-const roleTabs = document.querySelectorAll('.role-tab');
+const roleTabs = document.querySelectorAll(".role-tab");
 roleTabs.forEach((tab) => {
-  tab.addEventListener('click', () => {
-    roleTabs.forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentRoleFilter = tab.getAttribute('data-role') || 'all';
+  tab.addEventListener("click", () => {
+    roleTabs.forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    currentRoleFilter = tab.getAttribute("data-role") || "all";
     initLobby(true); // 선택 상태 보존
   });
 });
@@ -1484,24 +1718,27 @@ function openCharacterDetail(charId: string) {
   if (!charDetailModal) return;
 
   // 이름 주입
-  const nameEl = document.getElementById('detail-char-name');
+  const nameEl = document.getElementById("detail-char-name");
   if (nameEl) nameEl.textContent = char.name;
 
   // 역할군 배지 주입
-  const roleEl = document.getElementById('detail-char-role-badge');
+  const roleEl = document.getElementById("detail-char-role-badge");
   if (roleEl) {
     const roleMap: Record<string, { label: string; color: string }> = {
-      Nuker: { label: '🔥 누커', color: '#ff3366' },
-      Sniper: { label: '🎯 저격수', color: '#ff2d55' },
-      Speedster: { label: '⚡ 기동형', color: '#ffd700' },
-      Guardian: { label: '🛡️ 수호형', color: '#33cc66' },
-      Juggernaut: { label: '🦖 돌격형', color: '#ff8c00' },
-      Disabler: { label: '🌀 제어형', color: '#00bfff' },
-      Summoner: { label: '🌪️ 소환형', color: '#ff007f' },
-      Specialist: { label: '🎰 변수형', color: '#9933ff' },
-      Supporter: { label: '🧪 지원형', color: '#888888' },
+      Nuker: { label: "🔥 누커", color: "#ff3366" },
+      Sniper: { label: "🎯 저격수", color: "#ff2d55" },
+      Speedster: { label: "⚡ 기동형", color: "#ffd700" },
+      Guardian: { label: "🛡️ 수호형", color: "#33cc66" },
+      Juggernaut: { label: "🦖 돌격형", color: "#ff8c00" },
+      Disabler: { label: "🌀 제어형", color: "#00bfff" },
+      Summoner: { label: "🌪️ 소환형", color: "#ff007f" },
+      Specialist: { label: "🎰 변수형", color: "#9933ff" },
+      Supporter: { label: "🧪 지원형", color: "#888888" },
     };
-    const roleInfo = roleMap[char.role] || { label: char.role, color: '#888888' };
+    const roleInfo = roleMap[char.role] || {
+      label: char.role,
+      color: "#888888",
+    };
     roleEl.textContent = roleInfo.label;
     roleEl.style.backgroundColor = `${roleInfo.color}25`;
     roleEl.style.border = `1px solid ${roleInfo.color}80`;
@@ -1509,85 +1746,92 @@ function openCharacterDetail(charId: string) {
   }
 
   // 아바타 렌더링
-  const avatarContainer = document.getElementById('detail-char-avatar-container');
+  const avatarContainer = document.getElementById(
+    "detail-char-avatar-container",
+  );
   if (avatarContainer) {
-    avatarContainer.innerHTML = getAvatarHTML(char.name, char.image, 'detail-avatar-img');
+    avatarContainer.innerHTML = getAvatarHTML(
+      char.name,
+      char.image,
+      "detail-avatar-img",
+    );
     const avatarEl = avatarContainer.firstElementChild as HTMLElement;
     if (avatarEl) {
-      avatarEl.style.width = '70px';
-      avatarEl.style.height = '70px';
+      avatarEl.style.width = "70px";
+      avatarEl.style.height = "70px";
       avatarEl.style.border = `2px solid ${char.color}`;
       avatarEl.style.boxShadow = `0 0 12px ${char.color}50`;
-      if (avatarEl.classList.contains('avatar-text')) {
+      if (avatarEl.classList.contains("avatar-text")) {
         avatarEl.style.background = `radial-gradient(circle, ${char.color}35 0%, rgba(0,0,0,0.6) 100%)`;
       }
     }
   }
 
   // 상세 설명 주입
-  const descEl = document.getElementById('detail-char-desc');
+  const descEl = document.getElementById("detail-char-desc");
   if (descEl) descEl.textContent = char.detailedDescription;
 
   // 스탯 게이지 채우기
   const hpPercent = Math.min(100, (char.maxHp / 200) * 100);
-  const hpBar = document.getElementById('detail-stat-bar-hp');
+  const hpBar = document.getElementById("detail-stat-bar-hp");
   if (hpBar) hpBar.style.width = `${hpPercent}%`;
-  const hpVal = document.getElementById('detail-stat-val-hp');
+  const hpVal = document.getElementById("detail-stat-val-hp");
   if (hpVal) hpVal.textContent = char.maxHp.toString();
 
   const atkPercent = Math.min(100, (char.attackPower / 30) * 100);
-  const atkBar = document.getElementById('detail-stat-bar-atk');
+  const atkBar = document.getElementById("detail-stat-bar-atk");
   if (atkBar) atkBar.style.width = `${atkPercent}%`;
-  const atkVal = document.getElementById('detail-stat-val-atk');
+  const atkVal = document.getElementById("detail-stat-val-atk");
   if (atkVal) atkVal.textContent = char.attackPower.toString();
 
   const speedPercent = Math.min(100, (char.speed / 2.0) * 100);
-  const speedBar = document.getElementById('detail-stat-bar-speed');
+  const speedBar = document.getElementById("detail-stat-bar-speed");
   if (speedBar) speedBar.style.width = `${speedPercent}%`;
-  const speedVal = document.getElementById('detail-stat-val-speed');
+  const speedVal = document.getElementById("detail-stat-val-speed");
   if (speedVal) speedVal.textContent = `${char.speed.toFixed(1)}x`;
 
   // 스킬 정보
-  const skillNameEl = document.getElementById('detail-skill-name');
+  const skillNameEl = document.getElementById("detail-skill-name");
   if (skillNameEl) {
     skillNameEl.textContent = char.skillName;
     skillNameEl.style.color = char.color;
   }
-  const skillDescEl = document.getElementById('detail-skill-desc');
+  const skillDescEl = document.getElementById("detail-skill-desc");
   if (skillDescEl) skillDescEl.textContent = char.skillDescription;
 
-  charDetailModal.classList.remove('hidden');
+  charDetailModal.classList.remove("hidden");
 }
 
 // Initialize Game Mode Tab Selection
 function initModeSelection() {
-  const modeTabs = document.querySelectorAll('.mode-tab');
-  const modeDesc = document.getElementById('mode-desc');
+  const modeTabs = document.querySelectorAll(".mode-tab");
+  const modeDesc = document.getElementById("mode-desc");
 
   const modeDescriptions: Record<string, string> = {
-    solo: '⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)',
-    team: '🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.',
-    boss: '👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스의 능력치와 스킬은 전용 파일에서 정의됩니다.'
+    solo: "⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)",
+    team: "🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.",
+    boss: "👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스의 능력치와 스킬은 전용 파일에서 정의됩니다.",
   };
 
-  modeTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
+  modeTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
       // 액티브 탭 클래스 토글
-      modeTabs.forEach(t => {
-        t.classList.remove('active');
-        (t as HTMLElement).style.background = 'transparent';
-        (t as HTMLElement).style.color = '#888';
+      modeTabs.forEach((t) => {
+        t.classList.remove("active");
+        (t as HTMLElement).style.background = "transparent";
+        (t as HTMLElement).style.color = "#888";
       });
-      tab.classList.add('active');
-      (tab as HTMLElement).style.background = 'rgba(255, 255, 255, 0.1)';
-      (tab as HTMLElement).style.color = '#fff';
+      tab.classList.add("active");
+      (tab as HTMLElement).style.background = "rgba(255, 255, 255, 0.1)";
+      (tab as HTMLElement).style.color = "#fff";
 
-      const selectedMode = tab.getAttribute('data-mode') as 'solo' | 'team' | 'boss';
+      const selectedMode = tab.getAttribute("data-mode") as
+        "solo" | "team" | "boss";
       currentMode = selectedMode;
       updateTeamGameTypeVisibility();
 
       if (modeDesc) {
-        modeDesc.textContent = modeDescriptions[selectedMode] || '';
+        modeDesc.textContent = modeDescriptions[selectedMode] || "";
       }
 
       // 모드 변경 시 선택 정보 초기화
@@ -1604,27 +1848,32 @@ function initModeSelection() {
 
 // Initialize Random Game Mode Radio Change Listeners
 function initRandomModeRadioListeners() {
-  const radioButtons = document.querySelectorAll('input[name="random-game-mode"]');
-  const countSettingItem = document.getElementById('random-count-setting-item');
+  const radioButtons = document.querySelectorAll(
+    'input[name="random-game-mode"]',
+  );
+  const countSettingItem = document.getElementById("random-count-setting-item");
 
-  radioButtons.forEach(radio => {
-    radio.addEventListener('change', (e) => {
+  radioButtons.forEach((radio) => {
+    radio.addEventListener("change", (e) => {
       const targetVal = (e.target as HTMLInputElement).value;
       if (countSettingItem) {
-        if (targetVal === 'solo') {
+        if (targetVal === "solo") {
           // 개인전일 때만 인원 선택기 활성화 및 노출
-          countSettingItem.style.display = 'flex';
+          countSettingItem.style.display = "flex";
         } else {
           // 팀전/보스전 시 인원수 고정이므로 아예 숨김
-          countSettingItem.style.display = 'none';
+          countSettingItem.style.display = "none";
         }
       }
-      randomTeamGameTypeSetting.classList.toggle('hidden', targetVal !== 'team');
+      randomTeamGameTypeSetting.classList.toggle(
+        "hidden",
+        targetVal !== "team",
+      );
     });
   });
 }
 
-teamGameTypeSelect.addEventListener('change', () => {
+teamGameTypeSelect.addEventListener("change", () => {
   teamGameType = teamGameTypeSelect.value as TeamGameType;
   updateStartButtonState();
 });
