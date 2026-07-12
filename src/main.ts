@@ -46,7 +46,9 @@ const gameStatusText = document.getElementById(
 ) as HTMLElement;
 const aliveCountEl = document.getElementById("alive-count") as HTMLElement;
 const totalCountEl = document.getElementById("total-count") as HTMLElement;
+const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
+const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
 const randomStartBtn = document.getElementById(
   "random-start-btn",
 ) as HTMLButtonElement;
@@ -78,6 +80,16 @@ const teamGameTypeSetting = document.getElementById(
   "team-game-type-setting",
 ) as HTMLElement;
 const tournamentHeader = document.getElementById("tournament-battle-header") as HTMLElement;
+
+function setHudCollapsed(collapsed: boolean) {
+  hudSidebar.classList.toggle("is-collapsed", collapsed);
+  hudToggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  hudToggleBtn.textContent = collapsed ? "상태 보기" : "접기";
+}
+
+hudToggleBtn.addEventListener("click", () => {
+  setHudCollapsed(!hudSidebar.classList.contains("is-collapsed"));
+});
 const tournamentStatus = document.getElementById("tournament-status") as HTMLElement;
 
 const openStatsBtn = document.getElementById(
@@ -950,6 +962,7 @@ function startGame() {
   lobbyView.classList.add("hidden");
   gameView.classList.remove("hidden");
   gameView.dataset.mode = currentMode;
+  setHudCollapsed(true);
 
   // 보스전과 팀전 전용 헤더 UI 토글
   const bossHeader = document.getElementById("boss-battle-header");

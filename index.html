@@ -232,7 +232,10 @@
 
           <!-- 실시간 HUD 정보 -->
           <aside id="hud" class="hud-sidebar card">
-             <h3>전투 상태</h3>
+             <div class="hud-title-row">
+               <h3>전투 상태</h3>
+               <button id="hud-toggle-btn" class="hud-toggle-btn" type="button" aria-expanded="false">상태 보기</button>
+             </div>
              <div id="hud-list" class="hud-list" style="margin-bottom: 0.8rem;">
                <!-- JS에서 동적으로 갱신됨 -->
              </div>
