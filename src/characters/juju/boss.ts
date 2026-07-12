@@ -28,7 +28,7 @@ interface JujuBossState extends CharacterState {
 // #region CONSTANTS
 // ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
-  MAX_HP: 1200,
+  MAX_HP: 800,
   RADIUS: 70,
   BASE_ATTACK: 24,
   COOLDOWN: 5,
