@@ -39,6 +39,14 @@ const SKILL_CONSTANTS = {
 // #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isSameTeam(source: CharacterState, target: CharacterState): boolean {
+  return source.teamId !== undefined && source.teamId === target.teamId;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const juyeonConfig: CharacterConfig = {
@@ -78,7 +86,7 @@ export const juyeonConfig: CharacterConfig = {
     let minDist = Infinity;
 
     ctx.characters.forEach((other) => {
-      if (other.isDead || other.id === char.id) return;
+      if (other.isDead || other.id === char.id || isSameTeam(char, other)) return;
       const dist = Math.hypot(other.x - char.x, other.y - char.y);
       if (dist < minDist) {
         minDist = dist;
@@ -130,7 +138,7 @@ export const juyeonConfig: CharacterConfig = {
 
     // 2. Projectile movement and collision
     js.juyeonProjectiles.forEach((proj) => {
-      if (proj.target.isDead) {
+      if (proj.target.isDead || isSameTeam(char, proj.target)) {
         proj.isHit = true;
         return;
       }
@@ -170,7 +178,12 @@ export const juyeonConfig: CharacterConfig = {
     // 3. Enemy model mask timer & stun burst
     ctx.characters.forEach((enemy) => {
       const target = enemy as any;
-      if (target.isDead || target.juyeonMaskTimer === undefined) return;
+      if (target.isDead || target.juyeonMaskTimer === undefined || target.juyeonMaskAppliedBy !== js.id) return;
+      if (isSameTeam(char, enemy)) {
+        delete target.juyeonMaskTimer;
+        delete target.juyeonMaskAppliedBy;
+        return;
+      }
 
       if (target.juyeonMaskTimer > 0) {
         target.juyeonMaskTimer -= dt;
