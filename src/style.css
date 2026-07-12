@@ -802,7 +802,22 @@ body {
   .game-lounge-wrapper { aspect-ratio: 4 / 3; }
   #game-view[data-mode="solo"] .hud-list,
   #game-view[data-mode="team"] .hud-list,
-  #game-view[data-mode="boss"] .hud-list { grid-template-columns: 1fr; }
+  #game-view[data-mode="boss"] .hud-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #game-view[data-mode="solo"] .hud-item,
+  #game-view[data-mode="team"] .hud-item,
+  #game-view[data-mode="boss"] .hud-item { min-height: 54px; padding: 0.35rem; gap: 0.3rem; }
+  #game-view[data-mode="solo"] .hud-avatar .avatar-img,
+  #game-view[data-mode="solo"] .hud-avatar .avatar-text,
+  #game-view[data-mode="team"] .hud-avatar .avatar-img,
+  #game-view[data-mode="team"] .hud-avatar .avatar-text,
+  #game-view[data-mode="boss"] .hud-avatar .avatar-img,
+  #game-view[data-mode="boss"] .hud-avatar .avatar-text { width: 23px; height: 23px; font-size: 0.56rem; }
+  #game-view[data-mode="solo"] .hud-name-row,
+  #game-view[data-mode="team"] .hud-name-row,
+  #game-view[data-mode="boss"] .hud-name-row { font-size: 0.65rem; }
+  #game-view[data-mode="solo"] .hud-hp-text,
+  #game-view[data-mode="team"] .hud-hp-text,
+  #game-view[data-mode="boss"] .hud-hp-text { font-size: 0.56rem; }
 }
 
 .skill-indicator {
