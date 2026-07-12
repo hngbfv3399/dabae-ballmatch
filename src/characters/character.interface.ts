@@ -28,6 +28,8 @@ export interface CinematicRequest {
   tone: 'void' | 'time' | 'end';
   freezePlayers?: boolean;
   hidePlayers?: boolean;
+  quoteDuration?: number;
+  lightDelay?: number;
   lightDuration?: number;
 }
 

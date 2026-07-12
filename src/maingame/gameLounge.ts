@@ -1959,21 +1959,28 @@ export class GameLounge {
     const centerY = this.canvas.height / 2;
     if (cinematic.tone === "void") {
       const elapsed = cinematic.totalDuration - cinematic.timeLeft;
+      const lightDelay = cinematic.lightDelay ?? 0;
       const lightDuration = cinematic.lightDuration ?? cinematic.totalDuration;
-      const explosionProgress = Math.min(1, elapsed / lightDuration);
-      const radius = 16 + explosionProgress * 300;
+      const explosionProgress = Math.max(0, Math.min(1, (elapsed - lightDelay) / lightDuration));
+      const remainingDuration = Math.max(0.001, cinematic.totalDuration - lightDelay - lightDuration);
+      const fadeAfterExplosion = Math.max(0, 1 - Math.max(0, elapsed - lightDelay - lightDuration) / remainingDuration);
+      const lightIntensity = explosionProgress * fadeAfterExplosion;
+      const radius = 16 + explosionProgress * Math.hypot(this.canvas.width, this.canvas.height);
       const glow = this.ctx.createRadialGradient(centerX, centerY, 1, centerX, centerY, radius);
-      glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.08, "#ffffff"); glow.addColorStop(0.22, "#b9e8ff"); glow.addColorStop(0.42, "#8b5cf6"); glow.addColorStop(1, "rgba(0,0,0,0)");
+      glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.08, "#ffffff"); glow.addColorStop(0.22, "#b9e8ff"); glow.addColorStop(0.42, "#8b5cf6"); glow.addColorStop(1, "rgba(225,242,255,0.22)");
+      this.ctx.fillStyle = `rgba(225,242,255,${lightIntensity * 0.72})`;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       this.ctx.fillStyle = glow; this.ctx.beginPath(); this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2); this.ctx.fill();
     }
     this.ctx.filter = "none";
     this.ctx.textAlign = "center";
     this.ctx.shadowBlur = 18;
     this.ctx.shadowColor = isEnd ? "#ffffff" : "#c4b5fd";
+    const showQuote = cinematic.quoteDuration === undefined || (cinematic.totalDuration - cinematic.timeLeft) <= cinematic.quoteDuration;
     this.ctx.fillStyle = isEnd ? "#1f1438" : "#f5f3ff";
     this.ctx.font = 'bold 30px "Orbit", sans-serif';
-    this.ctx.fillText(cinematic.title, centerX, centerY - 28);
-    if (cinematic.quote) {
+    if (showQuote) this.ctx.fillText(cinematic.title, centerX, centerY - 28);
+    if (cinematic.quote && showQuote) {
       this.ctx.font = '18px "Orbit", sans-serif';
       this.ctx.fillStyle = isEnd ? "#38255c" : "#ddd6fe";
       this.ctx.fillText(`“${cinematic.quote}”`, centerX, centerY + 18);

@@ -40,9 +40,10 @@ const SKILL_CONSTANTS = {
   COOLDOWN: 5,
   PHASE_TWO_RATIO: 0.7,
   PHASE_THREE_RATIO: 0.35,
+  INTRO_QUOTE_DURATION: 2,
   INTRO_EXPLOSION_DURATION: 2,
   INTRO_ARRIVAL_DURATION: 2,
-  INTRO_DURATION: 4,
+  INTRO_DURATION: 6,
   PHASE_TWO_CINEMATIC_DURATION: 3.4,
   PHASE_THREE_CINEMATIC_DURATION: 4.2,
   DEATH_CINEMATIC_DURATION: 2.0,
@@ -213,6 +214,8 @@ export const jujuSingularityBossConfig: CharacterConfig = {
         tone: 'void',
         freezePlayers: true,
         hidePlayers: true,
+        quoteDuration: SKILL_CONSTANTS.INTRO_QUOTE_DURATION,
+        lightDelay: SKILL_CONSTANTS.INTRO_QUOTE_DURATION,
         lightDuration: SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION,
       });
       announce(char, state, ctx, '별은 태어나고, 죽는다.');
@@ -400,8 +403,9 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     const state = char as JujuBossState;
     if ((state.introLeft ?? 0) <= 0) return;
     const elapsed = SKILL_CONSTANTS.INTRO_DURATION - state.introLeft!;
-    // 첫 2초는 피해 없는 중앙 폭발만 보이고, 이후 2초 동안 주주가 빛 속에서 나타난다.
-    canvasCtx.globalAlpha *= Math.max(0, Math.min(1, (elapsed - SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
+    // 대사 2초 → 무피해 폭발 2초 → 주주 등장 2초 순서로 진행한다.
+    const revealStart = SKILL_CONSTANTS.INTRO_QUOTE_DURATION + SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION;
+    canvasCtx.globalAlpha *= Math.max(0, Math.min(1, (elapsed - revealStart) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
   },
   onRenderBackground(char, canvasCtx, canvasWidth, canvasHeight) {
     const state = char as JujuBossState;
@@ -455,7 +459,8 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     state.futureRifts?.forEach((rift) => { canvasCtx.strokeStyle = '#ff5ac8'; canvasCtx.lineWidth = 3; canvasCtx.setLineDash([8, 7]); canvasCtx.beginPath(); canvasCtx.arc(rift.x, rift.y, 78, 0, Math.PI * 2); canvasCtx.stroke(); canvasCtx.setLineDash([]); });
     if ((state.introLeft ?? 0) > 0) {
       const elapsed = SKILL_CONSTANTS.INTRO_DURATION - state.introLeft!;
-      const arrivalProgress = Math.max(0, Math.min(1, (elapsed - SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
+      const revealStart = SKILL_CONSTANTS.INTRO_QUOTE_DURATION + SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION;
+      const arrivalProgress = Math.max(0, Math.min(1, (elapsed - revealStart) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
       if (arrivalProgress <= 0) { canvasCtx.restore(); return; }
       const centerX = canvasCtx.canvas.width / 2; const centerY = canvasCtx.canvas.height / 2;
       const radius = 28 + arrivalProgress * 84;
