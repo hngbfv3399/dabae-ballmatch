@@ -1185,6 +1185,10 @@ function startPracticeGame() {
   gameLounge.init(initialStates, speedMultiplier);
 }
 
+function formatHp(hp: number): string {
+  return Math.max(0, Math.round(hp)).toString();
+}
+
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
   // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
@@ -1207,7 +1211,7 @@ function updateHUD(characters: CharacterState[]) {
       const hpPercent = Math.max(0, Math.min(100, hpRatio * 100));
       if (bossHpFill) bossHpFill.style.width = `${hpPercent}%`;
       if (bossHpRatio)
-        bossHpRatio.textContent = `${hpPercent.toFixed(1)}% (${boss.hp}/${boss.maxHp})`;
+        bossHpRatio.textContent = `${hpPercent.toFixed(1)}% (${formatHp(boss.hp)}/${formatHp(boss.maxHp)})`;
       if (bossNameLabel) bossNameLabel.textContent = `👑 BOSS (${boss.name})`;
     } else {
       if (bossHpFill) bossHpFill.style.width = "0%";
@@ -1315,7 +1319,7 @@ function updateHUD(characters: CharacterState[]) {
       <div class="hud-info">
         <div class="hud-name-row">
           <span style="color: ${char.color}">${char.name}${char.isBoss ? " (👑)" : ""}</span>
-          <span class="hud-hp-text">${char.isDead ? "탈락" : `${char.hp}/${char.maxHp}`}</span>
+          <span class="hud-hp-text">${char.isDead ? "탈락" : `${formatHp(char.hp)}/${formatHp(char.maxHp)}`}</span>
         </div>
         <!-- HP Bar -->
         <div class="bar-container" style="margin-bottom: 4px;">
@@ -1542,7 +1546,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
             const survival = char.bossSurvivalTime || 0;
             const hpStatus = char.isDead
               ? '<span style="color: #ff3366;">탈락</span>'
-              : `<span style="color: #39ff14;">${char.hp} HP</span>`;
+              : `<span style="color: #39ff14;">${formatHp(char.hp)} HP</span>`;
 
             return `
             <div class="standing-item ${isWinner ? "winner-item" : ""}">
