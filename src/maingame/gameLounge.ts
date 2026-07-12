@@ -38,6 +38,30 @@ type BossDrop = BossDropDefinition;
 interface MapCut extends MapCutDefinition { source: CharacterState; timeLeft: number; hitIds: string[]; }
 type ActiveCinematic = CinematicRequest & { timeLeft: number; totalDuration: number };
 
+function overlapsMapCut(target: CharacterState, cut: MapCut): boolean {
+  const angle = cut.angle ?? 0;
+  const centerX = cut.x + cut.width / 2;
+  const centerY = cut.y + cut.height / 2;
+  const dx = target.x - centerX;
+  const dy = target.y - centerY;
+  const localX = dx * Math.cos(angle) + dy * Math.sin(angle);
+  const localY = -dx * Math.sin(angle) + dy * Math.cos(angle);
+  return Math.abs(localX) < cut.width / 2 + target.radius && Math.abs(localY) < cut.height / 2 + target.radius;
+}
+
+function traceTornEdge(ctx: CanvasRenderingContext2D, cut: MapCut, y: number, reverse = false) {
+  const halfWidth = cut.width / 2;
+  const segmentCount = 26;
+  const seed = (cut.x * 0.017 + cut.y * 0.023) % (Math.PI * 2);
+  for (let index = 0; index <= segmentCount; index += 1) {
+    const progress = index / segmentCount;
+    const x = reverse ? halfWidth - progress * cut.width : -halfWidth + progress * cut.width;
+    const tear = Math.sin(progress * 29 + seed) * 8 + Math.sin(progress * 61 + seed * 1.7) * 4;
+    if (index === 0) ctx.moveTo(x, y + tear);
+    else ctx.lineTo(x, y + tear);
+  }
+}
+
 export class GameLounge {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -295,8 +319,7 @@ export class GameLounge {
       this.characters.forEach((target) => {
         if (target.isDead || target.id === cut.source.id || cut.hitIds.includes(target.id)) return;
         if (cut.source.teamId !== undefined && target.teamId !== undefined && cut.source.teamId === target.teamId) return;
-        const overlaps = target.x + target.radius > cut.x && target.x - target.radius < cut.x + cut.width && target.y + target.radius > cut.y && target.y - target.radius < cut.y + cut.height;
-        if (!overlaps) return;
+        if (!overlapsMapCut(target, cut)) return;
         cut.hitIds.push(target.id);
         this.dealDamage(cut.source, target, cut.damage, '⬛ 공간 삭제');
       });
@@ -1511,24 +1534,42 @@ export class GameLounge {
     this.mapCuts.forEach((cut) => {
       const active = cut.timeLeft <= cut.activeDuration;
       this.ctx.save();
+      const centerX = cut.x + cut.width / 2;
+      const centerY = cut.y + cut.height / 2;
+      const halfHeight = cut.height / 2;
+      this.ctx.translate(centerX, centerY);
+      this.ctx.rotate(cut.angle ?? 0);
+      this.ctx.beginPath();
+      traceTornEdge(this.ctx, cut, -halfHeight);
+      traceTornEdge(this.ctx, cut, halfHeight, true);
+      this.ctx.closePath();
+      this.ctx.fillStyle = active ? 'rgba(0,0,0,0.96)' : 'rgba(244,114,182,0.13)';
+      this.ctx.fill();
+
+      this.ctx.shadowColor = active ? '#c084fc' : '#f0abfc';
+      this.ctx.shadowBlur = active ? 24 : 12;
+      this.ctx.strokeStyle = active ? '#f5d0fe' : '#f0abfc';
+      this.ctx.lineWidth = active ? 7 : 3;
+      this.ctx.setLineDash(active ? [] : [16, 9]);
+      this.ctx.beginPath();
+      traceTornEdge(this.ctx, cut, -halfHeight);
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      traceTornEdge(this.ctx, cut, halfHeight);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+
       if (active) {
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillRect(cut.x, cut.y, cut.width, cut.height);
-        this.ctx.strokeStyle = '#f5d0fe';
-        this.ctx.lineWidth = 4;
-        this.ctx.strokeRect(cut.x, cut.y, cut.width, cut.height);
+        this.ctx.fillStyle = 'rgba(196,181,253,0.26)';
+        this.ctx.fillRect(-cut.width / 2, -halfHeight - 14, cut.width, 10);
+        this.ctx.fillStyle = 'rgba(91,33,182,0.5)';
+        this.ctx.fillRect(-cut.width / 2, halfHeight + 4, cut.width, 10);
       } else {
-        this.ctx.fillStyle = 'rgba(244,114,182,0.12)';
-        this.ctx.fillRect(cut.x, cut.y, cut.width, cut.height);
-        this.ctx.strokeStyle = '#f0abfc';
-        this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([12, 8]);
-        this.ctx.strokeRect(cut.x, cut.y, cut.width, cut.height);
-        this.ctx.setLineDash([]);
+        this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = '#f5d0fe';
-        this.ctx.font = 'bold 14px Orbit';
+        this.ctx.font = 'bold 15px Orbit';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(`⬛ 공간 삭제 ${(cut.timeLeft - cut.activeDuration).toFixed(1)}s`, cut.x + cut.width / 2, cut.y + cut.height / 2);
+        this.ctx.fillText(`✂ 전장 절단 ${(cut.timeLeft - cut.activeDuration).toFixed(1)}s`, 0, 5);
       }
       this.ctx.restore();
     });

@@ -26,6 +26,7 @@ export interface MapCutDefinition {
   y: number;
   width: number;
   height: number;
+  angle?: number;
   warningDuration: number;
   activeDuration: number;
   damage: number;

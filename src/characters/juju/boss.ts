@@ -65,10 +65,12 @@ const SKILL_CONSTANTS = {
   TIME_STOP_DURATION: 1.25,
   REWIND_SECONDS: 2,
   REWIND_DAMAGE: 8,
-  MAP_CUT_WIDTH: 260,
-  MAP_CUT_HEIGHT: 170,
-  MAP_CUT_WARNING: 1.25,
-  MAP_CUT_ACTIVE: 2.4,
+  MAP_CUT_WIDTH: 1500,
+  MAP_CUT_HEIGHT: 110,
+  MAP_CUT_WARNING: 1.6,
+  MAP_CUT_ACTIVE: 2.8,
+  MAP_CUT_INTERVAL: 2.15,
+  MAP_CUT_ENRAGE_INTERVAL: 1.35,
   MAP_CUT_DAMAGE: 9999,
   ULTIMATE_CAST: 8,
   ULTIMATE_DAMAGE: 34,
@@ -368,12 +370,15 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       state.faults.push(spawnFault(ctx));
       state.patternTimer = 3.5;
     } else {
-      const firstCut = randomPoint(ctx, SKILL_CONSTANTS.MAP_CUT_WIDTH / 2);
-      const secondCut = randomPoint(ctx, SKILL_CONSTANTS.MAP_CUT_WIDTH / 2);
-      ctx.spawnMapCut(char, { x: firstCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: Math.max(30, firstCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2), width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
-      ctx.spawnMapCut(char, { x: secondCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: Math.max(30, secondCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2), width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
+      const firstCut = randomPoint(ctx);
+      const secondCut = randomPoint(ctx);
+      const sliceAngles = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4];
+      const firstAngle = sliceAngles[Math.floor(Math.random() * sliceAngles.length)];
+      const secondAngle = sliceAngles[Math.floor(Math.random() * sliceAngles.length)];
+      ctx.spawnMapCut(char, { x: firstCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: firstCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2, width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, angle: firstAngle, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
+      ctx.spawnMapCut(char, { x: secondCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: secondCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2, width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, angle: secondAngle, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
       state.faults.push(spawnFault(ctx, Math.PI / 4), spawnFault(ctx, -Math.PI / 4));
-      state.patternTimer = hpRatio <= SKILL_CONSTANTS.ENRAGE_RATIO ? 1.7 : 2.7;
+      state.patternTimer = hpRatio <= SKILL_CONSTANTS.ENRAGE_RATIO ? SKILL_CONSTANTS.MAP_CUT_ENRAGE_INTERVAL : SKILL_CONSTANTS.MAP_CUT_INTERVAL;
     }
   },
   // #endregion UPDATE
