@@ -73,6 +73,12 @@ export const seyeonConfig: CharacterConfig = {
       // Charm, pull, stun, and tick damage to all enemies in radius
       ctx.characters.forEach((enemy) => {
         if (enemy.isDead || enemy.id === char.id) return;
+        // 팀전과 보스전에서는 아군/같은 도전자 팀을 매혹·기절·흡입 대상에서 제외한다.
+        if (
+          char.teamId !== undefined &&
+          enemy.teamId !== undefined &&
+          char.teamId === enemy.teamId
+        ) return;
 
         const dx = char.x - enemy.x;
         const dy = char.y - enemy.y;
