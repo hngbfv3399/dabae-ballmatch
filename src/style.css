@@ -550,6 +550,8 @@ body {
   padding: 0.4rem 0.55rem;
 }
 
+.focus-mode-btn { display: none; }
+
 .hud-list {
   display: flex;
   flex-direction: column;
@@ -712,6 +714,19 @@ body {
 
   .game-header { position: sticky; top: 0; z-index: 30; margin: -0.1rem -0.1rem 0.65rem; padding: 0.5rem 0.1rem; background: rgba(10,10,20,0.94); backdrop-filter: blur(12px); }
   .game-header .btn { padding: 0.55rem 0.7rem; font-size: 0.78rem; }
+  .focus-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid rgba(0, 242, 254, 0.45);
+    border-radius: 8px;
+    background: rgba(0, 242, 254, 0.12);
+    color: var(--neon-cyan);
+    font: 700 0.66rem 'Orbit', sans-serif;
+    white-space: nowrap;
+  }
   .status-banner { order: 3; width: 100%; font-size: 1rem; text-align: center; }
   .alive-counter { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
   .boss-battle-header, .team-battle-header, #tournament-battle-header { margin-bottom: 0.65rem !important; padding: 0.7rem !important; border-radius: 10px !important; }
@@ -726,6 +741,53 @@ body {
   .hud-sidebar.is-collapsed .hud-title-row h3 { margin: 0; padding: 0; border: 0; }
   /* 다인전 2열 HUD 규칙보다 우선해 실제로 접힌 상태를 적용한다. */
   #game-view .hud-sidebar.is-collapsed .hud-list { display: none; }
+
+  /* 전장 확대: 브라우저 전체 화면과 가로 회전을 요청하고, HUD를 완전히 비운다. */
+  #game-view.is-focus-mode {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: 0;
+    background: #05050c;
+  }
+  #game-view.is-focus-mode .game-header {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    z-index: 3;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+  }
+  #game-view.is-focus-mode .game-header > :not(#focus-mode-btn),
+  #game-view.is-focus-mode .hud-sidebar,
+  #game-view.is-focus-mode .boss-battle-header,
+  #game-view.is-focus-mode .team-battle-header,
+  #game-view.is-focus-mode #tournament-battle-header { display: none !important; }
+  #game-view.is-focus-mode .game-main {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+  #game-view.is-focus-mode .game-lounge-wrapper {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    background: #000;
+  }
+  #game-view.is-focus-mode #game-canvas {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 4 / 3;
+  }
   .hud-list { gap: 0.4rem; }
   .hud-item { min-width: 165px; padding: 0.48rem; gap: 0.5rem; }
   .hud-avatar .avatar-img, .hud-avatar .avatar-text { width: 32px; height: 32px; }

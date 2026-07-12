@@ -28,6 +28,7 @@ const gameSpeedSelect = document.getElementById(
 const backToLobbyBtn = document.getElementById(
   "back-to-lobby-btn",
 ) as HTMLButtonElement;
+const focusModeBtn = document.getElementById("focus-mode-btn") as HTMLButtonElement;
 const gameCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 
 function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
@@ -89,6 +90,37 @@ function setHudCollapsed(collapsed: boolean) {
 
 hudToggleBtn.addEventListener("click", () => {
   setHudCollapsed(!hudSidebar.classList.contains("is-collapsed"));
+});
+
+async function setFocusMode(enabled: boolean) {
+  gameView.classList.toggle("is-focus-mode", enabled);
+  focusModeBtn.textContent = enabled ? "✕ 전장 닫기" : "⛶ 전장 확대";
+
+  if (enabled) {
+    try {
+      await gameView.requestFullscreen?.();
+      await screen.orientation?.lock?.("landscape");
+    } catch {
+      // 전체 화면/화면 회전이 제한된 브라우저에서는 CSS 집중 모드만 적용한다.
+    }
+  } else {
+    try {
+      await screen.orientation?.unlock?.();
+      if (document.fullscreenElement) await document.exitFullscreen();
+    } catch {
+      // 브라우저가 전체 화면 종료 API를 지원하지 않아도 UI는 정상 복귀한다.
+    }
+  }
+}
+
+focusModeBtn.addEventListener("click", () => {
+  void setFocusMode(!gameView.classList.contains("is-focus-mode"));
+});
+
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && gameView.classList.contains("is-focus-mode")) {
+    void setFocusMode(false);
+  }
 });
 const tournamentStatus = document.getElementById("tournament-status") as HTMLElement;
 
@@ -1544,6 +1576,7 @@ function closeWinnerModal() {
 }
 
 function goBackToLobby() {
+  if (gameView.classList.contains("is-focus-mode")) void setFocusMode(false);
   isPracticeMode = false;
   tournamentState = null;
   if (tournamentHeader) tournamentHeader.classList.add("hidden");
