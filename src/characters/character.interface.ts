@@ -8,6 +8,18 @@ export interface CharacterStatusEffect {
   color: string;
 }
 
+export interface BossDropDefinition {
+  x: number;
+  y: number;
+  name: string;
+  icon: string;
+  color: string;
+  duration: number;
+  heal: number;
+  damageMultiplier: number;
+  speedMultiplier: number;
+}
+
 export interface CharacterBehaviorContext {
   characters: CharacterState[];
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
@@ -18,6 +30,7 @@ export interface CharacterBehaviorContext {
   applyCharm: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
   applyDomination: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
   addFloatingText: (x: number, y: number, text: string, color: string, life?: number) => void;
+  spawnBossDrop: (drop: BossDropDefinition) => void;
   arenaWidth: number;
   arenaHeight: number;
   logMessage?: (msg: string, type: string) => void;
@@ -122,6 +135,9 @@ export interface CharacterState extends CharacterConfig {
   wasAboveKnockbackThreshold?: boolean;
   relicGems?: number; // 보석 쟁탈전에서 현재 보유 중인 보석 수
   relicSpeedMultiplier?: number; // 보석 보유에 따른 이동 속도 배율
+  raidDamageMultiplier?: number;
+  raidSpeedMultiplier?: number;
+  raidBuffTimeLeft?: number;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

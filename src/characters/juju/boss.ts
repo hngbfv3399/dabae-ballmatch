@@ -56,6 +56,10 @@ const SKILL_CONSTANTS = {
   ULTIMATE_CAST: 8,
   ULTIMATE_DAMAGE: 34,
   EXHAUSTED_DURATION: 8,
+  DROP_HEAL: 30,
+  DROP_DURATION: 8,
+  DROP_DAMAGE_MULTIPLIER: 1.25,
+  DROP_SPEED_MULTIPLIER: 1.15,
 };
 // #endregion CONSTANTS
 
@@ -168,6 +172,16 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       state.bossPhase = nextPhase;
       const text = nextPhase === 2 ? '시간은... 멈춘다.' : '공간도... 시간도... 의미가 없다.';
       announce(char, state, ctx, text);
+      const dropAngle = Math.random() * Math.PI * 2;
+      const dropDistance = 110 + Math.random() * 90;
+      ctx.spawnBossDrop({
+        x: char.x + Math.cos(dropAngle) * dropDistance,
+        y: char.y + Math.sin(dropAngle) * dropDistance,
+        name: '시공 파편', icon: '✦', color: '#67e8f9',
+        duration: SKILL_CONSTANTS.DROP_DURATION, heal: SKILL_CONSTANTS.DROP_HEAL,
+        damageMultiplier: SKILL_CONSTANTS.DROP_DAMAGE_MULTIPLIER,
+        speedMultiplier: SKILL_CONSTANTS.DROP_SPEED_MULTIPLIER,
+      });
       challengers(ctx).forEach((target) => ctx.applyStun(char, target, nextPhase === 2 ? 0.8 : 1.1));
     }
 

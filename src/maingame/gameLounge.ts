@@ -1,6 +1,7 @@
 import type {
   CharacterState,
   CharacterBehaviorContext,
+  BossDropDefinition,
   CharacterStatusEffect,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
@@ -30,6 +31,10 @@ interface RelicGem {
   y: number;
 }
 
+interface BossDrop extends BossDropDefinition {
+  timeLeft: number;
+}
+
 export class GameLounge {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -54,6 +59,7 @@ export class GameLounge {
   private teamGameType: TeamGameType = "deathmatch";
   private controlScores = { red: 0, blue: 0 };
   private relicGems: RelicGem[] = [];
+  private bossDrops: BossDrop[] = [];
   private relicSpawnTimer = 0;
   private relicGeneratedCount = 0;
   private relicDeathmatchPhase = false;
@@ -213,6 +219,10 @@ export class GameLounge {
           life: life !== undefined ? life : 1.0,
         });
       },
+      spawnBossDrop: (drop) => {
+        this.bossDrops.push({ ...drop, timeLeft: 14 });
+        this.floatingTexts.push({ x: drop.x, y: drop.y - 28, text: `${drop.icon} ${drop.name} 출현!`, color: drop.color, life: 1.5 });
+      },
       arenaWidth: this.canvas.width,
       arenaHeight: this.canvas.height,
       logMessage: (msg: string, type: string) => {
@@ -232,6 +242,25 @@ export class GameLounge {
     char.wasAboveKnockbackThreshold = isAboveThreshold;
     if ((char.knockbackInertiaLeft ?? 0) > 0) {
       char.knockbackInertiaLeft = Math.max(0, (char.knockbackInertiaLeft ?? 0) - dt);
+    }
+  }
+
+  private updateBossDrops(dt: number) {
+    this.bossDrops.forEach((drop) => { drop.timeLeft -= dt; });
+    this.bossDrops = this.bossDrops.filter((drop) => drop.timeLeft > 0);
+    for (let index = this.bossDrops.length - 1; index >= 0; index -= 1) {
+      const drop = this.bossDrops[index];
+      const collector = this.characters.find((char) => !char.isDead && !char.isBoss && Math.hypot(char.x - drop.x, char.y - drop.y) <= char.radius + 24);
+      if (!collector) continue;
+      collector.hp = Math.min(collector.maxHp, collector.hp + drop.heal);
+      collector.raidDamageMultiplier = Math.max(collector.raidDamageMultiplier ?? 1, drop.damageMultiplier);
+      collector.raidSpeedMultiplier = Math.max(collector.raidSpeedMultiplier ?? 1, drop.speedMultiplier);
+      collector.raidBuffTimeLeft = Math.max(collector.raidBuffTimeLeft ?? 0, drop.duration);
+      collector.statusIndicators = (collector.statusIndicators ?? []).filter((effect) => effect.label !== '시공 파편');
+      collector.statusIndicators.push({ icon: drop.icon, label: '시공 파편', timeLeft: drop.duration, duration: drop.duration, color: drop.color });
+      this.floatingTexts.push({ x: collector.x, y: collector.y - 58, text: `${drop.icon} ${drop.name}!`, color: drop.color, life: 1.3 });
+      this.createExplosion(collector.x, collector.y, drop.color, 20);
+      this.bossDrops.splice(index, 1);
     }
   }
 
@@ -436,6 +465,7 @@ export class GameLounge {
     this.teamGameType = teamGameType;
     this.controlScores = { red: 0, blue: 0 };
     this.relicGems = [];
+    this.bossDrops = [];
     this.relicSpawnTimer = 0;
     this.relicGeneratedCount = 0;
     this.relicDeathmatchPhase = false;
@@ -823,10 +853,21 @@ export class GameLounge {
     }
 
     this.updateTeamObjective(dt);
+    this.updateBossDrops(dt);
 
     const context = this.getBehaviorContext();
 
     aliveCharacters.forEach((char) => {
+      if ((char.raidBuffTimeLeft ?? 0) > 0) {
+        char.raidBuffTimeLeft! -= dt;
+        char.statusIndicators = (char.statusIndicators ?? []).filter((effect) => effect.label !== '시공 파편');
+        if (char.raidBuffTimeLeft! > 0) {
+          char.statusIndicators.push({ icon: '✦', label: '시공 파편', timeLeft: char.raidBuffTimeLeft!, duration: 8, color: '#67e8f9' });
+        } else {
+          char.raidDamageMultiplier = 1;
+          char.raidSpeedMultiplier = 1;
+        }
+      }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
       if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
@@ -893,9 +934,9 @@ export class GameLounge {
       }
 
       // 위치 업데이트
-      const relicSpeedMultiplier = char.relicSpeedMultiplier ?? 1;
-      char.x += char.vx * dt * 60 * relicSpeedMultiplier; // 60fps 기준 속도 조절
-      char.y += char.vy * dt * 60 * relicSpeedMultiplier;
+      const moveMultiplier = (char.relicSpeedMultiplier ?? 1) * (char.raidSpeedMultiplier ?? 1);
+      char.x += char.vx * dt * 60 * moveMultiplier; // 60fps 기준 속도 조절
+      char.y += char.vy * dt * 60 * moveMultiplier;
 
       // 벽 충돌 체크
       checkWallCollision(char, this.canvas.width, this.canvas.height);
@@ -1138,6 +1179,7 @@ export class GameLounge {
     if (attacker && attacker.damageMultiplier !== undefined) {
       finalDamage *= attacker.damageMultiplier;
     }
+    finalDamage *= attacker.raidDamageMultiplier ?? 1;
 
     const context = this.getBehaviorContext();
 
@@ -1483,6 +1525,16 @@ export class GameLounge {
       this.ctx.shadowBlur = 0;
       this.ctx.restore();
     }
+
+    this.bossDrops.forEach((drop) => {
+      const pulse = 0.85 + Math.sin(performance.now() / 110) * 0.15;
+      this.ctx.save();
+      this.ctx.shadowBlur = 18; this.ctx.shadowColor = drop.color;
+      this.ctx.fillStyle = `${drop.color}44`; this.ctx.beginPath(); this.ctx.arc(drop.x, drop.y, 24 * pulse, 0, Math.PI * 2); this.ctx.fill();
+      this.ctx.strokeStyle = drop.color; this.ctx.lineWidth = 3; this.ctx.beginPath(); this.ctx.arc(drop.x, drop.y, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (drop.timeLeft / 14)); this.ctx.stroke();
+      this.ctx.shadowBlur = 0; this.ctx.fillStyle = '#fff'; this.ctx.font = 'bold 20px Orbit'; this.ctx.textAlign = 'center'; this.ctx.fillText(drop.icon, drop.x, drop.y + 7);
+      this.ctx.font = 'bold 11px Orbit'; this.ctx.fillStyle = drop.color; this.ctx.fillText(`${drop.name} ${drop.timeLeft.toFixed(0)}s`, drop.x, drop.y - 31); this.ctx.restore();
+    });
 
     // 보스전에서는 제한시간 HUD를 표시하지 않는다.
     const isPractice = this.characters.some((c) => c.id === "dummy");
