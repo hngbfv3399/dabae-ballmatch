@@ -1203,7 +1203,8 @@ function updateHUD(characters: CharacterState[]) {
         const countdown = objective.relicWinningTeam
           ? ` · ${objective.relicWinningTeam === 1 ? "🔴" : "🔵"} 승리까지 ${Math.max(0, objective.relicWinCountdown).toFixed(1)}초`
           : "";
-        objectiveText.textContent = `보석 쟁탈전 · 🔴 ${objective.redRelics}/${objective.relicGoal}  |  🔵 ${objective.blueRelics}/${objective.relicGoal}${countdown}`;
+        const phase = objective.relicDeathmatchPhase ? " · ⚔️ 데스매치 단계 (부활 없음)" : "";
+        objectiveText.textContent = `보석 쟁탈전 · 🔴 ${objective.redRelics}/${objective.relicGoal}  |  🔵 ${objective.blueRelics}/${objective.relicGoal}${countdown}${phase}`;
       } else {
         objectiveText.textContent = "데스매치 · 전원 섬멸";
       }

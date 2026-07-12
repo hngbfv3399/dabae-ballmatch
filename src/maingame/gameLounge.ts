@@ -54,6 +54,8 @@ export class GameLounge {
   private controlScores = { red: 0, blue: 0 };
   private relicGems: RelicGem[] = [];
   private relicSpawnTimer = 0;
+  private relicGeneratedCount = 0;
+  private relicDeathmatchPhase = false;
   private relicWinningTeam: 1 | 2 | null = null;
   private relicWinCountdown = 0;
   private readonly objectiveScoreToWin = 100;
@@ -62,7 +64,7 @@ export class GameLounge {
   private readonly relicGoal = 10;
   private readonly relicWinDelay = 5;
   private readonly relicSpawnInterval = 1.8;
-  private readonly relicMaxOnField = 5;
+  private readonly relicTotalSpawnLimit = 12;
   private readonly relicPickupRadius = 30;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
@@ -237,6 +239,7 @@ export class GameLounge {
       relicGoal: this.relicGoal,
       relicWinningTeam: this.relicWinningTeam,
       relicWinCountdown: this.relicWinCountdown,
+      relicDeathmatchPhase: this.relicDeathmatchPhase,
     };
   }
 
@@ -272,6 +275,7 @@ export class GameLounge {
   }
 
   private respawnObjectivePlayers(dt: number) {
+    if (this.teamGameType === "relic" && this.relicDeathmatchPhase) return;
     if (!this.isObjectiveTeamMode()) return;
     this.characters.forEach((char) => {
       const state = char as CharacterState & { respawnTimeLeft?: number };
@@ -306,7 +310,7 @@ export class GameLounge {
   }
 
   private updateTeamObjective(dt: number) {
-    if (!this.isObjectiveTeamMode() || this.isGameOver) return;
+    if ((this.teamGameType !== "control" && this.teamGameType !== "relic") || this.isGameOver) return;
     const players = this.characters.filter(
       (char) => !char.isDead && !char.id.includes("clone"),
     );
@@ -342,7 +346,7 @@ export class GameLounge {
 
     // 보석 균열 포탈은 전장 세 곳에서 보석을 주기적으로 생성한다.
     this.relicSpawnTimer -= dt;
-    if (this.relicSpawnTimer <= 0 && this.relicGems.length < this.relicMaxOnField) {
+    if (this.relicSpawnTimer <= 0 && this.relicGeneratedCount < this.relicTotalSpawnLimit) {
       const portals = [
         { x: this.canvas.width * 0.25, y: this.canvas.height * 0.3 },
         { x: this.canvas.width * 0.5, y: this.canvas.height * 0.68 },
@@ -350,8 +354,14 @@ export class GameLounge {
       ];
       const portal = portals[Math.floor(Math.random() * portals.length)];
       this.relicGems.push({ x: portal.x, y: portal.y });
+      this.relicGeneratedCount += 1;
       this.relicSpawnTimer = this.relicSpawnInterval;
       this.floatingTexts.push({ x: portal.x, y: portal.y - 28, text: "💎 보석 생성", color: "#d8b4fe", life: 1 });
+      if (this.relicGeneratedCount >= this.relicTotalSpawnLimit) {
+        this.relicDeathmatchPhase = true;
+        this.onLogMessage?.("⚔️ [보석 쟁탈전] 보석 공급 종료! 이제 부활 없는 데스매치입니다.", "skill");
+        this.floatingTexts.push({ x: this.canvas.width / 2, y: this.canvas.height / 2 - 60, text: "⚔️ 보석 공급 종료 · 데스매치!", color: "#ffcc00", life: 2 });
+      }
     }
 
     for (let index = this.relicGems.length - 1; index >= 0; index -= 1) {
@@ -408,6 +418,8 @@ export class GameLounge {
     this.controlScores = { red: 0, blue: 0 };
     this.relicGems = [];
     this.relicSpawnTimer = 0;
+    this.relicGeneratedCount = 0;
+    this.relicDeathmatchPhase = false;
     this.relicWinningTeam = null;
     this.relicWinCountdown = 0;
 
@@ -657,7 +669,7 @@ export class GameLounge {
             );
           }
         }
-      } else if (isTeamGame && !this.isObjectiveTeamMode()) {
+      } else if (isTeamGame && (!this.isObjectiveTeamMode() || this.relicDeathmatchPhase)) {
         const redTeamAlive = aliveRealPlayers.some((p) => p.teamId === 1);
         const blueTeamAlive = aliveRealPlayers.some((p) => p.teamId === 2);
 
