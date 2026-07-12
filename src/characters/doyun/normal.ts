@@ -45,6 +45,7 @@ export const doyunConfig: CharacterConfig = {
     let minDist = Infinity;
     ctx.characters.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
+      if (isSameTeam(char, enemy)) return;
       const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
       if (dist < minDist) {
         minDist = dist;
@@ -120,6 +121,7 @@ export const doyunConfig: CharacterConfig = {
         const chars = ctx.characters;
         for (const enemy of chars) {
           if (enemy.isDead || enemy.id === char.id) continue;
+          if (isSameTeam(char, enemy)) continue;
           const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
           if (dist < minDist) {
             minDist = dist;
@@ -151,7 +153,7 @@ export const doyunConfig: CharacterConfig = {
   // #region COLLISION — explode on target hit
   // ═══════════════════════════════════════════
   onCollisionWithTarget(char: CharacterState, opponent: CharacterState, ctx) {
-    if (char.skillActive) {
+    if (char.skillActive && !isSameTeam(char, opponent)) {
       executeDunkSlam(char, opponent, ctx);
     }
   },
@@ -236,6 +238,7 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
   // Splash damage and knockback within splash radius
   ctx.characters.forEach((enemy: CharacterState) => {
     if (enemy.isDead || enemy.id === char.id) return;
+    if (isSameTeam(char, enemy)) return;
     const dist = Math.hypot(enemy.x - slamX, enemy.y - slamY);
     if (dist <= SKILL_CONSTANTS.SPLASH_RADIUS) {
       const damage = Math.round(char.attackPower * SKILL_CONSTANTS.DMG_MULTIPLIER) + SKILL_CONSTANTS.DMG_BASE;
@@ -273,5 +276,9 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
   const currentSpeed = Math.hypot(char.vx, char.vy);
   char.vx = (char.vx / (currentSpeed || 1)) * (char.speed * 3.5);
   char.vy = (char.vy / (currentSpeed || 1)) * (char.speed * 3.5);
+}
+
+function isSameTeam(source: CharacterState, target: CharacterState): boolean {
+  return source.teamId !== undefined && target.teamId !== undefined && source.teamId === target.teamId;
 }
 // #endregion HELPERS
