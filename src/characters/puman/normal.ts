@@ -42,6 +42,14 @@ const SKILL_CONSTANTS = {
 // #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isEnemy(first: CharacterState, second: CharacterState): boolean {
+  return first.teamId === undefined || second.teamId === undefined || first.teamId !== second.teamId;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const pumanConfig: CharacterConfig = {
@@ -72,7 +80,7 @@ export const pumanConfig: CharacterConfig = {
     let minDist = Infinity;
 
     ctx.characters.forEach((enemy) => {
-      if (enemy.isDead || enemy.id === char.id) return;
+      if (enemy.isDead || enemy.id === char.id || !isEnemy(char, enemy)) return;
       const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
       if (dist < minDist) {
         minDist = dist;
@@ -170,7 +178,7 @@ export const pumanConfig: CharacterConfig = {
       // Check collision with enemies
       let hitEnemy: CharacterState | null = null;
       for (const enemy of ctx.characters) {
-        if (enemy.isDead || enemy.id === pm.id) continue;
+        if (enemy.isDead || enemy.id === pm.id || !isEnemy(pm, enemy)) continue;
         const distToEnemy = Math.hypot(enemy.x - plant.x, enemy.y - plant.y);
         if (distToEnemy < enemy.radius + plant.radius) {
           hitEnemy = enemy;
@@ -212,6 +220,7 @@ export const pumanConfig: CharacterConfig = {
         proj.isHit = true;
         
         const target = proj.target;
+        if (!isEnemy(char, target)) return;
         (target as any).isPoisoned = true;
         (target as any).poisonTimeLeft = 3.0;
         (target as any).poisonDamageTimer = 1.0;
@@ -235,7 +244,7 @@ export const pumanConfig: CharacterConfig = {
     // 4. Poison DOT ticks updates
     ctx.characters.forEach((enemy) => {
       const target = enemy as any;
-      if (target.isDead || !target.isPoisoned || target.poisonTimeLeft === undefined) return;
+      if (target.isDead || !isEnemy(char, enemy) || !target.isPoisoned || target.poisonTimeLeft === undefined) return;
 
       target.poisonTimeLeft -= dt;
       target.poisonDamageTimer -= dt;
