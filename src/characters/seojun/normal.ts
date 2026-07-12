@@ -21,8 +21,8 @@ interface SeojunState extends CharacterState {
 // #region CONSTANTS
 // ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
-  FIRST_CAST_COOLDOWN: 4,
-  RECAST_COOLDOWN: 6,
+  FIRST_CAST_COOLDOWN: 6,
+  RECAST_COOLDOWN: 4,
   ANCHOR_DURATION: 7,
   PATH_SAMPLE_INTERVAL: 0.08,
   REWIND_DURATION: 0.7,

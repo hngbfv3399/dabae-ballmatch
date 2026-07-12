@@ -4,9 +4,9 @@ import type { CharacterBehaviorContext, CharacterConfig, CharacterState } from '
 // #region TYPES
 // ═══════════════════════════════════════════
 interface JiwooState extends CharacterState {
-  vanityPassiveUsed?: boolean;
   vanityReturnX?: number;
   vanityReturnY?: number;
+  realityFractureStacks?: Record<string, { stacks: number; timeLeft: number }>;
 }
 // #endregion TYPES
 
@@ -15,10 +15,12 @@ interface JiwooState extends CharacterState {
 // ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
   COOLDOWN: 8,
-  PASSIVE_THRESHOLD_RATIO: 0.15,
-  PASSIVE_HEAL_RATIO: 0.4,
-  VANITY_DURATION: 3,
+  VANITY_DURATION: 6,
   REFLECT_DAMAGE_RATIO: 1,
+  REALITY_FRACTURE_MAX_STACKS: 3,
+  REALITY_FRACTURE_DURATION: 5,
+  REALITY_FRACTURE_DAMAGE: 18,
+  REALITY_FRACTURE_CONFUSION_DURATION: 1,
 };
 // #endregion CONSTANTS
 
@@ -40,7 +42,7 @@ function clearDebuffs(char: CharacterState): void {
 export const jiwooConfig: CharacterConfig = {
   id: 'jiwoo', name: '지우', maxHp: 130, speed: 1.4, attackPower: 12, baseAttackRange: 48,
   skillName: '허식 (Vanity)',
-  skillDescription: `패시브: HP ${SKILL_CONSTANTS.PASSIVE_THRESHOLD_RATIO * 100}% 이하가 될 피해를 처음 받을 때 HP를 ${SKILL_CONSTANTS.PASSIVE_HEAL_RATIO * 100}%까지 회복하고 모든 디버프를 해제합니다. 액티브: ${SKILL_CONSTANTS.VANITY_DURATION}초간 지우의 허상이 남습니다. 적은 허상을 정상적으로 공격하지만 지우는 피해를 전부 무시하며, 허상이 받은 피해의 ${SKILL_CONSTANTS.REFLECT_DAMAGE_RATIO * 100}%를 공격자에게 즉시 되돌립니다.`,
+  skillDescription: `패시브: 같은 적에게 기본 공격을 ${SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS}회 적중하면 현실 균열을 일으켜 ${SKILL_CONSTANTS.REALITY_FRACTURE_DAMAGE} 피해와 ${SKILL_CONSTANTS.REALITY_FRACTURE_CONFUSION_DURATION}초 혼란을 줍니다. 누적은 ${SKILL_CONSTANTS.REALITY_FRACTURE_DURATION}초 뒤 사라집니다. 액티브: ${SKILL_CONSTANTS.VANITY_DURATION}초간 지우의 허상이 남습니다. 적은 허상을 정상적으로 공격하지만 지우는 피해를 전부 무시하며, 허상이 받은 피해의 ${SKILL_CONSTANTS.REFLECT_DAMAGE_RATIO * 100}%를 공격자에게 즉시 되돌립니다.`,
   color: '#b38cff', skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, tier: 'A', role: 'Disabler',
   detailedDescription: '지우는 죽음 직전 현실을 부정하고, 허상으로 사라졌다가 원점으로 되돌아와 적의 판단을 무너뜨리는 교란형 마법사입니다.',
 // #endregion CONFIG
@@ -63,6 +65,10 @@ export const jiwooConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number) {
     const js = char as JiwooState;
+    Object.entries(js.realityFractureStacks ?? {}).forEach(([targetId, mark]) => {
+      mark.timeLeft -= dt;
+      if (mark.timeLeft <= 0) delete js.realityFractureStacks?.[targetId];
+    });
     if (!char.skillActive) return;
     char.skillDurationLeft -= dt;
     clearDebuffs(char);
@@ -75,20 +81,36 @@ export const jiwooConfig: CharacterConfig = {
   // #endregion UPDATE
 
   // ═══════════════════════════════════════════
+  // #region BASIC_ATTACK
+  // ═══════════════════════════════════════════
+  onBasicAttack(char: CharacterState, target: CharacterState, ctx: CharacterBehaviorContext) {
+    const js = char as JiwooState;
+    const marks = js.realityFractureStacks ??= {};
+    const mark = marks[target.id] ?? { stacks: 0, timeLeft: SKILL_CONSTANTS.REALITY_FRACTURE_DURATION };
+    mark.stacks += 1;
+    mark.timeLeft = SKILL_CONSTANTS.REALITY_FRACTURE_DURATION;
+
+    if (mark.stacks < SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS) {
+      marks[target.id] = mark;
+      ctx.addFloatingText(target.x, target.y - 48, `◈ 균열 ${mark.stacks}/${SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS}`, char.color, 0.8);
+      return;
+    }
+
+    delete marks[target.id];
+    ctx.dealDamage(char, target, SKILL_CONSTANTS.REALITY_FRACTURE_DAMAGE, '◈ 현실 균열');
+    ctx.applyConfusion(char, target, SKILL_CONSTANTS.REALITY_FRACTURE_CONFUSION_DURATION, 0.2);
+    ctx.createExplosion(target.x, target.y, char.color, 18);
+    ctx.addFloatingText(target.x, target.y - 55, '◈ 현실 균열!', char.color, 1.1);
+  },
+  // #endregion BASIC_ATTACK
+
+  // ═══════════════════════════════════════════
   // #region DAMAGE
   // ═══════════════════════════════════════════
   onTakeDamage(target: CharacterState, attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) {
-    const js = target as JiwooState;
     if (target.skillActive) {
       ctx.dealDamage(target, attacker, damage * SKILL_CONSTANTS.REFLECT_DAMAGE_RATIO, '🪞 허식 반사');
       ctx.addFloatingText(attacker.x, attacker.y - 50, `🪞 ${Math.round(damage)} 반사!`, target.color, 1);
-      return { finalDamage: damage, blocked: true };
-    }
-    if (!js.vanityPassiveUsed && target.hp - damage <= target.maxHp * SKILL_CONSTANTS.PASSIVE_THRESHOLD_RATIO) {
-      js.vanityPassiveUsed = true;
-      target.hp = target.maxHp * SKILL_CONSTANTS.PASSIVE_HEAL_RATIO;
-      clearDebuffs(target);
-      ctx.addFloatingText(target.x, target.y - 55, '🪞 현실 부정!', target.color, 1.4);
       return { finalDamage: damage, blocked: true };
     }
     return { finalDamage: damage, blocked: false };

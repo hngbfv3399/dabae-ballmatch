@@ -644,6 +644,69 @@ body {
   .hud-name-row { font-size: 0.82rem; }
 }
 
+/* Mobile-first readability: prioritize selection, match state, and tap targets. */
+@media (max-width: 700px) {
+  #app { padding: 0.55rem; min-height: 100dvh; }
+  .lobby-header { margin-bottom: 1rem; }
+  .lobby-header h1 { font-size: clamp(2rem, 11vw, 2.8rem); letter-spacing: 0.1em; }
+  .lobby-header .subtitle { font-size: 0.82rem; }
+  .lobby-main { gap: 0.9rem; }
+  .character-selection { padding: 0.8rem !important; }
+  .character-selection > div:first-child { align-items: flex-start !important; gap: 0.55rem; }
+  .character-selection h2 { font-size: 1.05rem; }
+  .role-filter-bar { gap: 0.35rem !important; padding: 0.5rem !important; margin-bottom: 0.8rem !important; }
+  .role-tab { font-size: 0.7rem; padding: 0.35rem 0.45rem; }
+  .character-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .character-card { min-width: 0; padding: 0.8rem 0.55rem; border-radius: 11px; }
+  .character-card .avatar-img, .character-card .avatar-text { width: 52px; height: 52px; font-size: 0.86rem; }
+  .character-card .char-name { font-size: 1rem; margin: 0.45rem 0 0.25rem; }
+  .character-card .char-stats { margin: 0.4rem 0; padding-top: 0.45rem; font-size: 0.72rem; }
+  .character-card .char-history { display: none; }
+  .character-card .card-team-selector { margin-top: 0.45rem !important; }
+  .character-card .char-detail-trigger-btn { top: 7px !important; left: 7px !important; font-size: 0.62rem !important; padding: 2px 5px !important; }
+  .tier-card-badge, .mode-card-badge { transform: scale(0.82); transform-origin: top right; }
+  .lobby-controls { gap: 0.65rem; }
+  .control-step, .game-settings { padding: 0.85rem; }
+  .mode-tabs { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem !important; }
+  .mode-tab { min-height: 42px; font-size: 0.78rem !important; }
+  .setting-item select, .btn { min-height: 42px; }
+  .manual-start-card { position: sticky; bottom: 0.45rem; z-index: 20; padding: 0.85rem; box-shadow: 0 -8px 24px rgba(5,5,14,0.65); }
+  .manual-start-card p { display: none; }
+  #start-btn { font-size: 0.9rem; padding: 0.7rem; }
+  .optional-modes { padding: 0.8rem; }
+  .random-mode-selector { flex-wrap: wrap; justify-content: flex-start !important; gap: 0.45rem !important; }
+
+  .game-header { position: sticky; top: 0; z-index: 30; margin: -0.1rem -0.1rem 0.65rem; padding: 0.5rem 0.1rem; background: rgba(10,10,20,0.94); backdrop-filter: blur(12px); }
+  .game-header .btn { padding: 0.55rem 0.7rem; font-size: 0.78rem; }
+  .status-banner { order: 3; width: 100%; font-size: 1rem; text-align: center; }
+  .alive-counter { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+  .boss-battle-header, .team-battle-header, #tournament-battle-header { margin-bottom: 0.65rem !important; padding: 0.7rem !important; border-radius: 10px !important; }
+  .boss-battle-header span, .team-battle-header span { font-size: 0.78rem !important; }
+  .game-main { gap: 0.7rem; }
+  .game-lounge-wrapper { aspect-ratio: 16 / 11; border-radius: 8px; }
+  .hud-sidebar { padding: 0.65rem; border-radius: 10px; }
+  .hud-sidebar h3 { font-size: 0.9rem; margin-bottom: 0.45rem; }
+  .hud-list { gap: 0.4rem; }
+  .hud-item { min-width: 165px; padding: 0.48rem; gap: 0.5rem; }
+  .hud-avatar .avatar-img, .hud-avatar .avatar-text { width: 32px; height: 32px; }
+  .bar-container { height: 6px; }
+  #countdown-number { font-size: 4rem; }
+
+  .modal-content { width: calc(100% - 1rem); max-height: 94dvh; padding: 1.1rem 0.75rem; }
+  .winner-trophy { font-size: 2.6rem; }
+  .winner-title { font-size: 1.35rem; letter-spacing: 0.05em; }
+  .winner-info-card { max-height: 64dvh; padding: 0.75rem; margin-bottom: 0.8rem; }
+  .mvp-stats-grid { gap: 0.35rem; }
+  .standing-item { padding: 0.45rem; gap: 0.45rem; }
+  .standing-stat-col { display: none; }
+}
+
+@media (max-width: 380px) {
+  .character-grid { grid-template-columns: 1fr; }
+  .mode-tabs { grid-template-columns: 1fr; }
+  .game-lounge-wrapper { aspect-ratio: 4 / 3; }
+}
+
 .skill-indicator {
   position: absolute;
   right: 0.5rem;
