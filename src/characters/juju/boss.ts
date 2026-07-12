@@ -21,6 +21,7 @@ interface JujuBossState extends CharacterState {
   exhaustedLeft?: number;
   baseAttackPower?: number;
   baseSpeed?: number;
+  dropSpawnTimer?: number;
 }
 // #endregion TYPES
 
@@ -60,6 +61,10 @@ const SKILL_CONSTANTS = {
   DROP_DURATION: 8,
   DROP_DAMAGE_MULTIPLIER: 1.25,
   DROP_SPEED_MULTIPLIER: 1.15,
+  DROP_FIRST_SPAWN_MIN: 7,
+  DROP_FIRST_SPAWN_MAX: 11,
+  DROP_SPAWN_MIN: 9,
+  DROP_SPAWN_MAX: 14,
 };
 // #endregion CONSTANTS
 
@@ -89,6 +94,17 @@ function randomPoint(ctx: CharacterBehaviorContext, margin = 100) {
     x: margin + Math.random() * (ctx.arenaWidth - margin * 2),
     y: margin + Math.random() * (ctx.arenaHeight - margin * 2),
   };
+}
+
+function spawnTemporalFragment(ctx: CharacterBehaviorContext) {
+  const point = randomPoint(ctx);
+  ctx.spawnBossDrop({
+    ...point,
+    name: '시공 파편', icon: '✦', color: '#67e8f9',
+    duration: SKILL_CONSTANTS.DROP_DURATION, heal: SKILL_CONSTANTS.DROP_HEAL,
+    damageMultiplier: SKILL_CONSTANTS.DROP_DAMAGE_MULTIPLIER,
+    speedMultiplier: SKILL_CONSTANTS.DROP_SPEED_MULTIPLIER,
+  });
 }
 
 function spawnFault(ctx: CharacterBehaviorContext, angle = Math.random() * Math.PI): TemporalFault {
@@ -165,6 +181,13 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     state.playerHistory ??= {};
     state.baseAttackPower ??= char.attackPower;
     state.baseSpeed ??= char.speed;
+    state.dropSpawnTimer ??= SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN + Math.random() * (SKILL_CONSTANTS.DROP_FIRST_SPAWN_MAX - SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN);
+
+    state.dropSpawnTimer -= dt;
+    if (state.dropSpawnTimer <= 0) {
+      spawnTemporalFragment(ctx);
+      state.dropSpawnTimer = SKILL_CONSTANTS.DROP_SPAWN_MIN + Math.random() * (SKILL_CONSTANTS.DROP_SPAWN_MAX - SKILL_CONSTANTS.DROP_SPAWN_MIN);
+    }
 
     const hpRatio = char.hp / char.maxHp;
     const nextPhase: 1 | 2 | 3 = hpRatio <= SKILL_CONSTANTS.PHASE_THREE_RATIO ? 3 : hpRatio <= SKILL_CONSTANTS.PHASE_TWO_RATIO ? 2 : 1;
@@ -172,16 +195,6 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       state.bossPhase = nextPhase;
       const text = nextPhase === 2 ? '시간은... 멈춘다.' : '공간도... 시간도... 의미가 없다.';
       announce(char, state, ctx, text);
-      const dropAngle = Math.random() * Math.PI * 2;
-      const dropDistance = 110 + Math.random() * 90;
-      ctx.spawnBossDrop({
-        x: char.x + Math.cos(dropAngle) * dropDistance,
-        y: char.y + Math.sin(dropAngle) * dropDistance,
-        name: '시공 파편', icon: '✦', color: '#67e8f9',
-        duration: SKILL_CONSTANTS.DROP_DURATION, heal: SKILL_CONSTANTS.DROP_HEAL,
-        damageMultiplier: SKILL_CONSTANTS.DROP_DAMAGE_MULTIPLIER,
-        speedMultiplier: SKILL_CONSTANTS.DROP_SPEED_MULTIPLIER,
-      });
       challengers(ctx).forEach((target) => ctx.applyStun(char, target, nextPhase === 2 ? 0.8 : 1.1));
     }
 
