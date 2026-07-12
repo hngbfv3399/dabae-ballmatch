@@ -316,6 +316,7 @@ export class GameLounge {
     this.mapCuts.forEach((cut) => {
       cut.timeLeft -= dt;
       if (cut.timeLeft > cut.activeDuration) return;
+      if (cut.damage <= 0) return;
       this.characters.forEach((target) => {
         if (target.isDead || target.id === cut.source.id || cut.hitIds.includes(target.id)) return;
         if (cut.source.teamId !== undefined && target.teamId !== undefined && cut.source.teamId === target.teamId) return;
@@ -1533,6 +1534,8 @@ export class GameLounge {
 
     this.mapCuts.forEach((cut) => {
       const active = cut.timeLeft <= cut.activeDuration;
+      const rejoining = cut.damage <= 0 && active && cut.timeLeft < 0.45;
+      const rejoinAlpha = rejoining ? cut.timeLeft / 0.45 : 1;
       this.ctx.save();
       const centerX = cut.x + cut.width / 2;
       const centerY = cut.y + cut.height / 2;
@@ -1543,13 +1546,13 @@ export class GameLounge {
       traceTornEdge(this.ctx, cut, -halfHeight);
       traceTornEdge(this.ctx, cut, halfHeight, true);
       this.ctx.closePath();
-      this.ctx.fillStyle = active ? 'rgba(0,0,0,0.96)' : 'rgba(244,114,182,0.13)';
+      this.ctx.fillStyle = active ? `rgba(0,0,0,${0.96 * rejoinAlpha})` : 'rgba(244,114,182,0.13)';
       this.ctx.fill();
 
       this.ctx.shadowColor = active ? '#c084fc' : '#f0abfc';
       this.ctx.shadowBlur = active ? 24 : 12;
       this.ctx.strokeStyle = active ? '#f5d0fe' : '#f0abfc';
-      this.ctx.lineWidth = active ? 7 : 3;
+      this.ctx.lineWidth = active ? 7 * rejoinAlpha : 3;
       this.ctx.setLineDash(active ? [] : [16, 9]);
       this.ctx.beginPath();
       traceTornEdge(this.ctx, cut, -halfHeight);
@@ -1560,10 +1563,17 @@ export class GameLounge {
       this.ctx.setLineDash([]);
 
       if (active) {
-        this.ctx.fillStyle = 'rgba(196,181,253,0.26)';
+        this.ctx.fillStyle = `rgba(196,181,253,${0.26 * rejoinAlpha})`;
         this.ctx.fillRect(-cut.width / 2, -halfHeight - 14, cut.width, 10);
-        this.ctx.fillStyle = 'rgba(91,33,182,0.5)';
+        this.ctx.fillStyle = `rgba(91,33,182,${0.5 * rejoinAlpha})`;
         this.ctx.fillRect(-cut.width / 2, halfHeight + 4, cut.width, 10);
+        if (rejoining) {
+          this.ctx.shadowBlur = 0;
+          this.ctx.fillStyle = '#f5d0fe';
+          this.ctx.font = 'bold 15px Orbit';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('✦ 전장이 봉합된다', 0, 5);
+        }
       } else {
         this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = '#f5d0fe';

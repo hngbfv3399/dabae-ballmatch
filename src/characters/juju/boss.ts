@@ -72,6 +72,8 @@ const SKILL_CONSTANTS = {
   MAP_CUT_INTERVAL: 2.15,
   MAP_CUT_ENRAGE_INTERVAL: 1.35,
   MAP_CUT_DAMAGE: 9999,
+  PHASE_THREE_PREVIEW_WARNING: 0.8,
+  PHASE_THREE_PREVIEW_ACTIVE: 2.0,
   ULTIMATE_CAST: 8,
   ULTIMATE_DAMAGE: 34,
   EXHAUSTED_DURATION: 8,
@@ -259,6 +261,20 @@ export const jujuSingularityBossConfig: CharacterConfig = {
         tone: nextPhase === 2 ? 'time' : 'end',
         freezePlayers: true,
       });
+      if (nextPhase === 3) {
+        const previewPoint = randomPoint(ctx);
+        ctx.spawnMapCut(char, {
+          x: previewPoint.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2,
+          y: previewPoint.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2,
+          width: SKILL_CONSTANTS.MAP_CUT_WIDTH,
+          height: SKILL_CONSTANTS.MAP_CUT_HEIGHT,
+          angle: -Math.PI / 4,
+          warningDuration: SKILL_CONSTANTS.PHASE_THREE_PREVIEW_WARNING,
+          activeDuration: SKILL_CONSTANTS.PHASE_THREE_PREVIEW_ACTIVE,
+          damage: 0,
+        });
+        ctx.addFloatingText(ctx.arenaWidth / 2, ctx.arenaHeight / 2 - 80, '✂ 전장이 갈라진다', '#f5d0fe', 2.8);
+      }
       challengers(ctx).forEach((target) => ctx.applyStun(char, target, nextPhase === 2 ? 1.2 : 1.6));
     }
 
