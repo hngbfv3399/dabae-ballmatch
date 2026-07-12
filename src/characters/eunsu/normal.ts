@@ -74,6 +74,11 @@ export const eunsuConfig: CharacterConfig = {
       scaleMultiplier: 1,
       totalDamageDealt: 0,
       totalDamageTaken: 0,
+      kills: 0,
+      rank: 0,
+      isMvp: false,
+      mvpScore: 0,
+      deathAnimationTime: 0,
 
       // Simple clone basic attack hook
       onBasicAttack(c, opp, cx) {

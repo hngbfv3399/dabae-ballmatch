@@ -146,4 +146,13 @@ export interface CharacterState extends CharacterConfig {
   isBoss?: boolean;           // 보스전의 보스 여부
   cooldownMultiplier?: number;// 스킬 충전 쿨타임 배율 (기본 1.0, 보스는 2.0)
   damageMultiplier?: number;  // 대미지 가산 배율 (기본 1.0, 보스는 2.0)
+
+  // === 경기 공통 결과 상태 ===
+  // 엔진과 결과 UI가 공유하는 값이다. 캐릭터 구현에서 any로 주입하지 않는다.
+  kills: number;
+  rank: number;
+  isMvp: boolean;
+  mvpScore: number;
+  deathAnimationTime: number;
+  lastGaugeLogTime?: number;
 }

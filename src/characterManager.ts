@@ -98,5 +98,10 @@ export function createCharacterState(
     reflectedDamage: 0,
     objectiveContribution: 0,
     bossSurvivalTime: 0,
+    kills: 0,
+    rank: 0,
+    isMvp: false,
+    mvpScore: 0,
+    deathAnimationTime: 0,
   };
 }

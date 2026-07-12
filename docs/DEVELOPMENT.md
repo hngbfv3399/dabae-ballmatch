@@ -171,8 +171,12 @@ All code modifications and contributions must strictly follow these coding guide
 Once the new feature/character is verified and TypeScript compilation succeeds, the agent must perform the following post-development steps:
 
 ### 5.1. Update Patch Notes
-- **Document Changes**: Add a brief entry in `docs/PATCHNOTES.md` outlining the changes (e.g., version, date, and description of the new character or balance numbers).
+- **Document Changes**: Add a brief entry in the repository-root [`PATCH_NOTES.md`](../PATCH_NOTES.md) outlining the changes (e.g., version, date, and description of the new character or balance numbers).
 - **Format**: Use standard bullet points describing the balance ratios, skill adjustments, or bugs squashed.
+
+### 5.1.1. Balance Regression Check
+- **Baseline Test**: Before and after a numeric balance change, run `npm run test:balance`.
+- **Interpretation**: The test is deterministic and covers base stats only; it is a regression signal, not a replacement for skill-inclusive manual playtesting. See [`docs/BALANCE_TESTING.md`](BALANCE_TESTING.md).
 
 ### 5.2. Git Version Control & Commits
 - **Precise Commit Scope**: Stage only relevant modified modules using `git add`.
@@ -186,4 +190,3 @@ Once the new feature/character is verified and TypeScript compilation succeeds, 
 - **Backend Schema Sync**: If character parameters, databases, or game states are backed by Convex, ensure that any changes are immediately synced.
 - **Commands**: Proactively run `npx convex dev` to push changes to the local development sandbox, or `npx convex deploy` to sync remote server functions.
 - **Verification**: Ensure no backend deployment warnings or database constraints fail after the frontend logic updates.
-

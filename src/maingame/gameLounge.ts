@@ -5,6 +5,7 @@ import type {
   CharacterStatusEffect,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
+import { finalizeMatchResults } from "./matchResults";
 import type { TeamGameType } from "../maps";
 
 interface Particle {
@@ -476,9 +477,11 @@ export class GameLounge {
     // 캐릭터 내부의 함수 객체(훅)들은 JSON.parse(JSON.stringify()) 과정에서 손실되므로,
     // 원본 selectedCharacters 리스트에서 함수들을 다시 찾아와 연결 복원
     this.characters.forEach((char) => {
-      (char as any).kills = 0;
-      (char as any).rank = 0;
-      (char as any).isMvp = false;
+      char.kills = 0;
+      char.rank = 0;
+      char.isMvp = false;
+      char.mvpScore = 0;
+      char.deathAnimationTime = 0;
 
       const orig = selectedCharacters.find((c) => c.id === char.id);
       if (orig) {
@@ -581,10 +584,10 @@ export class GameLounge {
 
     // 사망 캐릭터 데스 애니메이션 타임 업데이트
     this.characters.forEach((char) => {
-      if (char.isDead && (char as any).deathAnimationTime > 0) {
-        (char as any).deathAnimationTime -= dt;
-        if ((char as any).deathAnimationTime < 0) {
-          (char as any).deathAnimationTime = 0;
+      if (char.isDead && char.deathAnimationTime > 0) {
+        char.deathAnimationTime -= dt;
+        if (char.deathAnimationTime < 0) {
+          char.deathAnimationTime = 0;
         }
         // 사망 궤적 이펙트 파티클
         if (Math.random() < 0.15) {
@@ -663,7 +666,7 @@ export class GameLounge {
                 char.hp = 0;
                 char.isDead = true;
                 char.opacity = 0.8;
-                (char as any).deathAnimationTime = 1.5;
+                char.deathAnimationTime = 1.5;
                 if (!this.eliminationOrder.includes(char.id)) {
                   this.eliminationOrder.push(char.id);
                 }
@@ -773,56 +776,14 @@ export class GameLounge {
           (c) => !c.id.includes("eunsu_clone") && c.id !== "dummy",
         );
 
-        // 1. 순위(Rank) 계산: 생존자 우선 (체력 내림차순, 피해량 내림차순) -> 탈락자 우선 (늦게 탈락된 순서대로 높은 등수)
-        const alive = realChars
-          .filter((c) => !c.isDead)
-          .sort((a, b) => {
-            if (b.hp !== a.hp) return b.hp - a.hp;
-            return (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0);
-          });
-
-        const deadIds = [...this.eliminationOrder].reverse();
-        const dead = realChars
-          .filter((c) => c.isDead)
-          .sort((a, b) => {
-            const idxA = deadIds.indexOf(a.id);
-            const idxB = deadIds.indexOf(b.id);
-            const valA = idxA === -1 ? 9999 : idxA;
-            const valB = idxB === -1 ? 9999 : idxB;
-            return valA - valB;
-          });
-
-        const rankedChars = [...alive, ...dead];
-        rankedChars.forEach((char, index) => {
-          (char as any).rank = index + 1;
-        });
-
-        // 2. MVP 점수 계산 및 MVP 선정: damage + kills * 150 + (생존여부 ? 100 : 0)
-        let mvpChar: CharacterState | null = null;
-        let maxScore = -Infinity;
-
-        realChars.forEach((char) => {
-          const damage = char.totalDamageDealt || 0;
-          const kills = (char as any).kills || 0;
-          const survived = !char.isDead ? 100 : 0;
-          const score = damage + kills * 150 + survived;
-          (char as any).mvpScore = score;
-
-          if (score > maxScore) {
-            maxScore = score;
-            mvpChar = char;
-          }
-        });
-
-        realChars.forEach((char) => {
-          (char as any).isMvp = mvpChar !== null && char.id === mvpChar.id;
-        });
+        // 결과 계산은 렌더링·루프와 분리된 순수 모듈에서 수행한다.
+        const { mvp: mvpChar } = finalizeMatchResults(realChars, this.eliminationOrder);
 
         // 전투력 분석 리포트 출력 (순위, MVP, 가한 대미지, 킬수 등)
         console.log(`\n🏆🏆🏆 [전투 종료 결산 리포트] 🏆🏆🏆`);
         if (mvpChar) {
           console.log(
-            `🎖️ MATCH MVP: ${(mvpChar as any).name} (MVP 점수: ${Math.round((mvpChar as any).mvpScore || 0)})`,
+            `🎖️ MATCH MVP: ${mvpChar.name} (MVP 점수: ${Math.round(mvpChar.mvpScore)})`,
           );
         }
         if (this.winnerCharacter) {
@@ -834,15 +795,15 @@ export class GameLounge {
         console.log(`📊 캐릭터별 최종 순위 및 통계 (전투력 분석):`);
         const stats = realChars
           .map((c) => ({
-            순위: `${(c as any).rank}위`,
+            순위: `${c.rank}위`,
             이름: c.name,
             상태: c.isDead ? "💀 탈락" : "👑 생존",
-            처치수: `${(c as any).kills || 0}킬`,
+            처치수: `${c.kills}킬`,
             "가한 대미지": c.totalDamageDealt || 0,
             "피격 대미지": c.totalDamageTaken || 0,
             "최대 체력": c.maxHp,
-            "MVP 점수": Math.round((c as any).mvpScore || 0),
-            "MVP 여부": (c as any).isMvp ? "🎖️ MVP" : "",
+            "MVP 점수": Math.round(c.mvpScore),
+            "MVP 여부": c.isMvp ? "🎖️ MVP" : "",
           }))
           .sort((a, b) => parseInt(a.순위) - parseInt(b.순위));
         console.table(stats);
@@ -984,13 +945,12 @@ export class GameLounge {
 
       // 운희(unhee), 세연(seyeon) 스킬 게이지 충전 상태 1초 주기 콘솔 로그 출력
       if (char.id === "unhee" || char.id === "seyeon") {
-        const anyChar = char as any;
         const now = Date.now();
-        if (anyChar.lastGaugeLogTime === undefined) {
-          anyChar.lastGaugeLogTime = 0;
+        if (char.lastGaugeLogTime === undefined) {
+          char.lastGaugeLogTime = 0;
         }
-        if (now - anyChar.lastGaugeLogTime >= 1000) {
-          anyChar.lastGaugeLogTime = now;
+        if (now - char.lastGaugeLogTime >= 1000) {
+          char.lastGaugeLogTime = now;
           const isCharging =
             !char.skillActive && !char.isStunned && !char.nayutaControlled;
           console.log(
@@ -1276,7 +1236,7 @@ export class GameLounge {
           target as CharacterState & { respawnTimeLeft?: number }
         ).respawnTimeLeft = this.objectiveRespawnTime;
       }
-      (target as any).deathAnimationTime = 1.5; // 1.5초 데스 애니메이션 타이머
+      target.deathAnimationTime = 1.5; // 1.5초 데스 애니메이션 타이머
 
       this.eliminationCount++;
       const totalRealCount = this.characters.filter(
@@ -1295,7 +1255,7 @@ export class GameLounge {
             const mainEunsu = this.characters.find((c) => c.id === "eunsu");
             if (mainEunsu) killAttacker = mainEunsu;
           }
-          (killAttacker as any).kills = ((killAttacker as any).kills || 0) + 1;
+          killAttacker.kills += 1;
         }
       }
 
@@ -1570,7 +1530,7 @@ export class GameLounge {
     this.characters.forEach((char) => {
       // 2-A. 사망 캐릭터 렌더링 (회전, 수축, 서서히 사라짐 연출)
       if (char.isDead) {
-        const animTime = (char as any).deathAnimationTime || 0;
+        const animTime = char.deathAnimationTime;
         if (animTime > 0) {
           this.ctx.save();
           const progress = animTime / 1.5; // 1.0 -> 0.0

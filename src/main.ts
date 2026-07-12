@@ -263,6 +263,23 @@ interface CharacterStats {
   mvpCount?: number;
 }
 
+interface GlobalCharacterStats extends CharacterStats {
+  characterId: string;
+}
+
+interface GlobalCounterStats {
+  victimId: string;
+  killerId: string;
+  mode: string;
+  count: number;
+}
+
+interface DamageRankingEntry {
+  characterId: string;
+  games: number;
+  avgDamageDealt: number;
+}
+
 const DEFAULT_TIERS: Record<string, "S" | "A" | "B" | "C" | "D" | "E" | "F"> = {
   chanhwi: "S",
   juju: "S",
@@ -284,9 +301,9 @@ let statsUnsubscribe: (() => void) | null = null;
 let countersUnsubscribe: (() => void) | null = null;
 let damageRankingUnsubscribe: (() => void) | null = null;
 
-let currentGlobalStats: any[] = [];
-let currentGlobalCounters: any[] = [];
-let currentGlobalDamageRanking: any[] = [];
+let currentGlobalStats: GlobalCharacterStats[] = [];
+let currentGlobalCounters: GlobalCounterStats[] = [];
+let currentGlobalDamageRanking: DamageRankingEntry[] = [];
 
 function getStoredStats(): Record<string, Record<string, CharacterStats>> {
   const record: Record<string, Record<string, CharacterStats>> = {};
@@ -311,13 +328,9 @@ function calculateDynamicTiers() {
   const mode = statsModeSelect ? statsModeSelect.value : "all";
   const stats = statsAll[mode] || {};
 
-  let totalGames = (stats as any).totalGames || 0;
-  if (totalGames === 0) {
-    const maxCharGames = Object.values(stats)
-      .map((s: any) => (typeof s === "object" && s !== null ? s.games || 0 : 0))
-      .reduce((max, g) => Math.max(max, g), 0);
-    totalGames = maxCharGames;
-  }
+  const totalGames = Object.values(stats)
+    .map((stat) => stat.games)
+    .reduce((max, games) => Math.max(max, games), 0);
   lobbyTotalGames = totalGames;
 
   if (totalSimGamesEl) {
@@ -431,8 +444,8 @@ async function recordGameEnd(
         characterId: char.id,
         damageDealt: char.totalDamageDealt || 0,
         damageTaken: char.totalDamageTaken || 0,
-        rank: (char as any).rank || 1,
-        isMvp: !!(char as any).isMvp,
+        rank: char.rank || 1,
+        isMvp: char.isMvp,
       })),
     });
   } catch (err) {}
@@ -1398,9 +1411,9 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   const realChars = allChars.filter(
     (char) => !char.id.includes("clone") && char.id !== "dummy",
   );
-  const mvp = realChars.find((c) => (c as any).isMvp) || winner || realChars[0];
+  const mvp = realChars.find((c) => c.isMvp) || winner || realChars[0];
   const sorted = [...realChars].sort(
-    (a, b) => ((a as any).rank || 99) - ((b as any).rank || 99),
+    (a, b) => (a.rank || 99) - (b.rank || 99),
   );
 
   // 모드별 팀 승리 배너 정의
@@ -1453,10 +1466,10 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   }
 
   // Build MVP card HTML
-  const mvpScore = (mvp as any).mvpScore
-    ? Math.round((mvp as any).mvpScore)
+  const mvpScore = mvp.mvpScore
+    ? Math.round(mvp.mvpScore)
     : 0;
-  const mvpKills = (mvp as any).kills || 0;
+  const mvpKills = mvp.kills;
   const mvpDmg = mvp.totalDamageDealt || 0;
   const topDamage = [...realChars].sort((a, b) => (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0))[0];
   const topTaken = [...realChars].sort((a, b) => (b.totalDamageTaken || 0) - (a.totalDamageTaken || 0))[0];
@@ -1510,7 +1523,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       <div class="standings-list">
         ${sorted
           .map((char, index) => {
-            const rank = (char as any).rank || index + 1;
+            const rank = char.rank || index + 1;
             const isWinner = rank === 1;
             const rankBadgeClass =
               rank === 1
@@ -1520,7 +1533,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
                   : rank === 3
                     ? "rank-bronze"
                     : "rank-normal";
-            const kills = (char as any).kills || 0;
+            const kills = char.kills;
             const damage = char.totalDamageDealt || 0;
             const taken = char.totalDamageTaken || 0;
             const cc = char.totalCcDuration || 0;
