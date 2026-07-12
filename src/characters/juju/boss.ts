@@ -23,6 +23,10 @@ interface JujuBossState extends CharacterState {
   baseAttackPower?: number;
   baseSpeed?: number;
   dropSpawnTimer?: number;
+  introLeft?: number;
+  introStarted?: boolean;
+  phaseTransitionLeft?: number;
+  deathCinematicStarted?: boolean;
 }
 // #endregion TYPES
 
@@ -35,7 +39,11 @@ const SKILL_CONSTANTS = {
   BASE_ATTACK: 24,
   COOLDOWN: 5,
   PHASE_TWO_RATIO: 0.7,
-  PHASE_THREE_RATIO: 0.3,
+  PHASE_THREE_RATIO: 0.35,
+  INTRO_DURATION: 7.2,
+  PHASE_TWO_CINEMATIC_DURATION: 3.4,
+  PHASE_THREE_CINEMATIC_DURATION: 4.2,
+  DEATH_CINEMATIC_DURATION: 2.0,
   ENRAGE_RATIO: 0.1,
   HORIZON_RADIUS: 130,
   HORIZON_DURATION: 2,
@@ -149,12 +157,12 @@ export const jujuSingularityBossConfig: CharacterConfig = {
   attackPower: SKILL_CONSTANTS.BASE_ATTACK,
   baseAttackRange: 95,
   skillName: '『시공 특이점』',
-  skillDescription: '전용 레이드 보스. 체력에 따라 공간 왜곡, 시간 붕괴, 특이점 3페이즈 패턴을 사용합니다.',
+  skillDescription: '전용 레이드 보스. 별의 탄생부터 우주의 종말까지, 공간·시간·전장 자체를 조작하는 3페이즈 패턴을 사용합니다.',
   color: '#8b5cf6',
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'S',
   role: 'Disabler',
-  detailedDescription: '별이 사라진 우주에서 붕괴하는 특이점과 시간 단층, 시간 정지와 시간 역행을 다루는 1대3 전용 보스입니다.',
+  detailedDescription: '첫 등장에서는 초신성과 블랙홀을 거쳐 전장에 강림합니다. 70%에서 시간을 멈추고, 35%에서 우주를 소거해 전장 자체를 위협하는 1대3 전용 보스입니다.',
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════
@@ -188,6 +196,31 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     state.baseSpeed ??= char.speed;
     state.dropSpawnTimer ??= SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN + Math.random() * (SKILL_CONSTANTS.DROP_FIRST_SPAWN_MAX - SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN);
 
+    // 전투 시작: 초신성 → 블랙홀 → 강림. 도전자 행동은 엔진 시네마틱으로 잠근다.
+    if (!state.introStarted) {
+      state.introStarted = true;
+      state.introLeft = SKILL_CONSTANTS.INTRO_DURATION;
+      char.x = ctx.arenaWidth / 2;
+      char.y = ctx.arenaHeight + char.radius;
+      char.vx = 0;
+      char.vy = 0;
+      ctx.startCinematic({
+        duration: SKILL_CONSTANTS.INTRO_DURATION,
+        title: 'SINGULARITY AWAKENS',
+        quote: '별은 태어나고, 죽는다. 하지만 나는 그 모든 순간을 동시에 본다.',
+        tone: 'void',
+        freezePlayers: true,
+      });
+      announce(char, state, ctx, '초신성 붕괴 · 특이점 강림');
+    }
+    if ((state.introLeft ?? 0) > 0) {
+      state.introLeft! -= dt;
+      const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
+      char.y = ctx.arenaHeight + char.radius - (ctx.arenaHeight / 2 + char.radius) * Math.min(1, Math.max(0, (progress - 0.42) / 0.58));
+      challengers(ctx).forEach((target) => pull(target, ctx.arenaWidth / 2, ctx.arenaHeight / 2, 0.05 + progress * 0.1));
+      return;
+    }
+
     state.dropSpawnTimer -= dt;
     if (state.dropSpawnTimer <= 0) {
       spawnTemporalFragment(ctx);
@@ -198,9 +231,24 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     const nextPhase: 1 | 2 | 3 = hpRatio <= SKILL_CONSTANTS.PHASE_THREE_RATIO ? 3 : hpRatio <= SKILL_CONSTANTS.PHASE_TWO_RATIO ? 2 : 1;
     if (nextPhase > state.bossPhase) {
       state.bossPhase = nextPhase;
-      const text = nextPhase === 2 ? '시간은... 멈춘다.' : '공간도... 시간도... 의미가 없다.';
+      state.phaseTransitionLeft = nextPhase === 2 ? SKILL_CONSTANTS.PHASE_TWO_CINEMATIC_DURATION : SKILL_CONSTANTS.PHASE_THREE_CINEMATIC_DURATION;
+      const text = nextPhase === 2 ? '시간은... 멈춘다.' : '결국 모든 별은 죽는다.';
       announce(char, state, ctx, text);
-      challengers(ctx).forEach((target) => ctx.applyStun(char, target, nextPhase === 2 ? 0.8 : 1.1));
+      ctx.startCinematic({
+        duration: state.phaseTransitionLeft,
+        title: nextPhase === 2 ? 'TIME FRACTURE' : 'THE LAST STAR COLLAPSES',
+        quote: text,
+        tone: nextPhase === 2 ? 'time' : 'end',
+        freezePlayers: true,
+      });
+      challengers(ctx).forEach((target) => ctx.applyStun(char, target, nextPhase === 2 ? 1.2 : 1.6));
+    }
+
+    if ((state.phaseTransitionLeft ?? 0) > 0) {
+      state.phaseTransitionLeft! -= dt;
+      char.vx = 0;
+      char.vy = 0;
+      return;
     }
 
     const players = challengers(ctx);
@@ -327,10 +375,45 @@ export const jujuSingularityBossConfig: CharacterConfig = {
   // #endregion DAMAGE
 
   // ═══════════════════════════════════════════
+  // #region DEATH
+  // ═══════════════════════════════════════════
+  onDeath(char, _killer, ctx) {
+    const state = char as JujuBossState;
+    if (state.deathCinematicStarted) return;
+    state.deathCinematicStarted = true;
+    ctx.startCinematic({
+      duration: SKILL_CONSTANTS.DEATH_CINEMATIC_DURATION,
+      title: 'SINGULARITY COLLAPSE',
+      quote: '우주조차... 끝이 오는군.',
+      tone: 'void',
+      freezePlayers: true,
+    });
+    ctx.createExplosion(char.x, char.y, '#ffffff', 56);
+  },
+  // #endregion DEATH
+
+  // ═══════════════════════════════════════════
   // #region RENDER
   // ═══════════════════════════════════════════
-  onRenderBackground(_char, canvasCtx, canvasWidth, canvasHeight) {
+  onRenderBackground(char, canvasCtx, canvasWidth, canvasHeight) {
+    const state = char as JujuBossState;
     canvasCtx.save();
+    if (state.bossPhase === 2) {
+      canvasCtx.fillStyle = 'rgba(26, 12, 50, 0.8)';
+      canvasCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+      canvasCtx.strokeStyle = 'rgba(214, 184, 255, 0.32)';
+      canvasCtx.lineWidth = 3;
+      for (let index = 0; index < 4; index++) {
+        const x = canvasWidth * (0.18 + index * 0.22);
+        canvasCtx.beginPath(); canvasCtx.moveTo(x, 0); canvasCtx.lineTo(x + 65, canvasHeight); canvasCtx.stroke();
+      }
+    } else if (state.bossPhase === 3) {
+      canvasCtx.fillStyle = '#f8f7ff';
+      canvasCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+      const voidGradient = canvasCtx.createRadialGradient(canvasWidth * 0.78, canvasHeight * 0.25, 10, canvasWidth * 0.78, canvasHeight * 0.25, 220);
+      voidGradient.addColorStop(0, '#030008'); voidGradient.addColorStop(0.45, '#1b073d'); voidGradient.addColorStop(1, 'rgba(255,255,255,0)');
+      canvasCtx.fillStyle = voidGradient; canvasCtx.beginPath(); canvasCtx.arc(canvasWidth * 0.78, canvasHeight * 0.25, 220, 0, Math.PI * 2); canvasCtx.fill();
+    }
     for (let index = 0; index < 80; index++) {
       const x = (index * 97) % canvasWidth;
       const y = (index * 173) % canvasHeight;
@@ -362,6 +445,13 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       if (!active) { canvasCtx.fillStyle = '#f5d0fe'; canvasCtx.font = 'bold 14px Orbit'; canvasCtx.textAlign = 'center'; canvasCtx.fillText(`⚡ 단층 ${(fault.timeLeft - (SKILL_CONSTANTS.FAULT_DURATION - SKILL_CONSTANTS.FAULT_WARNING_DURATION)).toFixed(1)}s`, fault.x, fault.y - 16); }
     });
     state.futureRifts?.forEach((rift) => { canvasCtx.strokeStyle = '#ff5ac8'; canvasCtx.lineWidth = 3; canvasCtx.setLineDash([8, 7]); canvasCtx.beginPath(); canvasCtx.arc(rift.x, rift.y, 78, 0, Math.PI * 2); canvasCtx.stroke(); canvasCtx.setLineDash([]); });
+    if ((state.introLeft ?? 0) > 0) {
+      const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
+      const centerX = canvasCtx.canvas.width / 2; const centerY = canvasCtx.canvas.height / 2;
+      const radius = 28 + progress * 84;
+      canvasCtx.fillStyle = '#030008'; canvasCtx.shadowBlur = 32; canvasCtx.shadowColor = '#8b5cf6'; canvasCtx.beginPath(); canvasCtx.arc(centerX, centerY, radius, 0, Math.PI * 2); canvasCtx.fill();
+      for (let index = 0; index < 16; index++) { const angle = index * Math.PI / 8 + progress * 5; const distance = radius + 35 + (index % 4) * 18; canvasCtx.fillStyle = index % 2 ? '#d8b4fe' : '#94a3b8'; canvasCtx.fillRect(centerX + Math.cos(angle) * distance, centerY + Math.sin(angle) * distance - progress * 40, 4, 4); }
+    }
     if (state.bossPhase === 3) { const x = canvasCtx.canvas.width / 2; const y = canvasCtx.canvas.height / 2; const radius = SKILL_CONSTANTS.SINGULARITY_RADIUS; const gradient = canvasCtx.createRadialGradient(x, y, 5, x, y, radius); gradient.addColorStop(0, 'rgba(0,0,0,0.88)'); gradient.addColorStop(0.45, 'rgba(35,8,76,0.28)'); gradient.addColorStop(1, 'rgba(174,90,255,0.03)'); canvasCtx.fillStyle = gradient; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius, 0, Math.PI * 2); canvasCtx.fill(); canvasCtx.strokeStyle = 'rgba(216,180,254,0.85)'; canvasCtx.lineWidth = 6; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.84, -state.patternTimer!, -state.patternTimer! + Math.PI * 1.7); canvasCtx.stroke(); canvasCtx.strokeStyle = 'rgba(103,232,249,0.7)'; canvasCtx.lineWidth = 2; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.55, state.patternTimer! * 1.6, state.patternTimer! * 1.6 + Math.PI * 1.3); canvasCtx.stroke(); }
     canvasCtx.strokeStyle = '#d8b4fe'; canvasCtx.lineWidth = 4; canvasCtx.beginPath(); canvasCtx.arc(char.x, char.y, currentRadius + 10, 0, Math.PI * 2); canvasCtx.stroke();
     canvasCtx.restore();

@@ -21,6 +21,14 @@ export interface BossDropDefinition {
   immunityDuration: number;
 }
 
+export interface CinematicRequest {
+  duration: number;
+  title: string;
+  quote?: string;
+  tone: 'void' | 'time' | 'end';
+  freezePlayers?: boolean;
+}
+
 export interface CharacterBehaviorContext {
   characters: CharacterState[];
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
@@ -32,6 +40,7 @@ export interface CharacterBehaviorContext {
   applyDomination: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
   addFloatingText: (x: number, y: number, text: string, color: string, life?: number) => void;
   spawnBossDrop: (drop: BossDropDefinition) => void;
+  startCinematic: (request: CinematicRequest) => void;
   arenaWidth: number;
   arenaHeight: number;
   logMessage?: (msg: string, type: string) => void;

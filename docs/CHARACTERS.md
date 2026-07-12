@@ -227,12 +227,13 @@ This document maps character-specific file paths and `#region` maps to allow AI 
 - **Role**: Boss Disabler | **Tier**: S
 - **Region Map**:
   - `TYPES`: Phase state, singularities, time faults, future rifts, and player history.
-  - `CONSTANTS`: Raid HP, phase thresholds, damage, duration, and enrage tuning.
+  - `CONSTANTS`: Raid HP, 70%/35% phase thresholds, cinematic durations, damage, duration, and enrage tuning.
   - `CONFIG`: Independent boss-only registration data.
   - `SKILL_TRIGGER`: Phase 3 singularity cast.
-  - `UPDATE`: Three-phase space/time raid pattern scheduler; time faults replace wormhole movement.
+  - `UPDATE`: Intro descent plus three-phase space/time raid pattern scheduler; time faults replace wormhole movement.
   - `DAMAGE`: Boss damage hook.
-  - `RENDER`: Starfield, collapsing singularities, time-fault telegraphs, and phase subtitles.
+  - `DEATH`: Singularity-collapse finale cinematic.
+  - `RENDER`: Starfield, black-hole arrival, phase-specific arenas, collapsing singularities, time-fault telegraphs, and phase subtitles.
 
 ## 20. Junseok (junseok)
 - **File**: `src/characters/junseok/normal.ts`

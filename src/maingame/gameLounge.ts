@@ -3,6 +3,7 @@ import type {
   CharacterBehaviorContext,
   BossDropDefinition,
   CharacterStatusEffect,
+  CinematicRequest,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
 import { finalizeMatchResults } from "./matchResults";
@@ -33,6 +34,7 @@ interface RelicGem {
 }
 
 type BossDrop = BossDropDefinition;
+type ActiveCinematic = CinematicRequest & { timeLeft: number; totalDuration: number };
 
 export class GameLounge {
   private canvas: HTMLCanvasElement;
@@ -40,6 +42,7 @@ export class GameLounge {
   private characters: CharacterState[] = [];
   private particles: Particle[] = [];
   private floatingTexts: FloatingText[] = [];
+  private activeCinematic: ActiveCinematic | null = null;
 
   private isRunning: boolean = false;
   private isPrepared: boolean = false;
@@ -223,12 +226,25 @@ export class GameLounge {
         this.bossDrops.push(drop);
         this.floatingTexts.push({ x: drop.x, y: drop.y - 28, text: `${drop.icon} ${drop.name} 출현!`, color: drop.color, life: 1.5 });
       },
+      startCinematic: (request) => {
+        this.activeCinematic = { ...request, timeLeft: request.duration, totalDuration: request.duration };
+      },
       arenaWidth: this.canvas.width,
       arenaHeight: this.canvas.height,
       logMessage: (msg: string, type: string) => {
         this.onLogMessage?.(msg, type);
       },
     };
+  }
+
+  private isCinematicLocked() {
+    return this.activeCinematic?.freezePlayers === true && this.activeCinematic.timeLeft > 0;
+  }
+
+  private updateCinematic(dt: number) {
+    if (!this.activeCinematic) return;
+    this.activeCinematic.timeLeft -= dt;
+    if (this.activeCinematic.timeLeft <= 0) this.activeCinematic = null;
   }
 
   private updateKnockbackInertia(char: CharacterState, dt: number) {
@@ -454,6 +470,7 @@ export class GameLounge {
     this.simulationSpeed = simulationSpeed;
     this.particles = [];
     this.floatingTexts = [];
+    this.activeCinematic = null;
     this.prepTimer = 3.0;
     this.isPrepared = false;
     this.isRunning = true;
@@ -581,6 +598,7 @@ export class GameLounge {
     }
 
     this.respawnObjectivePlayers(dt);
+    this.updateCinematic(dt);
 
     // 사망 캐릭터 데스 애니메이션 타임 업데이트
     this.characters.forEach((char) => {
@@ -820,6 +838,12 @@ export class GameLounge {
     const context = this.getBehaviorContext();
 
     aliveCharacters.forEach((char) => {
+      // 보스 시네마틱 중 도전자는 스킬·이동·공격을 모두 멈춘다.
+      if (this.isCinematicLocked() && !char.isBoss) {
+        char.vx = 0;
+        char.vy = 0;
+        return;
+      }
       if ((char.raidBuffTimeLeft ?? 0) > 0) {
         char.raidBuffTimeLeft! -= dt;
         char.statusIndicators = (char.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('레이드:'));
@@ -1866,6 +1890,8 @@ export class GameLounge {
       );
     });
 
+    this.renderCinematic();
+
     // 8. 데미지 플로팅 텍스트 렌더링
     this.ctx.save();
     this.ctx.font = 'bold 15px "Orbit", sans-serif';
@@ -1881,6 +1907,44 @@ export class GameLounge {
     this.ctx.restore();
 
     this.ctx.restore(); // 전체 흔들림 복구
+  }
+
+  private renderCinematic() {
+    const cinematic = this.activeCinematic;
+    if (!cinematic) return;
+    const progress = 1 - cinematic.timeLeft / cinematic.totalDuration;
+    const fade = Math.min(1, Math.min(progress * 4, cinematic.timeLeft * 3));
+    const isEnd = cinematic.tone === "end";
+    const isTime = cinematic.tone === "time";
+    this.ctx.save();
+    this.ctx.fillStyle = isEnd
+      ? `rgba(255, 255, 255, ${0.72 * fade})`
+      : isTime
+        ? `rgba(0, 0, 0, ${0.76 * fade})`
+        : `rgba(0, 0, 8, ${0.9 * fade})`;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    if (isTime) this.ctx.filter = "grayscale(1)";
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+    if (cinematic.tone === "void") {
+      const radius = 16 + progress * 160;
+      const glow = this.ctx.createRadialGradient(centerX, centerY, 1, centerX, centerY, radius);
+      glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.12, "#b9e8ff"); glow.addColorStop(0.3, "#8b5cf6"); glow.addColorStop(1, "rgba(0,0,0,0)");
+      this.ctx.fillStyle = glow; this.ctx.beginPath(); this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2); this.ctx.fill();
+    }
+    this.ctx.filter = "none";
+    this.ctx.textAlign = "center";
+    this.ctx.shadowBlur = 18;
+    this.ctx.shadowColor = isEnd ? "#ffffff" : "#c4b5fd";
+    this.ctx.fillStyle = isEnd ? "#1f1438" : "#f5f3ff";
+    this.ctx.font = 'bold 30px "Orbit", sans-serif';
+    this.ctx.fillText(cinematic.title, centerX, centerY - 28);
+    if (cinematic.quote) {
+      this.ctx.font = '18px "Orbit", sans-serif';
+      this.ctx.fillStyle = isEnd ? "#38255c" : "#ddd6fe";
+      this.ctx.fillText(`“${cinematic.quote}”`, centerX, centerY + 18);
+    }
+    this.ctx.restore();
   }
 }
 
