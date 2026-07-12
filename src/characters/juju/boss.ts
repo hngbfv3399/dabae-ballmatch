@@ -7,6 +7,7 @@ interface SingularityZone { x: number; y: number; radius: number; timeLeft: numb
 interface TemporalFault { x: number; y: number; angle: number; length: number; timeLeft: number; hitIds: string[]; }
 interface FutureRift { x: number; y: number; timeLeft: number; }
 interface PositionSnapshot { x: number; y: number; timeLeft: number; }
+interface RaidItemTemplate { name: string; icon: string; color: string; duration: number; heal: number; damageMultiplier: number; speedMultiplier: number; immunityDuration: number; }
 interface JujuBossState extends CharacterState {
   bossPhase?: 1 | 2 | 3;
   patternTimer?: number;
@@ -65,6 +66,12 @@ const SKILL_CONSTANTS = {
   DROP_FIRST_SPAWN_MAX: 11,
   DROP_SPAWN_MIN: 9,
   DROP_SPAWN_MAX: 14,
+  RAID_ITEMS: [
+    { name: '회복의 성운', icon: '💚', color: '#4ade80', duration: 0, heal: 45, damageMultiplier: 1, speedMultiplier: 1, immunityDuration: 0 },
+    { name: '시간 보호막', icon: '🛡', color: '#67e8f9', duration: 0, heal: 0, damageMultiplier: 1, speedMultiplier: 1, immunityDuration: 3 },
+    { name: '붕괴의 결정', icon: '⚔', color: '#fb923c', duration: 8, heal: 0, damageMultiplier: 1.35, speedMultiplier: 1, immunityDuration: 0 },
+    { name: '도약의 파편', icon: '⚡', color: '#facc15', duration: 8, heal: 0, damageMultiplier: 1, speedMultiplier: 1.25, immunityDuration: 0 },
+  ] satisfies RaidItemTemplate[],
 };
 // #endregion CONSTANTS
 
@@ -98,12 +105,10 @@ function randomPoint(ctx: CharacterBehaviorContext, margin = 100) {
 
 function spawnTemporalFragment(ctx: CharacterBehaviorContext) {
   const point = randomPoint(ctx);
+  const item = SKILL_CONSTANTS.RAID_ITEMS[Math.floor(Math.random() * SKILL_CONSTANTS.RAID_ITEMS.length)];
   ctx.spawnBossDrop({
     ...point,
-    name: '아이템 1', icon: '✦', color: '#67e8f9',
-    duration: SKILL_CONSTANTS.DROP_DURATION, heal: SKILL_CONSTANTS.DROP_HEAL,
-    damageMultiplier: SKILL_CONSTANTS.DROP_DAMAGE_MULTIPLIER,
-    speedMultiplier: SKILL_CONSTANTS.DROP_SPEED_MULTIPLIER,
+    ...item,
   });
 }
 

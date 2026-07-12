@@ -18,6 +18,7 @@ export interface BossDropDefinition {
   heal: number;
   damageMultiplier: number;
   speedMultiplier: number;
+  immunityDuration: number;
 }
 
 export interface CharacterBehaviorContext {
@@ -138,6 +139,7 @@ export interface CharacterState extends CharacterConfig {
   raidDamageMultiplier?: number;
   raidSpeedMultiplier?: number;
   raidBuffTimeLeft?: number;
+  raidImmunityTimeLeft?: number;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

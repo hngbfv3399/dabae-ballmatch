@@ -218,7 +218,7 @@ export class GameLounge {
         });
       },
       spawnBossDrop: (drop) => {
-        if (this.bossDrops.some((existing) => existing.name === drop.name)) return;
+        if (this.bossDrops.length > 0) return;
         this.bossDrops.push(drop);
         this.floatingTexts.push({ x: drop.x, y: drop.y - 28, text: `${drop.icon} ${drop.name} 출현!`, color: drop.color, life: 1.5 });
       },
@@ -252,11 +252,12 @@ export class GameLounge {
       const recipients = this.characters.filter((char) => !char.isDead && !char.isBoss);
       recipients.forEach((recipient) => {
         recipient.hp = Math.min(recipient.maxHp, recipient.hp + drop.heal);
-        recipient.raidDamageMultiplier = Math.max(recipient.raidDamageMultiplier ?? 1, drop.damageMultiplier);
-        recipient.raidSpeedMultiplier = Math.max(recipient.raidSpeedMultiplier ?? 1, drop.speedMultiplier);
-        recipient.raidBuffTimeLeft = Math.max(recipient.raidBuffTimeLeft ?? 0, drop.duration);
-        recipient.statusIndicators = (recipient.statusIndicators ?? []).filter((effect) => effect.label !== '아이템 1');
-        recipient.statusIndicators.push({ icon: drop.icon, label: '아이템 1', timeLeft: drop.duration, duration: drop.duration, color: drop.color });
+        if (drop.damageMultiplier > 1) recipient.raidDamageMultiplier = Math.max(recipient.raidDamageMultiplier ?? 1, drop.damageMultiplier);
+        if (drop.speedMultiplier > 1) recipient.raidSpeedMultiplier = Math.max(recipient.raidSpeedMultiplier ?? 1, drop.speedMultiplier);
+        if (drop.duration > 0) recipient.raidBuffTimeLeft = Math.max(recipient.raidBuffTimeLeft ?? 0, drop.duration);
+        if (drop.immunityDuration > 0) recipient.raidImmunityTimeLeft = Math.max(recipient.raidImmunityTimeLeft ?? 0, drop.immunityDuration);
+        recipient.statusIndicators = (recipient.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('레이드:'));
+        if (drop.duration > 0 || drop.immunityDuration > 0) recipient.statusIndicators.push({ icon: drop.icon, label: `레이드: ${drop.name}`, timeLeft: Math.max(drop.duration, drop.immunityDuration), duration: Math.max(drop.duration, drop.immunityDuration), color: drop.color });
         this.floatingTexts.push({ x: recipient.x, y: recipient.y - 58, text: `${drop.icon} ${drop.name}!`, color: drop.color, life: 1.3 });
       });
       this.createExplosion(collector.x, collector.y, drop.color, 20);
@@ -860,13 +861,18 @@ export class GameLounge {
     aliveCharacters.forEach((char) => {
       if ((char.raidBuffTimeLeft ?? 0) > 0) {
         char.raidBuffTimeLeft! -= dt;
-        char.statusIndicators = (char.statusIndicators ?? []).filter((effect) => effect.label !== '아이템 1');
+        char.statusIndicators = (char.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('레이드:'));
         if (char.raidBuffTimeLeft! > 0) {
-          char.statusIndicators.push({ icon: '✦', label: '아이템 1', timeLeft: char.raidBuffTimeLeft!, duration: 8, color: '#67e8f9' });
+          char.statusIndicators.push({ icon: '✦', label: '레이드 강화', timeLeft: char.raidBuffTimeLeft!, duration: 8, color: '#67e8f9' });
         } else {
           char.raidDamageMultiplier = 1;
           char.raidSpeedMultiplier = 1;
         }
+      }
+      if ((char.raidImmunityTimeLeft ?? 0) > 0) {
+        char.raidImmunityTimeLeft! -= dt;
+        char.statusIndicators = (char.statusIndicators ?? []).filter((effect) => effect.label !== '레이드: 시간 보호막');
+        if (char.raidImmunityTimeLeft! > 0) char.statusIndicators.push({ icon: '🛡', label: '레이드: 시간 보호막', timeLeft: char.raidImmunityTimeLeft!, duration: 3, color: '#67e8f9' });
       }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
@@ -1154,6 +1160,7 @@ export class GameLounge {
     customText?: string,
   ) {
     if (target.isDead) return;
+    if ((target.raidImmunityTimeLeft ?? 0) > 0) return;
 
     // 팀전 아군 피해 면역 및 보스전 도전자 간 피해 면역 (팀 킬 방지)
     if (
