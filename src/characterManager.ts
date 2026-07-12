@@ -93,6 +93,10 @@ export function createCharacterState(
     stunTimeLeft: 0,
     scaleMultiplier: 1,
     totalDamageDealt: 0,
-    totalDamageTaken: 0
+    totalDamageTaken: 0,
+    totalCcDuration: 0,
+    reflectedDamage: 0,
+    objectiveContribution: 0,
+    bossSurvivalTime: 0,
   };
 }

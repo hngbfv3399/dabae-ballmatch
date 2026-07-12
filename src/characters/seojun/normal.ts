@@ -192,14 +192,24 @@ export const seojunConfig: CharacterConfig = {
       }
     }
     if (ss.timePath && ss.timePath.length > 0) {
-      canvasCtx.strokeStyle = char.color; canvasCtx.globalAlpha = 0.65; canvasCtx.lineWidth = 2;
+      const progress = Math.max(0, (ss.timeAnchorLeft ?? 0) / SKILL_CONSTANTS.ANCHOR_DURATION);
+      canvasCtx.strokeStyle = char.color; canvasCtx.globalAlpha = 0.65 + progress * 0.25; canvasCtx.lineWidth = 3;
+      canvasCtx.setLineDash([9, 6]); canvasCtx.lineDashOffset = -Date.now() / 45;
       canvasCtx.beginPath(); canvasCtx.moveTo(ss.timePath[0].x, ss.timePath[0].y);
       ss.timePath.forEach((point) => canvasCtx.lineTo(point.x, point.y)); canvasCtx.stroke();
-      const anchor = ss.timePath[0]; canvasCtx.beginPath(); canvasCtx.arc(anchor.x, anchor.y, char.radius * 0.6, 0, Math.PI * 2); canvasCtx.stroke();
+      canvasCtx.setLineDash([]);
+      const anchor = ss.timePath[0]; canvasCtx.lineWidth = 4; canvasCtx.beginPath(); canvasCtx.arc(anchor.x, anchor.y, char.radius * 0.78, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress); canvasCtx.stroke();
+      canvasCtx.fillStyle = '#d9fbff'; canvasCtx.font = 'bold 11px Orbit'; canvasCtx.textAlign = 'center'; canvasCtx.fillText(`⏳ ${(ss.timeAnchorLeft ?? 0).toFixed(1)}s`, anchor.x, anchor.y - char.radius - 14);
     }
     canvasCtx.restore();
   },
   isTargetable: (char) => !(char as SeojunState).isRewinding,
+  getStatusEffects: (char) => {
+    const ss = char as SeojunState;
+    if (ss.isRewinding) return [{ icon: '🌀', label: '역행', timeLeft: Math.max(0, SKILL_CONSTANTS.REWIND_DURATION * (1 - (ss.rewindProgress ?? 0))), duration: SKILL_CONSTANTS.REWIND_DURATION, color: '#67e8f9' }];
+    if (ss.timeAnchorLeft && ss.timeAnchorLeft > 0) return [{ icon: '⏳', label: '시간 표식', timeLeft: ss.timeAnchorLeft, duration: SKILL_CONSTANTS.ANCHOR_DURATION, color: '#5de2e7' }];
+    return [];
+  },
   canUseSkillWhileCc: true,
   // #endregion RENDER
 };

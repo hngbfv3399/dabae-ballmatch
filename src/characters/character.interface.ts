@@ -1,5 +1,13 @@
 export type CrowdControlType = 'stun' | 'confusion' | 'charm' | 'domination';
 
+export interface CharacterStatusEffect {
+  icon: string;
+  label: string;
+  timeLeft: number;
+  duration: number;
+  color: string;
+}
+
 export interface CharacterBehaviorContext {
   characters: CharacterState[];
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
@@ -58,6 +66,7 @@ export interface CharacterConfig {
   onPreRender?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D) => void;
   // Called after all characters are drawn, for fullscreen overlays (e.g., screen darkening, subtitles).
   onRenderOverlay?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => void;
+  getStatusEffects?: (char: CharacterState) => CharacterStatusEffect[];
 
   // === Targeting Hook ===
   // Return false to exclude this character from being targeted by enemies.
@@ -92,6 +101,11 @@ export interface CharacterState extends CharacterConfig {
   isSuInvisible?: boolean; // 수 정밀 저격 은신 및 무적 여부
   totalDamageDealt?: number; // 한 게임 내 가한 총 피해량
   totalDamageTaken?: number; // 한 게임 내 받은 총 피해량
+  totalCcDuration?: number; // 한 게임 내 적에게 적용한 CC 시간
+  reflectedDamage?: number; // 한 게임 내 반사한 피해량
+  objectiveContribution?: number; // 점령 시간 또는 보석 수집 기여도
+  bossSurvivalTime?: number; // 보스전 도전자 생존 시간
+  statusIndicators?: CharacterStatusEffect[]; // 캐릭터 고유 상태 UI 데이터
   isCharmed?: boolean; // 세연 매혹 상태 여부
   charmTimeLeft?: number; // 매혹 남은 시간 (초)
   isPoisoned?: boolean; // 푸만 독성 상태 여부
@@ -107,6 +121,7 @@ export interface CharacterState extends CharacterConfig {
   knockbackInertiaLeft?: number;
   wasAboveKnockbackThreshold?: boolean;
   relicGems?: number; // 보석 쟁탈전에서 현재 보유 중인 보석 수
+  relicSpeedMultiplier?: number; // 보석 보유에 따른 이동 속도 배율
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

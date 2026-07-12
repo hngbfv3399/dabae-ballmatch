@@ -1,6 +1,7 @@
 import type {
   CharacterState,
   CharacterBehaviorContext,
+  CharacterStatusEffect,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
 import type { TeamGameType } from "../maps";
@@ -66,6 +67,8 @@ export class GameLounge {
   private readonly relicSpawnInterval = 1.8;
   private readonly relicTotalSpawnLimit = 12;
   private readonly relicPickupRadius = 30;
+  private readonly relicCarrierSlowPerGem = 0.025;
+  private readonly relicCarrierSlowCap = 0.18;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
 
@@ -152,6 +155,7 @@ export class GameLounge {
         if (target.isCcImmune) return false;
         target.isStunned = true;
         target.stunTimeLeft = Math.max(target.stunTimeLeft ?? 0, duration);
+        source.totalCcDuration = (source.totalCcDuration ?? 0) + duration;
         target.vx = 0;
         target.vy = 0;
         return true;
@@ -169,6 +173,7 @@ export class GameLounge {
         target.confusedTimeLeft = duration;
         target.confusionRerollTimer = 0;
         target.confusionRerollInterval = rerollInterval;
+        source.totalCcDuration = (source.totalCcDuration ?? 0) + duration;
         return true;
       },
       applyCharm: (source, target, duration, isReflected = false) => {
@@ -176,6 +181,7 @@ export class GameLounge {
         if (target.isCcImmune) return false;
         target.isCharmed = true;
         target.charmTimeLeft = Math.max(target.charmTimeLeft ?? 0, duration);
+        source.totalCcDuration = (source.totalCcDuration ?? 0) + duration;
         return true;
       },
       applyDomination: (source, target, duration, isReflected = false) => {
@@ -189,6 +195,7 @@ export class GameLounge {
         if (target.isCcImmune) return false;
         target.nayutaControlled = true;
         target.nayutaControlTimeLeft = Math.max(target.nayutaControlTimeLeft ?? 0, duration);
+        source.totalCcDuration = (source.totalCcDuration ?? 0) + duration;
         return true;
       },
       addFloatingText: (
@@ -262,6 +269,7 @@ export class GameLounge {
       this.relicGems.push({ x: char.x + Math.cos(angle) * distance, y: char.y + Math.sin(angle) * distance });
     }
     char.relicGems = 0;
+    char.relicSpeedMultiplier = 1;
     this.floatingTexts.push({ x: char.x, y: char.y - 55, text: `💎 보석 ${count}개 드롭`, color: "#c084fc", life: 1.3 });
   }
 
@@ -332,11 +340,17 @@ export class GameLounge {
           this.objectiveScoreToWin,
           this.controlScores.red + dt * 10,
         );
+      if (redCount > 0 && blueCount === 0)
+        players.filter((char) => char.teamId === 1 && Math.hypot(char.x - centerX, char.y - centerY) <= this.controlRadius)
+          .forEach((char) => { char.objectiveContribution = (char.objectiveContribution ?? 0) + dt; });
       if (blueCount > 0 && redCount === 0)
         this.controlScores.blue = Math.min(
           this.objectiveScoreToWin,
           this.controlScores.blue + dt * 10,
         );
+      if (blueCount > 0 && redCount === 0)
+        players.filter((char) => char.teamId === 2 && Math.hypot(char.x - centerX, char.y - centerY) <= this.controlRadius)
+          .forEach((char) => { char.objectiveContribution = (char.objectiveContribution ?? 0) + dt; });
       if (this.controlScores.red >= this.objectiveScoreToWin)
         this.finishTeamObjective(1);
       if (this.controlScores.blue >= this.objectiveScoreToWin)
@@ -369,6 +383,11 @@ export class GameLounge {
       const collector = players.find((char) => Math.hypot(char.x - gem.x, char.y - gem.y) <= char.radius + this.relicPickupRadius);
       if (!collector) continue;
       collector.relicGems = (collector.relicGems ?? 0) + 1;
+      collector.relicSpeedMultiplier = 1 - Math.min(
+        this.relicCarrierSlowCap,
+        collector.relicGems * this.relicCarrierSlowPerGem,
+      );
+      collector.objectiveContribution = (collector.objectiveContribution ?? 0) + 1;
       this.relicGems.splice(index, 1);
       this.floatingTexts.push({ x: collector.x, y: collector.y - 42, text: `💎 ${collector.relicGems}`, color: "#d8b4fe", life: 0.9 });
     }
@@ -810,6 +829,7 @@ export class GameLounge {
     aliveCharacters.forEach((char) => {
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
+      if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
       this.updateKnockbackInertia(char, dt);
 
       if (char.isConfused) {
@@ -873,8 +893,9 @@ export class GameLounge {
       }
 
       // 위치 업데이트
-      char.x += char.vx * dt * 60; // 60fps 기준 속도 조절
-      char.y += char.vy * dt * 60;
+      const relicSpeedMultiplier = char.relicSpeedMultiplier ?? 1;
+      char.x += char.vx * dt * 60 * relicSpeedMultiplier; // 60fps 기준 속도 조절
+      char.y += char.vy * dt * 60 * relicSpeedMultiplier;
 
       // 벽 충돌 체크
       checkWallCollision(char, this.canvas.width, this.canvas.height);
@@ -1155,6 +1176,9 @@ export class GameLounge {
     if (dmgAttacker && dmgAttacker.totalDamageDealt !== undefined) {
       dmgAttacker.totalDamageDealt += statDamage;
     }
+    if (customText === '🪞 허식 반사') {
+      attacker.reflectedDamage = (attacker.reflectedDamage ?? 0) + statDamage;
+    }
     if (target && target.totalDamageTaken !== undefined) {
       target.totalDamageTaken += statDamage;
     }
@@ -1324,6 +1348,46 @@ export class GameLounge {
         maxLife: 35,
       });
     }
+  }
+
+  private renderStatusEffects(char: CharacterState, currentRadius: number) {
+    const timed = (icon: string, label: string, timeLeft: number | undefined, color: string): CharacterStatusEffect => ({
+      icon, label, timeLeft: Math.max(0, timeLeft ?? 0), duration: Math.max(1, timeLeft ?? 1), color,
+    });
+    const effects: CharacterStatusEffect[] = [
+      ...(char.isStunned ? [timed('💫', '기절', char.stunTimeLeft, '#facc15')] : []),
+      ...(char.isConfused ? [timed('🌀', '혼란', char.confusedTimeLeft, '#fb7185')] : []),
+      ...(char.nayutaControlled ? [timed('⛓', '지배', char.nayutaControlTimeLeft, '#ef4444')] : []),
+      ...(char.isPoisoned ? [timed('☠', '독', char.poisonTimeLeft, '#84cc16')] : []),
+      ...(char.isImmune || char.isSuInvisible ? [timed('🛡', '무적', char.immuneTimeLeft, '#67e8f9')] : []),
+      ...(char.statusIndicators ?? []),
+      ...(char.getStatusEffects?.(char) ?? []),
+    ].slice(0, 3);
+    if (effects.length === 0) return;
+
+    const width = Math.max(54, currentRadius * 2.05);
+    const height = 15;
+    const baseY = char.y - currentRadius - 29 - effects.length * (height + 3);
+    this.ctx.save();
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'middle';
+    effects.forEach((effect, index) => {
+      const y = baseY + index * (height + 3);
+      this.ctx.fillStyle = 'rgba(7, 7, 18, 0.84)';
+      this.ctx.fillRect(char.x - width / 2, y, width, height);
+      this.ctx.fillStyle = effect.color;
+      this.ctx.fillRect(char.x - width / 2, y + height - 3, width * Math.max(0, Math.min(1, effect.timeLeft / Math.max(effect.duration, 0.01))), 3);
+      this.ctx.strokeStyle = `${effect.color}aa`;
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(char.x - width / 2, y, width, height);
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = 'bold 9px Orbit';
+      this.ctx.fillText(`${effect.icon} ${effect.label}`, char.x - width / 2 + 4, y + 6.5);
+      this.ctx.textAlign = 'right';
+      this.ctx.fillText(`${Math.max(0, effect.timeLeft).toFixed(1)}s`, char.x + width / 2 - 4, y + 6.5);
+      this.ctx.textAlign = 'left';
+    });
+    this.ctx.restore();
   }
 
   private render() {
@@ -1591,6 +1655,7 @@ export class GameLounge {
 
       // 캐릭터 고유 렌더링 확장 훅 위임 (코딩진행바, 기절별 등)
       char.onRenderExtra?.(char, this.ctx, currentRadius);
+      this.renderStatusEffects(char, currentRadius);
 
       // 2-B. 팀전/보스전 소속 머리 위 텍스트 라벨 렌더링
       if (!char.isDead) {
@@ -1649,6 +1714,23 @@ export class GameLounge {
         this.ctx.font = `bold ${Math.max(9, currentRadius * 0.25)}px "Orbit", sans-serif`;
         this.ctx.textBaseline = "top";
         this.ctx.fillText("BOSS", char.x, char.y + currentRadius + 18);
+        this.ctx.restore();
+      }
+
+      if ((char.relicGems ?? 0) > 0) {
+        this.ctx.save();
+        const slowPercent = Math.round((1 - (char.relicSpeedMultiplier ?? 1)) * 100);
+        this.ctx.strokeStyle = '#d8b4fe';
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([5, 4]);
+        this.ctx.beginPath();
+        this.ctx.arc(char.x, char.y, currentRadius + 12, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        this.ctx.fillStyle = '#f3e8ff';
+        this.ctx.font = 'bold 11px Orbit';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`💎 ${char.relicGems}  -${slowPercent}%`, char.x, char.y + currentRadius + 31);
         this.ctx.restore();
       }
 

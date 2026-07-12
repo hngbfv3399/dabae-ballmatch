@@ -1411,6 +1411,21 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     : 0;
   const mvpKills = (mvp as any).kills || 0;
   const mvpDmg = mvp.totalDamageDealt || 0;
+  const topDamage = [...realChars].sort((a, b) => (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0))[0];
+  const topTaken = [...realChars].sort((a, b) => (b.totalDamageTaken || 0) - (a.totalDamageTaken || 0))[0];
+  const topCc = [...realChars].sort((a, b) => (b.totalCcDuration || 0) - (a.totalCcDuration || 0))[0];
+  const topReflect = [...realChars].sort((a, b) => (b.reflectedDamage || 0) - (a.reflectedDamage || 0))[0];
+  const topObjective = [...realChars].sort((a, b) => (b.objectiveContribution || 0) - (a.objectiveContribution || 0))[0];
+  const topBossSurvival = [...realChars].filter((char) => !char.isBoss).sort((a, b) => (b.bossSurvivalTime || 0) - (a.bossSurvivalTime || 0))[0];
+  const objectiveMetric = teamGameType === 'control' ? '점령' : '보석';
+  const highlights = [
+    topDamage && `🔥 최다 피해 <b>${topDamage.name}</b> ${Math.round(topDamage.totalDamageDealt || 0)}`,
+    topTaken && `🛡 최다 피격 <b>${topTaken.name}</b> ${Math.round(topTaken.totalDamageTaken || 0)}`,
+    topCc && (topCc.totalCcDuration || 0) > 0 ? `💫 CC 기여 <b>${topCc.name}</b> ${(topCc.totalCcDuration || 0).toFixed(1)}초` : null,
+    topReflect && (topReflect.reflectedDamage || 0) > 0 ? `🪞 반사 피해 <b>${topReflect.name}</b> ${Math.round(topReflect.reflectedDamage || 0)}` : null,
+    currentMode === 'team' && topObjective ? `🎯 ${objectiveMetric} 기여 <b>${topObjective.name}</b> ${teamGameType === 'control' ? `${(topObjective.objectiveContribution || 0).toFixed(1)}초` : `${topObjective.objectiveContribution || 0}개`}` : null,
+    currentMode === 'boss' && topBossSurvival ? `⏱ 생존 <b>${topBossSurvival.name}</b> ${(topBossSurvival.bossSurvivalTime || 0).toFixed(1)}초` : null,
+  ].filter(Boolean).map((item) => `<div class="battle-highlight">${item}</div>`).join('');
 
   let html = `
     ${modeWinnerBanner}
@@ -1437,6 +1452,11 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       </div>
     </div>
 
+    <div class="battle-highlights">
+      <div class="standings-header">📊 전투 하이라이트</div>
+      <div class="battle-highlight-grid">${highlights}</div>
+    </div>
+
     <!-- Rankings Section -->
     <div class="standings-container">
       <div class="standings-header">🏆 최종 순위 결과</div>
@@ -1455,6 +1475,11 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
                     : "rank-normal";
             const kills = (char as any).kills || 0;
             const damage = char.totalDamageDealt || 0;
+            const taken = char.totalDamageTaken || 0;
+            const cc = char.totalCcDuration || 0;
+            const reflect = char.reflectedDamage || 0;
+            const objective = char.objectiveContribution || 0;
+            const survival = char.bossSurvivalTime || 0;
             const hpStatus = char.isDead
               ? '<span style="color: #ff3366;">탈락</span>'
               : `<span style="color: #39ff14;">${char.hp} HP</span>`;
@@ -1472,6 +1497,13 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
               <div class="standing-stat-col">
                 <span class="standing-stat-label">K/D</span>
                 <span class="standing-stat-val">${kills}킬 / ${damage}딜</span>
+              </div>
+              <div class="standing-detail-stats">
+                <span>🛡 ${taken}</span>
+                <span>💫 ${cc.toFixed(1)}s</span>
+                ${reflect > 0 ? `<span>🪞 ${reflect}</span>` : ''}
+                ${currentMode === 'team' ? `<span>🎯 ${teamGameType === 'control' ? `${objective.toFixed(1)}s` : `${objective}개`}</span>` : ''}
+                ${currentMode === 'boss' && !char.isBoss ? `<span>⏱ ${survival.toFixed(1)}s</span>` : ''}
               </div>
             </div>
           `;

@@ -63,10 +63,15 @@ export const jiwooConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   // #region UPDATE
   // ═══════════════════════════════════════════
-  onUpdate(char: CharacterState, dt: number) {
+  onUpdate(char: CharacterState, dt: number, ctx: CharacterBehaviorContext) {
     const js = char as JiwooState;
     Object.entries(js.realityFractureStacks ?? {}).forEach(([targetId, mark]) => {
       mark.timeLeft -= dt;
+      const target = ctx.characters.find((candidate) => candidate.id === targetId);
+      if (target) {
+        target.statusIndicators = (target.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('균열 '));
+        if (mark.timeLeft > 0) target.statusIndicators.push({ icon: '◈', label: `균열 ${mark.stacks}/3`, timeLeft: mark.timeLeft, duration: SKILL_CONSTANTS.REALITY_FRACTURE_DURATION, color: '#c084fc' });
+      }
       if (mark.timeLeft <= 0) delete js.realityFractureStacks?.[targetId];
     });
     if (!char.skillActive) return;
@@ -92,11 +97,14 @@ export const jiwooConfig: CharacterConfig = {
 
     if (mark.stacks < SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS) {
       marks[target.id] = mark;
+      target.statusIndicators = (target.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('균열 '));
+      target.statusIndicators.push({ icon: '◈', label: `균열 ${mark.stacks}/3`, timeLeft: mark.timeLeft, duration: SKILL_CONSTANTS.REALITY_FRACTURE_DURATION, color: '#c084fc' });
       ctx.addFloatingText(target.x, target.y - 48, `◈ 균열 ${mark.stacks}/${SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS}`, char.color, 0.8);
       return;
     }
 
     delete marks[target.id];
+    target.statusIndicators = (target.statusIndicators ?? []).filter((effect) => !effect.label.startsWith('균열 '));
     ctx.dealDamage(char, target, SKILL_CONSTANTS.REALITY_FRACTURE_DAMAGE, '◈ 현실 균열');
     ctx.applyConfusion(char, target, SKILL_CONSTANTS.REALITY_FRACTURE_CONFUSION_DURATION, 0.2);
     ctx.createExplosion(target.x, target.y, char.color, 18);
@@ -151,5 +159,8 @@ export const jiwooConfig: CharacterConfig = {
     canvasCtx.fillText('ILLUSION', char.x, char.y - currentRadius - 16);
     canvasCtx.restore();
   },
+  getStatusEffects: (char) => char.skillActive
+    ? [{ icon: '🪞', label: '허식', timeLeft: char.skillDurationLeft, duration: SKILL_CONSTANTS.VANITY_DURATION, color: '#f0d9ff' }]
+    : [],
   // #endregion RENDER
 };

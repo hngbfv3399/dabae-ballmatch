@@ -171,15 +171,22 @@ export const mongshilConfig: CharacterConfig = {
     const bottles = (char as MongshilState).toxicBottles ?? [];
     canvasCtx.save();
     residues.forEach((residue) => {
-      canvasCtx.globalAlpha = Math.max(0, residue.timeLeft / SKILL_CONSTANTS.RESIDUE_LIFETIME) * 0.45;
+      const progress = Math.max(0, residue.timeLeft / SKILL_CONSTANTS.RESIDUE_LIFETIME);
+      canvasCtx.globalAlpha = progress * 0.45;
       canvasCtx.fillStyle = '#a020f0';
       canvasCtx.beginPath();
       canvasCtx.arc(residue.x, residue.y, SKILL_CONSTANTS.RESIDUE_RADIUS, 0, Math.PI * 2);
       canvasCtx.fill();
+      canvasCtx.globalAlpha = 0.9;
+      canvasCtx.strokeStyle = '#f0abfc'; canvasCtx.lineWidth = 3;
+      canvasCtx.beginPath(); canvasCtx.arc(residue.x, residue.y, SKILL_CONSTANTS.RESIDUE_RADIUS, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress); canvasCtx.stroke();
+      canvasCtx.fillStyle = '#fff'; canvasCtx.font = 'bold 10px Orbit'; canvasCtx.textAlign = 'center'; canvasCtx.fillText(`🧪 ${residue.timeLeft.toFixed(1)}s`, residue.x, residue.y + 4);
     });
     canvasCtx.globalAlpha = 1;
     canvasCtx.fillStyle = '#d95f9f';
     bottles.forEach((bottle) => {
+      canvasCtx.strokeStyle = 'rgba(240,171,252,0.72)'; canvasCtx.lineWidth = 2; canvasCtx.setLineDash([6, 5]); canvasCtx.beginPath(); canvasCtx.moveTo(bottle.x, bottle.y); canvasCtx.lineTo(bottle.targetX, bottle.targetY); canvasCtx.stroke(); canvasCtx.setLineDash([]);
+      canvasCtx.strokeStyle = '#f0abfc'; canvasCtx.lineWidth = 2; canvasCtx.beginPath(); canvasCtx.arc(bottle.targetX, bottle.targetY, SKILL_CONSTANTS.RESIDUE_RADIUS, 0, Math.PI * 2); canvasCtx.stroke();
       canvasCtx.beginPath();
       canvasCtx.arc(bottle.x, bottle.y, 8, 0, Math.PI * 2);
       canvasCtx.fill();
