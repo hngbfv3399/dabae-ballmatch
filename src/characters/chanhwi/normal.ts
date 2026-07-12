@@ -16,6 +16,7 @@ const SKILL_CONSTANTS = {
   MID_RANGE: 400,             // <= 400px
   MID_HP_RATIO: 0.18,         // leave 18% HP
   FAR_HP_RATIO: 0.38,         // leave 38% HP
+  BOSS_DAMAGE_RATIO: 0.08,   // bosses take 8% of their maximum HP
   KNOCKBACK_SPEED: 32,
   STUN_DURATION: 1.8,
   BLAST_VISUAL_RADIUS: 850,
@@ -48,7 +49,7 @@ export const chanhwiConfig: CharacterConfig = {
   attackPower: 25,
   baseAttackRange: 45,
   skillName: '신라천정 (Shinra Tensei)',
-  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 전장의 모든 적들의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 사방 외벽으로 튕겨 날려보냅니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
+  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 사방 외벽으로 튕겨 날려보냅니다. 보스에게는 최대 체력의 8% 피해만 주며, 기절·강제 넉백은 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
   color: '#8a2be2', // 보라색
   skillChargeRate: 16.67,
   tier: 'S',
@@ -154,21 +155,30 @@ export const chanhwiConfig: CharacterConfig = {
             }
 
             const targetHp = Math.round(enemy.maxHp * hpRatio);
-            const damage = Math.max(1, enemy.hp - targetHp);
+            const damage = enemy.isBoss
+              ? Math.max(1, Math.round(enemy.maxHp * SKILL_CONSTANTS.BOSS_DAMAGE_RATIO))
+              : Math.max(1, enemy.hp - targetHp);
+            const hitText = enemy.isBoss
+              ? `💥 신라천정(보스 ${Math.round(SKILL_CONSTANTS.BOSS_DAMAGE_RATIO * 100)}%)`
+              : `💥 신라천정(${Math.round(hpRatio * 100)}%)`;
 
-            ctx.dealDamage(char, enemy, damage, `💥 신라천정(${Math.round(hpRatio * 100)}%)`);
+            ctx.dealDamage(char, enemy, damage, hitText);
 
-            // Massive knockback
-            const kAngle = Math.atan2(enemy.y - char.y, enemy.x - char.x);
-            enemy.vx = Math.cos(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
-            enemy.vy = Math.sin(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
+            if (!enemy.isBoss) {
+              // Massive knockback
+              const kAngle = Math.atan2(enemy.y - char.y, enemy.x - char.x);
+              enemy.vx = Math.cos(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
+              enemy.vy = Math.sin(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
 
-            // Stun
-            enemy.isStunned = true;
-            enemy.stunTimeLeft = SKILL_CONSTANTS.STUN_DURATION;
+              // Stun
+              ctx.applyStun(char, enemy, SKILL_CONSTANTS.STUN_DURATION);
+            }
 
-            console.log(`💥 [신라천정 타격] 찬휘 -> ${enemy.name} | 대미지: ${damage} (거리: ${Math.round(dist)}px, 남은 체력 ${Math.round(hpRatio * 100)}% 유도) | 초강력 벽 반사 넉백 (${SKILL_CONSTANTS.STUN_DURATION}초 기절)`);
-            ctx.logMessage?.(`💥 [신라천정 타격] 찬휘 ➡️ ${enemy.name} | ${damage} 피해 (거리: ${Math.round(dist)}px, HP ${Math.round(hpRatio * 100)}%만 남김, ${SKILL_CONSTANTS.STUN_DURATION}초 기절)`, 'skill');
+            const effectText = enemy.isBoss
+              ? `보스 최대 HP ${Math.round(SKILL_CONSTANTS.BOSS_DAMAGE_RATIO * 100)}% 피해, CC 면역`
+              : `거리: ${Math.round(dist)}px, HP ${Math.round(hpRatio * 100)}%만 남김, ${SKILL_CONSTANTS.STUN_DURATION}초 기절`;
+            console.log(`💥 [신라천정 타격] 찬휘 -> ${enemy.name} | 대미지: ${damage} (${effectText})`);
+            ctx.logMessage?.(`💥 [신라천정 타격] 찬휘 ➡️ ${enemy.name} | ${damage} 피해 (${effectText})`, 'skill');
           });
         }
       }

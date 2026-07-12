@@ -221,3 +221,15 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `BASIC_ATTACK`: Detonate a reality-fracture mark.
   - `DAMAGE`: Passive reality rewrite, active invulnerability, and one-time-per-attacker damage reflection.
   - `RENDER`: Phantom transparency and untargetability.
+
+## 19. Juju Singularity Boss (juju_singularity_boss)
+- **File**: `src/characters/juju/boss.ts`
+- **Role**: Boss Disabler | **Tier**: S
+- **Region Map**:
+  - `TYPES`: Phase state, singularities, time faults, future rifts, and player history.
+  - `CONSTANTS`: Raid HP, phase thresholds, damage, duration, and enrage tuning.
+  - `CONFIG`: Independent boss-only registration data.
+  - `SKILL_TRIGGER`: Phase 3 singularity cast.
+  - `UPDATE`: Three-phase space/time raid pattern scheduler; time faults replace wormhole movement.
+  - `DAMAGE`: Boss damage hook.
+  - `RENDER`: Starfield, collapsing singularities, time-fault telegraphs, and phase subtitles.

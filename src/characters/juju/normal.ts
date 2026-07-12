@@ -89,8 +89,7 @@ export const jujuConfig: CharacterConfig = {
 
           if (dist <= 250) {
             // A. Stun opponent to block movement (refresh 0.2s duration)
-            enemy.isStunned = true;
-            enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
+            if (!ctx.applyStun(char, enemy, 0.2)) return;
 
             // B. Cancel velocity
             enemy.vx = 0;

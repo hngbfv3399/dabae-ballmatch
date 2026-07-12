@@ -1852,6 +1852,7 @@ function initRandomModeRadioListeners() {
     'input[name="random-game-mode"]',
   );
   const countSettingItem = document.getElementById("random-count-setting-item");
+  const bossDescription = document.getElementById("random-boss-description");
 
   radioButtons.forEach((radio) => {
     radio.addEventListener("change", (e) => {
@@ -1869,6 +1870,7 @@ function initRandomModeRadioListeners() {
         "hidden",
         targetVal !== "team",
       );
+      bossDescription?.classList.toggle("hidden", targetVal !== "boss");
     });
   });
 }

@@ -139,7 +139,7 @@ export const unheeConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   // #region COLLISION — passive forced workout on contact
   // ═══════════════════════════════════════════
-  onCollisionWithTarget(_char: CharacterState, opponent: CharacterState, ctx) {
+  onCollisionWithTarget(char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead || opponent.id.includes('clone')) return;
 
     // Passive: 35% chance to force opponent to exercise (stun 1.5s) on contact (4s internal cooldown per target)
@@ -152,10 +152,7 @@ export const unheeConfig: CharacterConfig = {
     if (now - oppAny.lastUnheeStunTime >= 4000) {
       if (Math.random() < 0.35) {
         oppAny.lastUnheeStunTime = now;
-        opponent.isStunned = true;
-        opponent.stunTimeLeft = 1.5;
-        opponent.vx = 0;
-        opponent.vy = 0;
+        ctx.applyStun(char, opponent, 1.5);
 
         ctx.addFloatingText(opponent.x, opponent.y - 50, '🏋️ 강제 쇠질! (1.5초)', '#ff8c00', 1.6);
         

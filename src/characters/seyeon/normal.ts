@@ -80,9 +80,8 @@ export const seyeonConfig: CharacterConfig = {
 
         if (dist <= auraRadius) {
           // A. Set charmed and stunned states
-          enemy.isCharmed = true;
-          enemy.isStunned = true;
-          enemy.stunTimeLeft = Math.max(enemy.stunTimeLeft || 0, 0.2);
+          if (!ctx.applyCharm(char, enemy, 0.2)) return;
+          if (!ctx.applyStun(char, enemy, 0.2)) return;
 
           // B. Pull towards Seyeon
           enemy.vx = 0;

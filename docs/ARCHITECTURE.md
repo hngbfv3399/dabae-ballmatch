@@ -9,6 +9,7 @@ This document provides a high-level description of the system architecture for t
 - `src/maps/` — Arena definitions. Each map owns its dimensions and visual defaults independently.
   - `soloLargeArena.ts` — Expanded arena automatically used for 4–6 player free-for-all matches.
   - `teamArenas.ts` — Deathmatch, control, and royal-guard arena definitions.
+  - `jujuSingularityArena.ts` — Dedicated 1v3 cosmic raid arena for Juju Singularity.
 - `src/characters/<character-name>/normal.ts` — Normal playable character implementation.
 - `src/characters/<boss-name>/boss.ts` — Independently authored boss implementation; bosses are never runtime-scaled normal characters.
 
@@ -25,7 +26,7 @@ graph TD
     Lounge -->|Processes collisions| CharColl[onCollisionWithTarget hook]
     Lounge -->|Calculates dealDamage| DamageHooks[onDealDamage / onTakeDamage hooks]
     Lounge -->|Fires on death| DeathHooks[onDeath hook]
-    Lounge -->|Pre-draw / fullscreen visuals| RenderHooks[onPreRender / onRenderOverlay / onRenderExtra]
+    Lounge -->|Pre-draw / fullscreen visuals| RenderHooks[onRenderBackground / onPreRender / onRenderOverlay / onRenderExtra]
 ```
 
 ## Character Lifecycle Hooks
@@ -38,7 +39,8 @@ All characters must implement the `CharacterConfig` interface (`src/characters/c
 5. **`onTakeDamage(target, attacker, damage, ctx)`** — Defensive modifier. Resolves shields, immunity, swap passives, and damage reduction. Returns `{ finalDamage, blocked }`.
 6. **`onDealDamage(attacker, target, damage, ctx)`** — Offensive modifier. Resolves outgoing damage multipliers. Returns modified damage amount.
 7. **`onDeath(char, killer, ctx)`** — Cleanup hook executed when this character dies (e.g. releasing summons or debuffs).
-8. **`onPreRender(char, canvasCtx)`** — Run before drawing the character body. Modifies drawing states like opacity, scale, and background shadows.
+8. **`onRenderBackground(char, canvasCtx, width, height)`** — Draws character-specific arena background visuals before the board grid.
+9. **`onPreRender(char, canvasCtx)`** — Run before drawing the character body. Modifies drawing states like opacity, scale, and background shadows.
 9. **`onRenderExtra(char, canvasCtx, currentRadius)`** — Run after drawing the character body. Used to draw sub-entities, health plates, and local visual gauges.
 10. **`onRenderOverlay(char, canvasCtx, width, height)`** — Run at the end of the rendering loop. Used to draw screen-wide overlays, shake translations, and subtitle subtitles.
 11. **`isTargetable(char)`** — Exclude this character from auto-attack targeting list (returns `boolean`).

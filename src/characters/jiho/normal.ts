@@ -68,10 +68,7 @@ export const jihoConfig: CharacterConfig = {
         console.log(`💥 [디버프 격발] 지호 -> ${opponent.name} | [런타임 에러] 연쇄 충돌 발생!`);
         ctx.logMessage?.(`💥 [런타임 에러 격발] 지호 ➡️ ${opponent.name} | 연쇄 런타임 에러 (${SKILL_CONSTANTS.CRASH_DMG} 피해, ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절)`, 'damage');
         ctx.dealDamage(char, opponent, SKILL_CONSTANTS.CRASH_DMG, '💻 CRASH & STUN!');
-        opponent.isStunned = true;
-        opponent.stunTimeLeft = SKILL_CONSTANTS.CRASH_STUN_DURATION;
-        opponent.vx = 0;
-        opponent.vy = 0;
+        ctx.applyStun(char, opponent, SKILL_CONSTANTS.CRASH_STUN_DURATION);
         ctx.createExplosion(opponent.x, opponent.y, '#ff3366', 15);
 
         // Splash damage to enemies within 120px (excluding attacker and main target)

@@ -71,8 +71,7 @@ export const nayutaConfig: CharacterConfig = {
     if (char.teamId !== undefined && target.teamId !== undefined && char.teamId === target.teamId) return;
     if (Math.random() >= SKILL_CONSTANTS.CONTROL_CHANCE) return;
 
-    target.nayutaControlled = true;
-    target.nayutaControlTimeLeft = SKILL_CONSTANTS.CONTROL_DURATION;
+    if (!ctx.applyDomination(char, target, SKILL_CONSTANTS.CONTROL_DURATION)) return;
     ctx.createParticle(target.x, target.y, char.color, SKILL_CONSTANTS.CONTACT_PARTICLE_SIZE, SKILL_CONSTANTS.CONTACT_PARTICLE_LIFE);
     ctx.addFloatingText(target.x, target.y - 45, '👁️ 지배당함!', char.color, SKILL_CONSTANTS.CONTACT_TEXT_LIFE);
 

@@ -1,9 +1,14 @@
+export type CrowdControlType = 'stun' | 'confusion' | 'charm' | 'domination';
+
 export interface CharacterBehaviorContext {
   characters: CharacterState[];
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
   createExplosion: (x: number, y: number, color: string, count?: number) => void;
   dealDamage: (attacker: CharacterState, target: CharacterState, amount: number, customText?: string) => void;
-  applyConfusion: (target: CharacterState, duration: number, rerollInterval: number) => void;
+  applyStun: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
+  applyConfusion: (source: CharacterState, target: CharacterState, duration: number, rerollInterval: number, isReflected?: boolean) => boolean;
+  applyCharm: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
+  applyDomination: (source: CharacterState, target: CharacterState, duration: number, isReflected?: boolean) => boolean;
   addFloatingText: (x: number, y: number, text: string, color: string, life?: number) => void;
   arenaWidth: number;
   arenaHeight: number;
@@ -14,6 +19,7 @@ export interface CharacterConfig {
   id: string;
   name: string;
   image?: string;          // 캐릭터 초상화 이미지 경로 (선택 사항)
+  radius?: number;         // 전용 보스 등 캐릭터별 기본 충돌 반지름
   maxHp: number;
   speed: number;          // 기본 속도 배율
   attackPower: number;    // 기본 공격력
@@ -22,6 +28,7 @@ export interface CharacterConfig {
   skillDescription: string;
   color: string;          // 렌더링 시 캐릭터 대표 색상
   skillChargeRate: number;// 초당 오르는 스킬 게이지 (기본 증가량)
+  canUseSkillWhileCc?: boolean; // 기절·혼란 중에도 스킬 게이지 충전 및 발동 허용
   tier?: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'; // 캐릭터 밸런스 등급
   role: 'Nuker' | 'Sniper' | 'Speedster' | 'Guardian' | 'Juggernaut' | 'Disabler' | 'Summoner' | 'Specialist' | 'Supporter'; // 캐릭터 역할군
   detailedDescription: string; // 상세 플레이 스타일 설명
@@ -32,12 +39,15 @@ export interface CharacterConfig {
   onCollisionWithTarget?: (char: CharacterState, opponent: CharacterState, ctx: CharacterBehaviorContext) => void;
   onBasicAttack?: (char: CharacterState, opponent: CharacterState, ctx: CharacterBehaviorContext) => void;
   onRenderExtra?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) => void;
+  onRenderBackground?: (char: CharacterState, canvasCtx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => void;
 
   // === Damage Hooks (called from dealDamage) ===
   // Return modified damage. If blocked=true, damage is fully negated.
   onTakeDamage?: (target: CharacterState, attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) => { finalDamage: number; blocked: boolean };
   // Return modified outgoing damage amount.
   onDealDamage?: (attacker: CharacterState, target: CharacterState, damage: number, ctx: CharacterBehaviorContext) => number;
+  // Return true to cancel the original CC application.
+  onReceiveCrowdControl?: (target: CharacterState, source: CharacterState, type: CrowdControlType, duration: number, ctx: CharacterBehaviorContext) => boolean;
 
   // === Death Hook (cleanup when this character dies) ===
   onDeath?: (char: CharacterState, killer: CharacterState, ctx: CharacterBehaviorContext) => void;
@@ -93,6 +103,8 @@ export interface CharacterState extends CharacterConfig {
   confusionRerollTimer?: number;
   confusionRerollInterval?: number;
   isCcImmune?: boolean;
+  knockbackInertiaLeft?: number;
+  wasAboveKnockbackThreshold?: boolean;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

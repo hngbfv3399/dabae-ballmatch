@@ -3,7 +3,7 @@ import { v } from "convex/values";
 
 const CHARACTER_IDS = new Set([
   "doyun", "jiho", "su", "chanik", "chanhwi", "nayuta", "unhee", "dongjun", "seyeon", "puman",
-  "eunsu", "myeongseok", "juju", "juyeon", "sungjae", "mongshil", "seojun", "jiwoo",
+  "eunsu", "myeongseok", "juju", "juyeon", "sungjae", "mongshil", "seojun", "jiwoo", "juju_singularity_boss",
 ]);
 const MODES = new Set(["all", "2", "3", "4", "5", "6", "team", "boss"]);
 const MAX_PARTICIPANTS = 6;

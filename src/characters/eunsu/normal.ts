@@ -98,10 +98,7 @@ export const eunsuConfig: CharacterConfig = {
 
     // Passive: 25% chance to stun (0.8s) and deal double strike
     if (Math.random() < 0.25) {
-      opponent.isStunned = true;
-      opponent.stunTimeLeft = 0.8;
-      opponent.vx = 0;
-      opponent.vy = 0;
+      ctx.applyStun(char, opponent, 0.8);
 
       ctx.dealDamage(char, opponent, 6, '🥊 팡!');
       ctx.dealDamage(char, opponent, 6, '🥊 팡!');

@@ -66,6 +66,8 @@ export class GameLounge {
   private readonly royalKingSpeed = 105;
   private readonly royalKingDamageRange = 78;
   private readonly royalKingDamageMultiplier = 0.18;
+  private readonly knockbackInertiaDuration = 0.45;
+  private readonly knockbackInertiaSpeedMultiplier = 1.75;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -145,16 +147,43 @@ export class GameLounge {
       ) => {
         this.dealDamage(attacker, target, amount, customText);
       },
+      applyStun: (source, target, duration, isReflected = false) => {
+        if (!isReflected && target.onReceiveCrowdControl?.(target, source, 'stun', duration, this.getBehaviorContext())) return false;
+        if (target.isCcImmune) return false;
+        target.isStunned = true;
+        target.stunTimeLeft = Math.max(target.stunTimeLeft ?? 0, duration);
+        target.vx = 0;
+        target.vy = 0;
+        return true;
+      },
       applyConfusion: (
+        source: CharacterState,
         target: CharacterState,
         duration: number,
         rerollInterval: number,
+        isReflected = false,
       ) => {
-        if (target.isCcImmune) return;
+        if (!isReflected && target.onReceiveCrowdControl?.(target, source, 'confusion', duration, this.getBehaviorContext())) return false;
+        if (target.isCcImmune) return false;
         target.isConfused = true;
         target.confusedTimeLeft = duration;
         target.confusionRerollTimer = 0;
         target.confusionRerollInterval = rerollInterval;
+        return true;
+      },
+      applyCharm: (source, target, duration, isReflected = false) => {
+        if (!isReflected && target.onReceiveCrowdControl?.(target, source, 'charm', duration, this.getBehaviorContext())) return false;
+        if (target.isCcImmune) return false;
+        target.isCharmed = true;
+        target.charmTimeLeft = Math.max(target.charmTimeLeft ?? 0, duration);
+        return true;
+      },
+      applyDomination: (source, target, duration, isReflected = false) => {
+        if (!isReflected && target.onReceiveCrowdControl?.(target, source, 'domination', duration, this.getBehaviorContext())) return false;
+        if (target.isCcImmune) return false;
+        target.nayutaControlled = true;
+        target.nayutaControlTimeLeft = Math.max(target.nayutaControlTimeLeft ?? 0, duration);
+        return true;
       },
       addFloatingText: (
         x: number,
@@ -177,6 +206,20 @@ export class GameLounge {
         this.onLogMessage?.(msg, type);
       },
     };
+  }
+
+  private updateKnockbackInertia(char: CharacterState, dt: number) {
+    const speed = Math.hypot(char.vx, char.vy);
+    const threshold = 3.5 * char.speed * this.knockbackInertiaSpeedMultiplier;
+    const isAboveThreshold = speed >= threshold;
+    if (isAboveThreshold && !char.wasAboveKnockbackThreshold) {
+      char.knockbackInertiaLeft = this.knockbackInertiaDuration;
+      this.floatingTexts.push({ x: char.x, y: char.y - 48, text: '💨 충격 관성', color: '#b7fbff', life: 0.55 });
+    }
+    char.wasAboveKnockbackThreshold = isAboveThreshold;
+    if ((char.knockbackInertiaLeft ?? 0) > 0) {
+      char.knockbackInertiaLeft = Math.max(0, (char.knockbackInertiaLeft ?? 0) - dt);
+    }
   }
 
   public getTeamObjectiveState() {
@@ -367,8 +410,10 @@ export class GameLounge {
         // Restore new lifecycle hooks
         char.onTakeDamage = orig.onTakeDamage;
         char.onDealDamage = orig.onDealDamage;
+        char.onReceiveCrowdControl = orig.onReceiveCrowdControl;
         char.onDeath = orig.onDeath;
         char.onPreRender = orig.onPreRender;
+        char.onRenderBackground = orig.onRenderBackground;
         char.onRenderOverlay = orig.onRenderOverlay;
         char.isTargetable = orig.isTargetable;
       }
@@ -480,10 +525,13 @@ export class GameLounge {
       (c) => !c.id.includes("eunsu_clone"),
     );
 
-    // 90초 타이머 (연습모드 제외하고 항상 작동)
+    // 보스전은 제한시간 없이 보스 또는 도전자의 전멸까지 진행한다.
     const isPractice = this.characters.some((c) => c.id === "dummy");
+    const isBossGame = this.characters.some(
+      (c) => c.isBoss && !c.id.includes("clone"),
+    );
 
-    if (this.isPrepared && !this.isGameOver && !isPractice) {
+    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame) {
       this.roundTimer -= dt;
       if (this.roundTimer <= 0) {
         this.roundTimer = 0;
@@ -729,6 +777,7 @@ export class GameLounge {
     aliveCharacters.forEach((char) => {
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
+      this.updateKnockbackInertia(char, dt);
 
       if (char.isConfused) {
         char.confusedTimeLeft = (char.confusedTimeLeft ?? 0) - dt;
@@ -743,6 +792,11 @@ export class GameLounge {
           char.vy = Math.sin(angle) * speed;
           char.confusionRerollTimer = char.confusionRerollInterval ?? 0;
         }
+      }
+
+      if (char.isCharmed && (char.charmTimeLeft ?? 0) > 0) {
+        char.charmTimeLeft = Math.max(0, (char.charmTimeLeft ?? 0) - dt);
+        if (char.charmTimeLeft <= 0) char.isCharmed = false;
       }
 
       // 2-C. 기절 지속 시간 차감 및 속도 복원 (신규 캐릭터 포함 공통 엔진화)
@@ -797,12 +851,8 @@ export class GameLounge {
       }
 
       // 스킬 게이지 충전 및 100% 도달 시 즉시 발동 검사 (기절 중에는 게이지 충전 불가, 지배당한 적도 충전 불가)
-      if (
-        !char.skillActive &&
-        !char.isStunned &&
-        !char.isConfused &&
-        !char.nayutaControlled
-      ) {
+      const ccBlocksSkill = (char.isStunned || char.isConfused) && !char.canUseSkillWhileCc;
+      if (!char.skillActive && !ccBlocksSkill && !char.nayutaControlled) {
         let canCharge = true;
         if (char.id === "nayuta") {
           const hasControlled = this.characters.some(
@@ -905,7 +955,7 @@ export class GameLounge {
           // 충돌 시 양측 스킬 게이지 충전 보너스 (+5, 보스는 배율 적용)
           if (
             !c1.skillActive &&
-            !c1.isStunned &&
+            (!c1.isStunned || c1.canUseSkillWhileCc) &&
             !c1.isTyping &&
             !c1.nayutaControlled
           ) {
@@ -917,7 +967,7 @@ export class GameLounge {
           }
           if (
             !c2.skillActive &&
-            !c2.isStunned &&
+            (!c2.isStunned || c2.canUseSkillWhileCc) &&
             !c2.isTyping &&
             !c2.nayutaControlled
           ) {
@@ -1245,6 +1295,9 @@ export class GameLounge {
 
     this.ctx.fillStyle = "#06060c";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.characters.forEach((char) => {
+      char.onRenderBackground?.(char, this.ctx, this.canvas.width, this.canvas.height);
+    });
 
     this.ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
     this.ctx.lineWidth = 1;
@@ -1330,10 +1383,13 @@ export class GameLounge {
       this.ctx.restore();
     }
 
-    // 90초 타이머 그리기 (연습모드 제외하고 항상 작동)
+    // 보스전에서는 제한시간 HUD를 표시하지 않는다.
     const isPractice = this.characters.some((c) => c.id === "dummy");
+    const isBossGame = this.characters.some(
+      (c) => c.isBoss && !c.id.includes("clone"),
+    );
 
-    if (this.isPrepared && !this.isGameOver && !isPractice) {
+    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame) {
       this.ctx.save();
       this.ctx.fillStyle = this.roundTimer <= 10.0 ? "#ff3366" : "#ffffff";
       this.ctx.shadowBlur = 15;

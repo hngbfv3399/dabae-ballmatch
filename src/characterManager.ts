@@ -17,6 +17,7 @@ import { sungjaeConfig } from './characters/sungjae/normal';
 import { mongshilConfig } from './characters/mongshil/normal';
 import { seojunConfig } from './characters/seojun/normal';
 import { jiwooConfig } from './characters/jiwoo/normal';
+import { jujuSingularityBossConfig } from './characters/juju/boss';
 
 // 이용 가능한 캐릭터 목록
 export const availableCharacters: CharacterConfig[] = [
@@ -45,7 +46,7 @@ export const availableCharacters: CharacterConfig[] = [
  * a normal character's runtime stats; register `characters/<name>/boss.ts`
  * here once its mechanics are implemented.
  */
-export const availableBossCharacters: CharacterConfig[] = [];
+export const availableBossCharacters: CharacterConfig[] = [jujuSingularityBossConfig];
 
 /**
  * 캐릭터 설정을 게임 런타임 상태 객체로 변환합니다.
@@ -57,7 +58,7 @@ export function createCharacterState(
   canvasWidth: number,
   canvasHeight: number
 ): CharacterState {
-  const radius = 35; // 캐릭터 구체 반지름
+  const radius = config.radius ?? 35; // 캐릭터 구체 반지름
 
   // 겹치지 않게 원형 배치
   const centerX = canvasWidth / 2;

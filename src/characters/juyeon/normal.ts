@@ -23,7 +23,7 @@ interface JuyeonState extends CharacterState {
 // #region CONSTANTS
 // ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
-  COOLDOWN: 6,
+  COOLDOWN: 7,
   AMPOULE_SPEED: 9.5,
   HEAL_AMOUNT: 15,
   SPEED_BUFF_PCT: 50,
@@ -182,10 +182,7 @@ export const juyeonConfig: CharacterConfig = {
           delete target.juyeonMaskTimer;
 
           // Stun target for 1.5 seconds and trigger explosion damage
-          enemy.isStunned = true;
-          enemy.stunTimeLeft = SKILL_CONSTANTS.STUN_DURATION;
-          enemy.vx = 0;
-          enemy.vy = 0;
+          ctx.applyStun(char, enemy, SKILL_CONSTANTS.STUN_DURATION);
 
           ctx.dealDamage(char, enemy, SKILL_CONSTANTS.EXPLOSION_DAMAGE, '🗿 팩 석고화!');
           ctx.createExplosion(enemy.x, enemy.y, '#e8c4c8', 22);
