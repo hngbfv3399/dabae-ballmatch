@@ -1365,26 +1365,26 @@ export class GameLounge {
     ].slice(0, 3);
     if (effects.length === 0) return;
 
-    const width = Math.max(54, currentRadius * 2.05);
-    const height = 15;
-    const baseY = char.y - currentRadius - 29 - effects.length * (height + 3);
+    const width = Math.max(82, currentRadius * 2.7);
+    const height = 23;
+    const baseY = char.y - currentRadius - 35 - effects.length * (height + 5);
     this.ctx.save();
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'middle';
     effects.forEach((effect, index) => {
-      const y = baseY + index * (height + 3);
-      this.ctx.fillStyle = 'rgba(7, 7, 18, 0.84)';
+      const y = baseY + index * (height + 5);
+      this.ctx.fillStyle = 'rgba(5, 5, 16, 0.94)';
       this.ctx.fillRect(char.x - width / 2, y, width, height);
       this.ctx.fillStyle = effect.color;
-      this.ctx.fillRect(char.x - width / 2, y + height - 3, width * Math.max(0, Math.min(1, effect.timeLeft / Math.max(effect.duration, 0.01))), 3);
+      this.ctx.fillRect(char.x - width / 2, y + height - 5, width * Math.max(0, Math.min(1, effect.timeLeft / Math.max(effect.duration, 0.01))), 5);
       this.ctx.strokeStyle = `${effect.color}aa`;
-      this.ctx.lineWidth = 1;
+      this.ctx.lineWidth = 2;
       this.ctx.strokeRect(char.x - width / 2, y, width, height);
       this.ctx.fillStyle = '#fff';
-      this.ctx.font = 'bold 9px Orbit';
-      this.ctx.fillText(`${effect.icon} ${effect.label}`, char.x - width / 2 + 4, y + 6.5);
+      this.ctx.font = 'bold 12px Orbit';
+      this.ctx.fillText(`${effect.icon} ${effect.label}`, char.x - width / 2 + 6, y + 9);
       this.ctx.textAlign = 'right';
-      this.ctx.fillText(`${Math.max(0, effect.timeLeft).toFixed(1)}s`, char.x + width / 2 - 4, y + 6.5);
+      this.ctx.fillText(`${Math.max(0, effect.timeLeft).toFixed(1)}s`, char.x + width / 2 - 6, y + 9);
       this.ctx.textAlign = 'left';
     });
     this.ctx.restore();
