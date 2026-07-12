@@ -37,7 +37,7 @@ const SKILL_CONSTANTS = {
   PHASE_THREE_RATIO: 0.3,
   ENRAGE_RATIO: 0.1,
   HORIZON_RADIUS: 130,
-  HORIZON_DURATION: 4.5,
+  HORIZON_DURATION: 2,
   HORIZON_DAMAGE: 13,
   HORIZON_TICK: 0.6,
   HORIZON_PULL_BASE: 0.22,
@@ -100,7 +100,7 @@ function spawnTemporalFragment(ctx: CharacterBehaviorContext) {
   const point = randomPoint(ctx);
   ctx.spawnBossDrop({
     ...point,
-    name: '시공 파편', icon: '✦', color: '#67e8f9',
+    name: '아이템 1', icon: '✦', color: '#67e8f9',
     duration: SKILL_CONSTANTS.DROP_DURATION, heal: SKILL_CONSTANTS.DROP_HEAL,
     damageMultiplier: SKILL_CONSTANTS.DROP_DAMAGE_MULTIPLIER,
     speedMultiplier: SKILL_CONSTANTS.DROP_SPEED_MULTIPLIER,
