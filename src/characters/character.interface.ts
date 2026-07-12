@@ -28,6 +28,7 @@ export interface CinematicRequest {
   tone: 'void' | 'time' | 'end';
   freezePlayers?: boolean;
   hidePlayers?: boolean;
+  lightDuration?: number;
 }
 
 export interface CharacterBehaviorContext {

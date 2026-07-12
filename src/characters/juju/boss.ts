@@ -40,7 +40,9 @@ const SKILL_CONSTANTS = {
   COOLDOWN: 5,
   PHASE_TWO_RATIO: 0.7,
   PHASE_THREE_RATIO: 0.35,
-  INTRO_DURATION: 7.2,
+  INTRO_EXPLOSION_DURATION: 2,
+  INTRO_ARRIVAL_DURATION: 2,
+  INTRO_DURATION: 4,
   PHASE_TWO_CINEMATIC_DURATION: 3.4,
   PHASE_THREE_CINEMATIC_DURATION: 4.2,
   DEATH_CINEMATIC_DURATION: 2.0,
@@ -211,6 +213,7 @@ export const jujuSingularityBossConfig: CharacterConfig = {
         tone: 'void',
         freezePlayers: true,
         hidePlayers: true,
+        lightDuration: SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION,
       });
       announce(char, state, ctx, '별은 태어나고, 죽는다.');
     }
@@ -396,9 +399,9 @@ export const jujuSingularityBossConfig: CharacterConfig = {
   onPreRender(char, canvasCtx) {
     const state = char as JujuBossState;
     if ((state.introLeft ?? 0) <= 0) return;
-    const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
-    // 대사와 광원만 먼저 보이고, 후반부에 주주가 빛 속에서 서서히 드러난다.
-    canvasCtx.globalAlpha *= Math.max(0, Math.min(1, (progress - 0.62) / 0.25));
+    const elapsed = SKILL_CONSTANTS.INTRO_DURATION - state.introLeft!;
+    // 첫 2초는 피해 없는 중앙 폭발만 보이고, 이후 2초 동안 주주가 빛 속에서 나타난다.
+    canvasCtx.globalAlpha *= Math.max(0, Math.min(1, (elapsed - SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
   },
   onRenderBackground(char, canvasCtx, canvasWidth, canvasHeight) {
     const state = char as JujuBossState;
@@ -451,11 +454,13 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     });
     state.futureRifts?.forEach((rift) => { canvasCtx.strokeStyle = '#ff5ac8'; canvasCtx.lineWidth = 3; canvasCtx.setLineDash([8, 7]); canvasCtx.beginPath(); canvasCtx.arc(rift.x, rift.y, 78, 0, Math.PI * 2); canvasCtx.stroke(); canvasCtx.setLineDash([]); });
     if ((state.introLeft ?? 0) > 0) {
-      const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
+      const elapsed = SKILL_CONSTANTS.INTRO_DURATION - state.introLeft!;
+      const arrivalProgress = Math.max(0, Math.min(1, (elapsed - SKILL_CONSTANTS.INTRO_EXPLOSION_DURATION) / SKILL_CONSTANTS.INTRO_ARRIVAL_DURATION));
+      if (arrivalProgress <= 0) { canvasCtx.restore(); return; }
       const centerX = canvasCtx.canvas.width / 2; const centerY = canvasCtx.canvas.height / 2;
-      const radius = 28 + progress * 84;
+      const radius = 28 + arrivalProgress * 84;
       canvasCtx.fillStyle = '#030008'; canvasCtx.shadowBlur = 32; canvasCtx.shadowColor = '#8b5cf6'; canvasCtx.beginPath(); canvasCtx.arc(centerX, centerY, radius, 0, Math.PI * 2); canvasCtx.fill();
-      for (let index = 0; index < 16; index++) { const angle = index * Math.PI / 8 + progress * 5; const distance = radius + 35 + (index % 4) * 18; canvasCtx.fillStyle = index % 2 ? '#d8b4fe' : '#94a3b8'; canvasCtx.fillRect(centerX + Math.cos(angle) * distance, centerY + Math.sin(angle) * distance - progress * 40, 4, 4); }
+      for (let index = 0; index < 16; index++) { const angle = index * Math.PI / 8 + arrivalProgress * 5; const distance = radius + 35 + (index % 4) * 18; canvasCtx.fillStyle = index % 2 ? '#d8b4fe' : '#94a3b8'; canvasCtx.fillRect(centerX + Math.cos(angle) * distance, centerY + Math.sin(angle) * distance - arrivalProgress * 40, 4, 4); }
     }
     if (state.bossPhase === 3) { const x = canvasCtx.canvas.width / 2; const y = canvasCtx.canvas.height / 2; const radius = SKILL_CONSTANTS.SINGULARITY_RADIUS; const gradient = canvasCtx.createRadialGradient(x, y, 5, x, y, radius); gradient.addColorStop(0, 'rgba(0,0,0,0.88)'); gradient.addColorStop(0.45, 'rgba(35,8,76,0.28)'); gradient.addColorStop(1, 'rgba(174,90,255,0.03)'); canvasCtx.fillStyle = gradient; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius, 0, Math.PI * 2); canvasCtx.fill(); canvasCtx.strokeStyle = 'rgba(216,180,254,0.85)'; canvasCtx.lineWidth = 6; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.84, -state.patternTimer!, -state.patternTimer! + Math.PI * 1.7); canvasCtx.stroke(); canvasCtx.strokeStyle = 'rgba(103,232,249,0.7)'; canvasCtx.lineWidth = 2; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.55, state.patternTimer! * 1.6, state.patternTimer! * 1.6 + Math.PI * 1.3); canvasCtx.stroke(); }
     canvasCtx.strokeStyle = '#d8b4fe'; canvasCtx.lineWidth = 4; canvasCtx.beginPath(); canvasCtx.arc(char.x, char.y, currentRadius + 10, 0, Math.PI * 2); canvasCtx.stroke();

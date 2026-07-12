@@ -540,6 +540,24 @@ export class GameLounge {
       // 보스전은 카운트다운 대신 보스 전용 첫 등장 시네마틱으로 시작한다.
       this.prepTimer = 0;
       this.isPrepared = true;
+      const challengers = this.characters.filter((char) => !char.isBoss && !char.id.includes("clone"));
+      if (challengers.length === 4) {
+        // 맵 모서리가 아닌 중앙 전투 구역의 네 꼭짓점에 4명의 도전자를 배치한다.
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const offsetX = this.canvas.width * 0.19;
+        const offsetY = this.canvas.height * 0.2;
+        const vertices = [
+          { x: centerX - offsetX, y: centerY - offsetY },
+          { x: centerX + offsetX, y: centerY - offsetY },
+          { x: centerX - offsetX, y: centerY + offsetY },
+          { x: centerX + offsetX, y: centerY + offsetY },
+        ];
+        challengers.forEach((char, index) => {
+          char.x = vertices[index].x;
+          char.y = vertices[index].y;
+        });
+      }
       this.characters.forEach((char) => {
         const angle = this.initialAngles.get(char.id) || 0;
         const initialSpeed = 3.5 * char.speed;
@@ -1940,9 +1958,12 @@ export class GameLounge {
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
     if (cinematic.tone === "void") {
-      const radius = 16 + progress * 160;
+      const elapsed = cinematic.totalDuration - cinematic.timeLeft;
+      const lightDuration = cinematic.lightDuration ?? cinematic.totalDuration;
+      const explosionProgress = Math.min(1, elapsed / lightDuration);
+      const radius = 16 + explosionProgress * 300;
       const glow = this.ctx.createRadialGradient(centerX, centerY, 1, centerX, centerY, radius);
-      glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.12, "#b9e8ff"); glow.addColorStop(0.3, "#8b5cf6"); glow.addColorStop(1, "rgba(0,0,0,0)");
+      glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.08, "#ffffff"); glow.addColorStop(0.22, "#b9e8ff"); glow.addColorStop(0.42, "#8b5cf6"); glow.addColorStop(1, "rgba(0,0,0,0)");
       this.ctx.fillStyle = glow; this.ctx.beginPath(); this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2); this.ctx.fill();
     }
     this.ctx.filter = "none";
