@@ -121,6 +121,7 @@ let currentMode: GameMode = "solo";
 let teamGameType: TeamGameType = "deathmatch";
 let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
+const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
 
 function getCharacterFamilyId(character: { id: string; characterFamilyId?: string }) {
@@ -842,9 +843,9 @@ function initLobby(preserveSelections = false) {
             alert("같은 캐릭터의 보스 버전과 플레이어 버전은 함께 편성할 수 없습니다.");
             return;
           }
-          // 도전자 3명 제한
-          if (selectedRedIds.size >= 3) {
-            alert("⚔️ 도전자는 최대 3명까지만 선택할 수 있습니다!");
+          // 도전자 4명 제한
+          if (selectedRedIds.size >= BOSS_CHALLENGER_COUNT) {
+            alert(`⚔️ 도전자는 최대 ${BOSS_CHALLENGER_COUNT}명까지만 선택할 수 있습니다!`);
             return;
           }
           if (bossCharacterId === char.id) {
@@ -880,8 +881,8 @@ function updateStartButtonState() {
   if (currentMode === "tournament") {
     canStart = selectedIds.size === 16;
   } else if (currentMode === "boss") {
-    // 보스전 (1vs3): 보스 1명 및 도전자 3명 합쳐서 4명일 때 활성화
-    canStart = bossCharacterId !== null && selectedRedIds.size === 3;
+    // 보스전 (1vs4): 보스 1명 및 도전자 4명일 때 활성화
+    canStart = bossCharacterId !== null && selectedRedIds.size === BOSS_CHALLENGER_COUNT;
   } else if (currentMode === "team") {
     // 팀전 (3vs3): 레드 3명 & 블루 3명 합쳐서 6명일 때 활성화
     canStart = selectedRedIds.size === 3 && selectedBlueIds.size === 3;
@@ -905,7 +906,7 @@ function updateStartButtonState() {
   } else if (currentMode === "team") {
     startBtnText = `게임 시작 (팀전 RED ${selectedRedIds.size}/3 | BLUE ${selectedBlueIds.size}/3)`;
   } else if (currentMode === "boss") {
-    startBtnText = `게임 시작 (보스전 BOSS ${bossCharacterId ? 1 : 0}/1 | 도전자 ${selectedRedIds.size}/3)`;
+    startBtnText = `게임 시작 (보스전 BOSS ${bossCharacterId ? 1 : 0}/1 | 도전자 ${selectedRedIds.size}/${BOSS_CHALLENGER_COUNT})`;
   } else {
     startBtnText = `게임 시작 (개인전 ${selectedIds.size}명 선택됨)`;
   }
@@ -1619,13 +1620,13 @@ function startRandomGame() {
     const challengers = shuffled.filter(
       (character) => getCharacterFamilyId(character) !== getCharacterFamilyId(boss),
     );
-    if (challengers.length < 3) {
-      alert("보스와 겹치지 않는 플레이어 캐릭터가 3명 이상 필요합니다.");
+    if (challengers.length < BOSS_CHALLENGER_COUNT) {
+      alert(`보스와 겹치지 않는 플레이어 캐릭터가 ${BOSS_CHALLENGER_COUNT}명 이상 필요합니다.`);
       return;
     }
-    challengers.slice(0, 3).forEach((c) => {
+    challengers.slice(0, BOSS_CHALLENGER_COUNT).forEach((c) => {
       selectedIds.add(c.id);
-      selectedRedIds.add(c.id); // 3명 도전자 (RED)
+      selectedRedIds.add(c.id); // 4명 도전자 (RED)
     });
     syncModeTabs("boss");
   } else if (randMode === "tournament") {
