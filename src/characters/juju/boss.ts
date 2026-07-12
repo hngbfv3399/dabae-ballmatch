@@ -37,6 +37,7 @@ const SKILL_CONSTANTS = {
   MAX_HP: 800,
   RADIUS: 70,
   BASE_ATTACK: 24,
+  MOVEMENT_SPEED_MULTIPLIER: 3.5,
   COOLDOWN: 5,
   PHASE_TWO_RATIO: 0.7,
   PHASE_THREE_RATIO: 0.35,
@@ -108,6 +109,13 @@ function pull(target: CharacterState, x: number, y: number, strength: number) {
   const distance = Math.hypot(dx, dy) || 1;
   target.vx += (dx / distance) * strength;
   target.vy += (dy / distance) * strength;
+}
+
+function resumeBossMotion(char: CharacterState) {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = SKILL_CONSTANTS.MOVEMENT_SPEED_MULTIPLIER * char.speed;
+  char.vx = Math.cos(angle) * speed;
+  char.vy = Math.sin(angle) * speed;
 }
 
 function randomPoint(ctx: CharacterBehaviorContext, margin = 100) {
@@ -225,6 +233,7 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     }
     if ((state.introLeft ?? 0) > 0) {
       state.introLeft! -= dt;
+      if (state.introLeft! <= 0) resumeBossMotion(char);
       return;
     }
 
@@ -255,6 +264,7 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       state.phaseTransitionLeft! -= dt;
       char.vx = 0;
       char.vy = 0;
+      if (state.phaseTransitionLeft! <= 0) resumeBossMotion(char);
       return;
     }
 
