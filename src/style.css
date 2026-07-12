@@ -692,6 +692,84 @@ body {
   .bar-container { height: 6px; }
   #countdown-number { font-size: 4rem; }
 
+  /* 다인전: 모든 전투원의 HP·스킬 게이지를 가로 스크롤 없이 비교한다. */
+  #game-view[data-mode="solo"] .hud-list,
+  #game-view[data-mode="team"] .hud-list,
+  #game-view[data-mode="boss"] .hud-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    padding: 0;
+    gap: 0.45rem;
+  }
+  #game-view[data-mode="solo"] .hud-item,
+  #game-view[data-mode="team"] .hud-item,
+  #game-view[data-mode="boss"] .hud-item {
+    min-width: 0;
+    min-height: 64px;
+    padding: 0.42rem;
+    gap: 0.4rem;
+    border-radius: 8px;
+  }
+  #game-view[data-mode="solo"] .hud-info,
+  #game-view[data-mode="team"] .hud-info,
+  #game-view[data-mode="boss"] .hud-info { gap: 0.25rem; min-width: 0; }
+  #game-view[data-mode="solo"] .hud-name-row,
+  #game-view[data-mode="team"] .hud-name-row,
+  #game-view[data-mode="boss"] .hud-name-row { font-size: 0.7rem; gap: 0.2rem; }
+  #game-view[data-mode="solo"] .hud-hp-text,
+  #game-view[data-mode="team"] .hud-hp-text,
+  #game-view[data-mode="boss"] .hud-hp-text { font-size: 0.62rem; white-space: nowrap; }
+  #game-view[data-mode="solo"] .hud-avatar .avatar-img,
+  #game-view[data-mode="solo"] .hud-avatar .avatar-text,
+  #game-view[data-mode="team"] .hud-avatar .avatar-img,
+  #game-view[data-mode="team"] .hud-avatar .avatar-text,
+  #game-view[data-mode="boss"] .hud-avatar .avatar-img,
+  #game-view[data-mode="boss"] .hud-avatar .avatar-text { width: 27px; height: 27px; font-size: 0.62rem; }
+  #game-view[data-mode="solo"] .skill-indicator,
+  #game-view[data-mode="team"] .skill-indicator,
+  #game-view[data-mode="boss"] .skill-indicator { right: 0.28rem; top: 0.2rem; font-size: 0.54rem; }
+
+  /* 팀전·보스전은 상단 목표 정보가 한 줄씩 명확하게 유지된다. */
+  #game-view[data-mode="team"] .alive-counter,
+  #game-view[data-mode="boss"] .alive-counter { display: none; }
+  #game-view[data-mode="boss"] .game-header,
+  #game-view[data-mode="team"] .game-header { display: grid; grid-template-columns: auto 1fr; align-items: center; }
+  #game-view[data-mode="boss"] .status-banner,
+  #game-view[data-mode="team"] .status-banner { grid-column: 2; grid-row: 1; order: initial; font-size: 0.86rem; text-align: right; }
+  #game-view[data-mode="boss"] .boss-battle-header,
+  #game-view[data-mode="team"] .team-battle-header {
+    position: sticky;
+    top: 54px;
+    z-index: 20;
+    margin-left: -0.1rem !important;
+    margin-right: -0.1rem !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.32) !important;
+  }
+  #game-view[data-mode="boss"] .boss-battle-header > div:first-child {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.4rem;
+  }
+  #game-view[data-mode="boss"] #boss-name-label { font-size: 0.86rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #game-view[data-mode="boss"] #boss-hp-ratio { font-size: 0.82rem !important; white-space: nowrap; }
+  #game-view[data-mode="boss"] .boss-battle-header > div:last-child { height: 15px !important; border-radius: 6px !important; }
+  #game-view[data-mode="team"] .team-battle-header > div:first-child {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    text-align: center;
+  }
+  #game-view[data-mode="team"] .team-battle-header > div:first-child span { font-size: 0.67rem !important; white-space: nowrap; }
+  #game-view[data-mode="team"] #team-objective-text {
+    padding: 0.42rem 0.35rem;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.045);
+    line-height: 1.35;
+    font-size: 0.7rem !important;
+  }
+  #game-view[data-mode="team"] .team-battle-header > div:last-child { height: 13px !important; }
+
   .modal-content { width: calc(100% - 1rem); max-height: 94dvh; padding: 1.1rem 0.75rem; }
   .winner-trophy { font-size: 2.6rem; }
   .winner-title { font-size: 1.35rem; letter-spacing: 0.05em; }
@@ -708,6 +786,9 @@ body {
   .character-grid { grid-template-columns: 1fr; }
   .mode-tabs { grid-template-columns: 1fr; }
   .game-lounge-wrapper { aspect-ratio: 4 / 3; }
+  #game-view[data-mode="solo"] .hud-list,
+  #game-view[data-mode="team"] .hud-list,
+  #game-view[data-mode="boss"] .hud-list { grid-template-columns: 1fr; }
 }
 
 .skill-indicator {

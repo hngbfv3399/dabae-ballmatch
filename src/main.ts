@@ -949,6 +949,7 @@ function startGame() {
 
   lobbyView.classList.add("hidden");
   gameView.classList.remove("hidden");
+  gameView.dataset.mode = currentMode;
 
   // 보스전과 팀전 전용 헤더 UI 토글
   const bossHeader = document.getElementById("boss-battle-header");
@@ -1537,6 +1538,7 @@ function goBackToLobby() {
     gameLounge.stop();
   }
   gameView.classList.add("hidden");
+  delete gameView.dataset.mode;
   lobbyView.classList.remove("hidden");
   initLobby();
 }
