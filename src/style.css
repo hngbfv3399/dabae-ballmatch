@@ -723,7 +723,8 @@ body {
   .hud-toggle-btn { display: inline-flex; align-items: center; min-height: 30px; }
   .hud-sidebar.is-collapsed { padding: 0.5rem 0.65rem; }
   .hud-sidebar.is-collapsed .hud-title-row h3 { margin: 0; padding: 0; border: 0; }
-  .hud-sidebar.is-collapsed .hud-list { display: none; }
+  /* 다인전 2열 HUD 규칙보다 우선해 실제로 접힌 상태를 적용한다. */
+  #game-view .hud-sidebar.is-collapsed .hud-list { display: none; }
   .hud-list { gap: 0.4rem; }
   .hud-item { min-width: 165px; padding: 0.48rem; gap: 0.5rem; }
   .hud-avatar .avatar-img, .hud-avatar .avatar-text { width: 32px; height: 32px; }
