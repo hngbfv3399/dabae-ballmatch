@@ -717,7 +717,8 @@ body {
   .boss-battle-header, .team-battle-header, #tournament-battle-header { margin-bottom: 0.65rem !important; padding: 0.7rem !important; border-radius: 10px !important; }
   .boss-battle-header span, .team-battle-header span { font-size: 0.78rem !important; }
   .game-main { gap: 0.7rem; }
-  .game-lounge-wrapper { aspect-ratio: 16 / 11; border-radius: 8px; }
+  /* 캔버스의 4:3 비율을 유지해 모바일에서도 전장을 최대한 크게 보여 준다. */
+  .game-lounge-wrapper { aspect-ratio: 4 / 3; border-radius: 8px; }
   .hud-sidebar { padding: 0.65rem; border-radius: 10px; }
   .hud-sidebar h3 { font-size: 0.9rem; margin-bottom: 0.45rem; }
   .hud-toggle-btn { display: inline-flex; align-items: center; min-height: 30px; }
