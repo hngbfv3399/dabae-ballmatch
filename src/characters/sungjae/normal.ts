@@ -79,6 +79,14 @@ const SKILL_CONSTANTS = {
 // #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isSameTeam(source: CharacterState, target: CharacterState): boolean {
+  return source.teamId !== undefined && source.teamId === target.teamId;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const sungjaeConfig: CharacterConfig = {
@@ -270,7 +278,7 @@ export const sungjaeConfig: CharacterConfig = {
         let closestEnemy: CharacterState | null = null;
         let minDistance = Infinity;
         for (const enemy of ctx.characters) {
-          if (enemy.isDead || enemy.id === ss.id) continue;
+          if (enemy.isDead || enemy.id === ss.id || isSameTeam(ss, enemy)) continue;
           const dist = Math.hypot(enemy.x - ss.x, enemy.y - ss.y);
           if (dist < minDistance) {
             minDistance = dist;
@@ -324,7 +332,7 @@ export const sungjaeConfig: CharacterConfig = {
 
       // Check collision with other targets
       ctx.characters.forEach((enemy) => {
-        if (enemy.isDead || enemy.id === ss.id) return;
+        if (enemy.isDead || enemy.id === ss.id || isSameTeam(ss, enemy)) return;
         const dist = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
         const collisionRadius = bullet.isPlasma ? enemy.radius + 12 : enemy.radius + 5;
         
