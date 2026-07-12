@@ -2,6 +2,7 @@ import type {
   CharacterState,
   CharacterBehaviorContext,
   BossDropDefinition,
+  MapCutDefinition,
   CharacterStatusEffect,
   CinematicRequest,
 } from "../characters/character.interface";
@@ -34,6 +35,7 @@ interface RelicGem {
 }
 
 type BossDrop = BossDropDefinition;
+interface MapCut extends MapCutDefinition { source: CharacterState; timeLeft: number; hitIds: string[]; }
 type ActiveCinematic = CinematicRequest & { timeLeft: number; totalDuration: number };
 
 export class GameLounge {
@@ -62,6 +64,7 @@ export class GameLounge {
   private controlScores = { red: 0, blue: 0 };
   private relicGems: RelicGem[] = [];
   private bossDrops: BossDrop[] = [];
+  private mapCuts: MapCut[] = [];
   private relicSpawnTimer = 0;
   private relicGeneratedCount = 0;
   private relicDeathmatchPhase = false;
@@ -226,6 +229,9 @@ export class GameLounge {
         this.bossDrops.push(drop);
         this.floatingTexts.push({ x: drop.x, y: drop.y - 28, text: `${drop.icon} ${drop.name} 출현!`, color: drop.color, life: 1.5 });
       },
+      spawnMapCut: (source, cut) => {
+        this.mapCuts.push({ ...cut, source, timeLeft: cut.warningDuration + cut.activeDuration, hitIds: [] });
+      },
       startCinematic: (request) => {
         this.activeCinematic = { ...request, timeLeft: request.duration, totalDuration: request.duration };
       },
@@ -280,6 +286,22 @@ export class GameLounge {
       this.createExplosion(collector.x, collector.y, drop.color, 20);
       this.bossDrops.splice(index, 1);
     }
+  }
+
+  private updateMapCuts(dt: number) {
+    this.mapCuts.forEach((cut) => {
+      cut.timeLeft -= dt;
+      if (cut.timeLeft > cut.activeDuration) return;
+      this.characters.forEach((target) => {
+        if (target.isDead || target.id === cut.source.id || cut.hitIds.includes(target.id)) return;
+        if (cut.source.teamId !== undefined && target.teamId !== undefined && cut.source.teamId === target.teamId) return;
+        const overlaps = target.x + target.radius > cut.x && target.x - target.radius < cut.x + cut.width && target.y + target.radius > cut.y && target.y - target.radius < cut.y + cut.height;
+        if (!overlaps) return;
+        cut.hitIds.push(target.id);
+        this.dealDamage(cut.source, target, cut.damage, '⬛ 공간 삭제');
+      });
+    });
+    this.mapCuts = this.mapCuts.filter((cut) => cut.timeLeft > 0);
   }
 
   public getTeamObjectiveState() {
@@ -485,6 +507,7 @@ export class GameLounge {
     this.controlScores = { red: 0, blue: 0 };
     this.relicGems = [];
     this.bossDrops = [];
+    this.mapCuts = [];
     this.relicSpawnTimer = 0;
     this.relicGeneratedCount = 0;
     this.relicDeathmatchPhase = false;
@@ -866,6 +889,7 @@ export class GameLounge {
 
     this.updateTeamObjective(dt);
     this.updateBossDrops();
+    this.updateMapCuts(dt);
 
     const context = this.getBehaviorContext();
 
@@ -1483,6 +1507,31 @@ export class GameLounge {
     this.ctx.strokeStyle = "rgba(127, 0, 255, 0.2)";
     this.ctx.lineWidth = 6;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.mapCuts.forEach((cut) => {
+      const active = cut.timeLeft <= cut.activeDuration;
+      this.ctx.save();
+      if (active) {
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(cut.x, cut.y, cut.width, cut.height);
+        this.ctx.strokeStyle = '#f5d0fe';
+        this.ctx.lineWidth = 4;
+        this.ctx.strokeRect(cut.x, cut.y, cut.width, cut.height);
+      } else {
+        this.ctx.fillStyle = 'rgba(244,114,182,0.12)';
+        this.ctx.fillRect(cut.x, cut.y, cut.width, cut.height);
+        this.ctx.strokeStyle = '#f0abfc';
+        this.ctx.lineWidth = 3;
+        this.ctx.setLineDash([12, 8]);
+        this.ctx.strokeRect(cut.x, cut.y, cut.width, cut.height);
+        this.ctx.setLineDash([]);
+        this.ctx.fillStyle = '#f5d0fe';
+        this.ctx.font = 'bold 14px Orbit';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`⬛ 공간 삭제 ${(cut.timeLeft - cut.activeDuration).toFixed(1)}s`, cut.x + cut.width / 2, cut.y + cut.height / 2);
+      }
+      this.ctx.restore();
+    });
 
     if (this.teamGameType === "control") {
       const centerX = this.canvas.width / 2;

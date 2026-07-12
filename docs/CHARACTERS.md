@@ -230,7 +230,7 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `CONSTANTS`: Raid HP, 70%/35% phase thresholds, cinematic durations, damage, duration, and enrage tuning.
   - `CONFIG`: Independent boss-only registration data.
   - `SKILL_TRIGGER`: Phase 3 singularity cast.
-  - `UPDATE`: Intro descent plus three-phase space/time raid pattern scheduler; time faults replace wormhole movement.
+  - `UPDATE`: Intro descent plus three-phase space/time raid pattern scheduler; phase 3 uses map-cut hazards and time faults.
   - `DAMAGE`: Boss damage hook.
   - `DEATH`: Singularity-collapse finale cinematic.
   - `RENDER`: Starfield, black-hole arrival, phase-specific arenas, collapsing singularities, time-fault telegraphs, and phase subtitles.

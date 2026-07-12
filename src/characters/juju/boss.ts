@@ -64,8 +64,11 @@ const SKILL_CONSTANTS = {
   TIME_STOP_DURATION: 1.25,
   REWIND_SECONDS: 2,
   REWIND_DAMAGE: 12,
-  SINGULARITY_RADIUS: 260,
-  SINGULARITY_PULL: 0.25,
+  MAP_CUT_WIDTH: 260,
+  MAP_CUT_HEIGHT: 170,
+  MAP_CUT_WARNING: 1.25,
+  MAP_CUT_ACTIVE: 2.4,
+  MAP_CUT_DAMAGE: 9999,
   ULTIMATE_CAST: 8,
   ULTIMATE_DAMAGE: 34,
   EXHAUSTED_DURATION: 8,
@@ -312,15 +315,6 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     });
     state.futureRifts = state.futureRifts.filter((rift) => rift.timeLeft > 0);
 
-    if (state.bossPhase === 3) {
-      const centerX = ctx.arenaWidth / 2;
-      const centerY = ctx.arenaHeight / 2;
-      players.forEach((target) => {
-        const distance = Math.hypot(target.x - centerX, target.y - centerY);
-        if (distance <= SKILL_CONSTANTS.SINGULARITY_RADIUS) pull(target, centerX, centerY, SKILL_CONSTANTS.SINGULARITY_PULL);
-      });
-    }
-
     if (state.bossPhase === 3 && hpRatio <= SKILL_CONSTANTS.ENRAGE_RATIO && !state.ultimateStarted) {
       state.ultimateStarted = true;
       state.ultimateLeft = SKILL_CONSTANTS.ULTIMATE_CAST;
@@ -364,8 +358,10 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       state.faults.push(spawnFault(ctx));
       state.patternTimer = 3.5;
     } else {
-      state.horizons.push({ x: ctx.arenaWidth / 2, y: ctx.arenaHeight / 2, radius: SKILL_CONSTANTS.SINGULARITY_RADIUS, timeLeft: 2.5, tickLeft: 0.3 });
-      for (let index = 0; index < 3; index++) state.futureRifts.push({ ...randomPoint(ctx), timeLeft: 1.6 + index * 0.45 });
+      const firstCut = randomPoint(ctx, SKILL_CONSTANTS.MAP_CUT_WIDTH / 2);
+      const secondCut = randomPoint(ctx, SKILL_CONSTANTS.MAP_CUT_WIDTH / 2);
+      ctx.spawnMapCut(char, { x: firstCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: Math.max(30, firstCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2), width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
+      ctx.spawnMapCut(char, { x: secondCut.x - SKILL_CONSTANTS.MAP_CUT_WIDTH / 2, y: Math.max(30, secondCut.y - SKILL_CONSTANTS.MAP_CUT_HEIGHT / 2), width: SKILL_CONSTANTS.MAP_CUT_WIDTH, height: SKILL_CONSTANTS.MAP_CUT_HEIGHT, warningDuration: SKILL_CONSTANTS.MAP_CUT_WARNING, activeDuration: SKILL_CONSTANTS.MAP_CUT_ACTIVE, damage: SKILL_CONSTANTS.MAP_CUT_DAMAGE });
       state.faults.push(spawnFault(ctx, Math.PI / 4), spawnFault(ctx, -Math.PI / 4));
       state.patternTimer = hpRatio <= SKILL_CONSTANTS.ENRAGE_RATIO ? 1.7 : 2.7;
     }
@@ -467,7 +463,6 @@ export const jujuSingularityBossConfig: CharacterConfig = {
       canvasCtx.fillStyle = '#030008'; canvasCtx.shadowBlur = 32; canvasCtx.shadowColor = '#8b5cf6'; canvasCtx.beginPath(); canvasCtx.arc(centerX, centerY, radius, 0, Math.PI * 2); canvasCtx.fill();
       for (let index = 0; index < 16; index++) { const angle = index * Math.PI / 8 + arrivalProgress * 5; const distance = radius + 35 + (index % 4) * 18; canvasCtx.fillStyle = index % 2 ? '#d8b4fe' : '#94a3b8'; canvasCtx.fillRect(centerX + Math.cos(angle) * distance, centerY + Math.sin(angle) * distance - arrivalProgress * 40, 4, 4); }
     }
-    if (state.bossPhase === 3) { const x = canvasCtx.canvas.width / 2; const y = canvasCtx.canvas.height / 2; const radius = SKILL_CONSTANTS.SINGULARITY_RADIUS; const gradient = canvasCtx.createRadialGradient(x, y, 5, x, y, radius); gradient.addColorStop(0, 'rgba(0,0,0,0.88)'); gradient.addColorStop(0.45, 'rgba(35,8,76,0.28)'); gradient.addColorStop(1, 'rgba(174,90,255,0.03)'); canvasCtx.fillStyle = gradient; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius, 0, Math.PI * 2); canvasCtx.fill(); canvasCtx.strokeStyle = 'rgba(216,180,254,0.85)'; canvasCtx.lineWidth = 6; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.84, -state.patternTimer!, -state.patternTimer! + Math.PI * 1.7); canvasCtx.stroke(); canvasCtx.strokeStyle = 'rgba(103,232,249,0.7)'; canvasCtx.lineWidth = 2; canvasCtx.beginPath(); canvasCtx.arc(x, y, radius * 0.55, state.patternTimer! * 1.6, state.patternTimer! * 1.6 + Math.PI * 1.3); canvasCtx.stroke(); }
     canvasCtx.strokeStyle = '#d8b4fe'; canvasCtx.lineWidth = 4; canvasCtx.beginPath(); canvasCtx.arc(char.x, char.y, currentRadius + 10, 0, Math.PI * 2); canvasCtx.stroke();
     canvasCtx.restore();
   },
