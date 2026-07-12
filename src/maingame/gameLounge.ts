@@ -535,7 +535,21 @@ export class GameLounge {
       this.initialAngles.set(char.id, Math.random() * Math.PI * 2);
     });
 
-    this.onCountdown(3);
+    const isBossGame = this.characters.some((char) => char.isBoss && !char.id.includes("clone"));
+    if (isBossGame) {
+      // 보스전은 카운트다운 대신 보스 전용 첫 등장 시네마틱으로 시작한다.
+      this.prepTimer = 0;
+      this.isPrepared = true;
+      this.characters.forEach((char) => {
+        const angle = this.initialAngles.get(char.id) || 0;
+        const initialSpeed = 3.5 * char.speed;
+        char.vx = Math.cos(angle) * initialSpeed;
+        char.vy = Math.sin(angle) * initialSpeed;
+      });
+      this.onCountdown(0);
+    } else {
+      this.onCountdown(3);
+    }
     this.onUpdateHUD(this.characters);
 
     if (this.animationFrameId) {
@@ -840,8 +854,6 @@ export class GameLounge {
     aliveCharacters.forEach((char) => {
       // 보스 시네마틱 중 도전자는 스킬·이동·공격을 모두 멈춘다.
       if (this.isCinematicLocked() && !char.isBoss) {
-        char.vx = 0;
-        char.vy = 0;
         return;
       }
       if ((char.raidBuffTimeLeft ?? 0) > 0) {
@@ -1552,6 +1564,7 @@ export class GameLounge {
 
     // 2. 캐릭터 렌더링
     this.characters.forEach((char) => {
+      if (this.activeCinematic?.hidePlayers && !char.isBoss && !char.isDead) return;
       // 2-A. 사망 캐릭터 렌더링 (회전, 수축, 서서히 사라짐 연출)
       if (char.isDead) {
         const animTime = char.deathAnimationTime;

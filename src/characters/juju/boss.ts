@@ -196,12 +196,12 @@ export const jujuSingularityBossConfig: CharacterConfig = {
     state.baseSpeed ??= char.speed;
     state.dropSpawnTimer ??= SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN + Math.random() * (SKILL_CONSTANTS.DROP_FIRST_SPAWN_MAX - SKILL_CONSTANTS.DROP_FIRST_SPAWN_MIN);
 
-    // 전투 시작: 초신성 → 블랙홀 → 강림. 도전자 행동은 엔진 시네마틱으로 잠근다.
+    // 전투 시작: 첫 대사 → 밝은 빛 → 블랙홀 → 강림. 도전자에게 피해·CC는 적용하지 않는다.
     if (!state.introStarted) {
       state.introStarted = true;
       state.introLeft = SKILL_CONSTANTS.INTRO_DURATION;
       char.x = ctx.arenaWidth / 2;
-      char.y = ctx.arenaHeight + char.radius;
+      char.y = ctx.arenaHeight / 2;
       char.vx = 0;
       char.vy = 0;
       ctx.startCinematic({
@@ -210,14 +210,12 @@ export const jujuSingularityBossConfig: CharacterConfig = {
         quote: '별은 태어나고, 죽는다. 하지만 나는 그 모든 순간을 동시에 본다.',
         tone: 'void',
         freezePlayers: true,
+        hidePlayers: true,
       });
-      announce(char, state, ctx, '초신성 붕괴 · 특이점 강림');
+      announce(char, state, ctx, '별은 태어나고, 죽는다.');
     }
     if ((state.introLeft ?? 0) > 0) {
       state.introLeft! -= dt;
-      const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
-      char.y = ctx.arenaHeight + char.radius - (ctx.arenaHeight / 2 + char.radius) * Math.min(1, Math.max(0, (progress - 0.42) / 0.58));
-      challengers(ctx).forEach((target) => pull(target, ctx.arenaWidth / 2, ctx.arenaHeight / 2, 0.05 + progress * 0.1));
       return;
     }
 
@@ -395,6 +393,13 @@ export const jujuSingularityBossConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   // #region RENDER
   // ═══════════════════════════════════════════
+  onPreRender(char, canvasCtx) {
+    const state = char as JujuBossState;
+    if ((state.introLeft ?? 0) <= 0) return;
+    const progress = 1 - state.introLeft! / SKILL_CONSTANTS.INTRO_DURATION;
+    // 대사와 광원만 먼저 보이고, 후반부에 주주가 빛 속에서 서서히 드러난다.
+    canvasCtx.globalAlpha *= Math.max(0, Math.min(1, (progress - 0.62) / 0.25));
+  },
   onRenderBackground(char, canvasCtx, canvasWidth, canvasHeight) {
     const state = char as JujuBossState;
     canvasCtx.save();
