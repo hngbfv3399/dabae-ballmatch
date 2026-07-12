@@ -38,6 +38,14 @@ const FINAL_QUOTE = '신라... 텐세!!!';
 // #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isEnemy(first: CharacterState, second: CharacterState): boolean {
+  return first.teamId === undefined || second.teamId === undefined || first.teamId !== second.teamId;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const chanhwiConfig: CharacterConfig = {
@@ -48,12 +56,12 @@ export const chanhwiConfig: CharacterConfig = {
   attackPower: 25,
   baseAttackRange: 45,
   skillName: '신라천정 (Shinra Tensei)',
-  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 1.8초간 기절시킵니다. 보스에게는 최대 체력의 8% 피해만 주며 CC는 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
+  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 1.8초간 기절시킵니다. 아군은 영향을 받지 않습니다. 보스에게는 최대 체력의 8% 피해만 주며 CC는 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
   color: '#8a2be2', // 보라색
   skillChargeRate: 16.67,
   tier: 'S',
   role: 'Nuker',
-  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 전장의 모든 캐릭터에게 거리 비례 파멸적인 체력 고정 대미지와 기절을 가합니다.',
+  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 적에게만 거리 비례 파멸적인 체력 고정 대미지와 기절을 가합니다.',
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════
@@ -143,7 +151,7 @@ export const chanhwiConfig: CharacterConfig = {
           // Hit all alive enemies
           const chars = (ctx as any).characters as CharacterState[];
           chars.forEach((enemy) => {
-            if (enemy.isDead || enemy.id === char.id) return;
+            if (enemy.isDead || enemy.id === char.id || !isEnemy(char, enemy)) return;
 
             const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
             let hpRatio = SKILL_CONSTANTS.FAR_HP_RATIO;
