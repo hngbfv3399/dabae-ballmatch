@@ -18,10 +18,19 @@ interface JujuState extends CharacterState {
 // #endregion TYPES
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isEnemy(char: CharacterState, target: CharacterState) {
+  return char.teamId === undefined || target.teamId === undefined || char.teamId !== target.teamId;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const jujuConfig: CharacterConfig = {
   id: 'juju',
+  characterFamilyId: 'juju',
   name: '주주',
   maxHp: 135,
   speed: 1.25,
@@ -81,7 +90,7 @@ export const jujuConfig: CharacterConfig = {
 
         // Pull nearby enemies within 250px (exclude self)
         ctx.characters.forEach((enemy: CharacterState) => {
-          if (enemy.isDead || enemy.id === js.id) return;
+          if (enemy.isDead || enemy.id === js.id || !isEnemy(char, enemy)) return;
           
           const dx = bX - enemy.x;
           const dy = bY - enemy.y;
@@ -130,7 +139,7 @@ export const jujuConfig: CharacterConfig = {
 
           // Apply damage and knockback
           ctx.characters.forEach((enemy: CharacterState) => {
-            if (enemy.isDead || enemy.id === js.id) return;
+            if (enemy.isDead || enemy.id === js.id || !isEnemy(char, enemy)) return;
             
             const dx = enemy.x - bX;
             const dy = enemy.y - bY;
@@ -189,7 +198,7 @@ export const jujuConfig: CharacterConfig = {
         let maxHp = -Infinity;
         let swapTarget: any = null;
         ctx.characters.forEach((enemy) => {
-          if (enemy.isDead || enemy.id === 'juju') return;
+          if (enemy.isDead || enemy.id === 'juju' || !isEnemy(target, enemy)) return;
           if (enemy.hp > maxHp) {
             maxHp = enemy.hp;
             swapTarget = enemy;

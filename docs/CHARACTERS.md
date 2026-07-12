@@ -233,3 +233,19 @@ This document maps character-specific file paths and `#region` maps to allow AI 
   - `UPDATE`: Three-phase space/time raid pattern scheduler; time faults replace wormhole movement.
   - `DAMAGE`: Boss damage hook.
   - `RENDER`: Starfield, collapsing singularities, time-fault telegraphs, and phase subtitles.
+
+## 20. Junseok (junseok)
+- **File**: `src/characters/junseok/normal.ts`
+- **Role**: Specialist | **Tier**: A
+- **Region Map**:
+  - `TYPES`: Operation-data stack and delayed block-point state.
+  - `CONSTANTS`: Base/enhanced blast, prediction, knockback, and slow tuning.
+  - `HELPERS`: Enemy filtering and nearest-target selection.
+  - `CONFIG`: Character stats and skill copy.
+  - `SKILL_TRIGGER`: Predict target path and queue two or three block points.
+  - `UPDATE`: Resolve delayed blast, knockback, and slow restoration.
+  - `BASIC_ATTACK`: Build operation data from basic hits.
+  - `COLLISION`: Reserved no-op hook.
+  - `DAMAGE`: Standard incoming damage hook.
+  - `DEATH`: Clear queued block points.
+  - `RENDER`: Draw operation-data ring and predicted blast telegraphs.

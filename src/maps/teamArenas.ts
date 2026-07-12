@@ -10,7 +10,7 @@ export const teamControlArena: ArenaConfig = {
   backgroundColor: '#151029', teamGameType: 'control',
 };
 
-export const teamSiegeArena: ArenaConfig = {
-  id: 'team-royal-guard', name: '왕의 행렬', width: 1200, height: 700,
-  backgroundColor: '#0d1828', teamGameType: 'siege',
+export const teamRelicArena: ArenaConfig = {
+  id: 'team-relic-rift', name: '보석 균열지', width: 1200, height: 700,
+  backgroundColor: '#161126', teamGameType: 'relic',
 };

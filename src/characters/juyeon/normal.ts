@@ -49,7 +49,7 @@ export const juyeonConfig: CharacterConfig = {
   attackPower: 12,
   baseAttackRange: 45,
   skillName: '프리미엄 모델링 앰플 팩',
-  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 시전 시 즉시 자가 치유로 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 회복하고 ${SKILL_CONSTANTS.SPEED_BUFF_DURATION}초간 이동속도가 ${SKILL_CONSTANTS.SPEED_BUFF_PCT}% 증가합니다. 동시에 가장 가까운 적에게 앰플 팩을 발사해 1초 뒤 완전히 굳어 ${SKILL_CONSTANTS.STUN_DURATION}초간 기절시키며 굳은 팩이 깨질 때 ${SKILL_CONSTANTS.EXPLOSION_DAMAGE}의 피해를 입힙니다. 패시브: 적과 충돌 시 ${SKILL_CONSTANTS.STEAL_CHANCE * 100}% 확률로 이속 ${SKILL_CONSTANTS.STEAL_SPEED_PCT}%를 강탈해 중첩(최대 ${SKILL_CONSTANTS.STEAL_MAX_STACKS}중첩, ${SKILL_CONSTANTS.STEAL_DURATION}초)하며, 적의 보호막 실드를 즉시 파괴하고 ${SKILL_CONSTANTS.SHIELD_POP_DAMAGE}의 추가 피해를 입힙니다.`,
+  skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 시전 시 즉시 자가 치유로 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 회복하고 ${SKILL_CONSTANTS.SPEED_BUFF_DURATION}초간 이동속도가 ${SKILL_CONSTANTS.SPEED_BUFF_PCT}% 증가합니다. 동시에 가장 가까운 적에게 앰플 팩을 발사해 적중 즉시 ${SKILL_CONSTANTS.STUN_DURATION}초간 기절시키며, 1초 뒤 굳은 팩이 깨질 때 ${SKILL_CONSTANTS.EXPLOSION_DAMAGE}의 피해를 입힙니다. 패시브: 적과 충돌 시 ${SKILL_CONSTANTS.STEAL_CHANCE * 100}% 확률로 이속 ${SKILL_CONSTANTS.STEAL_SPEED_PCT}%를 강탈해 중첩(최대 ${SKILL_CONSTANTS.STEAL_MAX_STACKS}중첩, ${SKILL_CONSTANTS.STEAL_DURATION}초)하며, 적의 보호막 실드를 즉시 파괴하고 ${SKILL_CONSTANTS.SHIELD_POP_DAMAGE}의 추가 피해를 입힙니다.`,
   color: '#ffb6c1', // 베이비 핑크
   skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN,
   tier: 'A',
@@ -151,6 +151,8 @@ export const juyeonConfig: CharacterConfig = {
 
         (target as any).juyeonMaskTimer = 1.0;
         (target as any).juyeonMaskAppliedBy = js.id;
+        const stunned = ctx.applyStun(char, target, SKILL_CONSTANTS.STUN_DURATION);
+        if (stunned) ctx.addFloatingText(target.x, target.y - 42, `🗿 즉시 기절 ${SKILL_CONSTANTS.STUN_DURATION}초`, '#a8a8a8', 1.2);
       } else {
         const angle = Math.atan2(dy, dx);
         proj.x += Math.cos(angle) * proj.speed * dt * 60;
@@ -181,9 +183,7 @@ export const juyeonConfig: CharacterConfig = {
         if (target.juyeonMaskTimer <= 0) {
           delete target.juyeonMaskTimer;
 
-          // Stun target for 1.5 seconds and trigger explosion damage
-          ctx.applyStun(char, enemy, SKILL_CONSTANTS.STUN_DURATION);
-
+          // Damage triggers after the immediate-hit stun has held the target in place.
           ctx.dealDamage(char, enemy, SKILL_CONSTANTS.EXPLOSION_DAMAGE, '🗿 팩 석고화!');
           ctx.createExplosion(enemy.x, enemy.y, '#e8c4c8', 22);
           ctx.addFloatingText(enemy.x, enemy.y - 55, `🗿 마스크 응고! (기절 L${SKILL_CONSTANTS.STUN_DURATION}s)`, '#a8a8a8', 1.8);

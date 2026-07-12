@@ -17,7 +17,6 @@ const SKILL_CONSTANTS = {
   MID_HP_RATIO: 0.18,         // leave 18% HP
   FAR_HP_RATIO: 0.38,         // leave 38% HP
   BOSS_DAMAGE_RATIO: 0.08,   // bosses take 8% of their maximum HP
-  KNOCKBACK_SPEED: 32,
   STUN_DURATION: 1.8,
   BLAST_VISUAL_RADIUS: 850,
   SHAKE_MAX_CASTING: 10,      // max screen shake px during casting
@@ -49,12 +48,12 @@ export const chanhwiConfig: CharacterConfig = {
   attackPower: 25,
   baseAttackRange: 45,
   skillName: '신라천정 (Shinra Tensei)',
-  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 사방 외벽으로 튕겨 날려보냅니다. 보스에게는 최대 체력의 8% 피해만 주며, 기절·강제 넉백은 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
+  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 1.8초간 기절시킵니다. 보스에게는 최대 체력의 8% 피해만 주며 CC는 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
   color: '#8a2be2', // 보라색
   skillChargeRate: 16.67,
   tier: 'S',
   role: 'Nuker',
-  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 전장의 모든 캐릭터에게 거리 비례 파멸적인 체력 고정 대미지(외곽일수록 피해 급증)를 가해 사방 벽으로 거칠게 튕겨내는 가공할 화력을 지니고 있습니다.',
+  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 전장의 모든 캐릭터에게 거리 비례 파멸적인 체력 고정 대미지와 기절을 가합니다.',
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════
@@ -135,7 +134,7 @@ export const chanhwiConfig: CharacterConfig = {
         if (elapsed >= SKILL_CONSTANTS.BLAST_TRIGGER_TIME && !(char as any).blastTriggered) {
           (char as any).blastTriggered = true;
 
-          console.log(`💥 [신라천정 격발] 찬휘 -> 전 화면 무차별 전탄 척력파 방출! 전원 체력 거리 비례 감소 및 초강력 벽 반사 넉백!`);
+          console.log(`💥 [신라천정 격발] 찬휘 -> 전 화면 무차별 전탄 척력파 방출! 전원 체력 거리 비례 감소 및 기절!`);
           ctx.logMessage?.(`💥 [신라천정 격발] 찬휘 ➡️ 전 화면 무차별 척력파 방출!`, 'skill');
           ctx.addFloatingText(char.x, char.y - 60, 'SHINRA TENSEI!!!', '#ffcc00', 2.0);
           ctx.createExplosion(char.x, char.y, '#da70d6', 50);
@@ -165,18 +164,13 @@ export const chanhwiConfig: CharacterConfig = {
             ctx.dealDamage(char, enemy, damage, hitText);
 
             if (!enemy.isBoss) {
-              // Massive knockback
-              const kAngle = Math.atan2(enemy.y - char.y, enemy.x - char.x);
-              enemy.vx = Math.cos(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
-              enemy.vy = Math.sin(kAngle) * SKILL_CONSTANTS.KNOCKBACK_SPEED;
-
-              // Stun
+              // Stun without forced displacement
               ctx.applyStun(char, enemy, SKILL_CONSTANTS.STUN_DURATION);
             }
 
             const effectText = enemy.isBoss
               ? `보스 최대 HP ${Math.round(SKILL_CONSTANTS.BOSS_DAMAGE_RATIO * 100)}% 피해, CC 면역`
-              : `거리: ${Math.round(dist)}px, HP ${Math.round(hpRatio * 100)}%만 남김, ${SKILL_CONSTANTS.STUN_DURATION}초 기절`;
+              : `거리: ${Math.round(dist)}px, HP ${Math.round(hpRatio * 100)}%만 남김, ${SKILL_CONSTANTS.STUN_DURATION}초 기절 (넉백 없음)`;
             console.log(`💥 [신라천정 타격] 찬휘 -> ${enemy.name} | 대미지: ${damage} (${effectText})`);
             ctx.logMessage?.(`💥 [신라천정 타격] 찬휘 ➡️ ${enemy.name} | ${damage} 피해 (${effectText})`, 'skill');
           });

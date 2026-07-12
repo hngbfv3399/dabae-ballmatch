@@ -24,14 +24,9 @@ interface FloatingText {
   life: number; // 0 ~ 1
 }
 
-/** 왕 지키기 전용 목표물. 캐릭터 목록과 분리해 모든 캐릭터/트랩 공격의 대상에서 제외한다. */
-interface RoyalKing {
+interface RelicGem {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  hp: number;
-  maxHp: number;
 }
 
 export class GameLounge {
@@ -57,15 +52,18 @@ export class GameLounge {
   private eliminationOrder: string[] = [];
   private teamGameType: TeamGameType = "deathmatch";
   private controlScores = { red: 0, blue: 0 };
-  private royalKing: RoyalKing | null = null;
+  private relicGems: RelicGem[] = [];
+  private relicSpawnTimer = 0;
+  private relicWinningTeam: 1 | 2 | null = null;
+  private relicWinCountdown = 0;
   private readonly objectiveScoreToWin = 100;
   private readonly objectiveRespawnTime = 3;
   private readonly controlRadius = 150;
-  private readonly royalKingRadius = 140;
-  private readonly royalKingHp = 300;
-  private readonly royalKingSpeed = 105;
-  private readonly royalKingDamageRange = 78;
-  private readonly royalKingDamageMultiplier = 0.18;
+  private readonly relicGoal = 10;
+  private readonly relicWinDelay = 5;
+  private readonly relicSpawnInterval = 1.8;
+  private readonly relicMaxOnField = 5;
+  private readonly relicPickupRadius = 30;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
 
@@ -179,6 +177,12 @@ export class GameLounge {
         return true;
       },
       applyDomination: (source, target, duration, isReflected = false) => {
+        // 지배는 적 전용 CC다. 어떤 캐릭터 훅에서 호출해도 아군에게는 적용하지 않는다.
+        if (
+          source.teamId !== undefined &&
+          target.teamId !== undefined &&
+          source.teamId === target.teamId
+        ) return false;
         if (!isReflected && target.onReceiveCrowdControl?.(target, source, 'domination', duration, this.getBehaviorContext())) return false;
         if (target.isCcImmune) return false;
         target.nayutaControlled = true;
@@ -228,13 +232,34 @@ export class GameLounge {
       redScore: this.controlScores.red,
       blueScore: this.controlScores.blue,
       scoreToWin: this.objectiveScoreToWin,
-      royalKingHp: this.royalKing?.hp ?? 0,
-      royalKingMaxHp: this.royalKing?.maxHp ?? this.royalKingHp,
+      redRelics: this.getTeamRelicCount(1),
+      blueRelics: this.getTeamRelicCount(2),
+      relicGoal: this.relicGoal,
+      relicWinningTeam: this.relicWinningTeam,
+      relicWinCountdown: this.relicWinCountdown,
     };
   }
 
   private isObjectiveTeamMode(): boolean {
-    return this.teamGameType === "control" || this.teamGameType === "siege";
+    return this.teamGameType === "control" || this.teamGameType === "relic";
+  }
+
+  private getTeamRelicCount(teamId: 1 | 2) {
+    return this.characters
+      .filter((char) => !char.isDead && char.teamId === teamId)
+      .reduce((total, char) => total + (char.relicGems ?? 0), 0);
+  }
+
+  private dropRelics(char: CharacterState) {
+    const count = char.relicGems ?? 0;
+    if (count <= 0) return;
+    for (let index = 0; index < count; index += 1) {
+      const angle = (Math.PI * 2 * index) / count + Math.random() * 0.45;
+      const distance = char.radius + 18 + Math.random() * 26;
+      this.relicGems.push({ x: char.x + Math.cos(angle) * distance, y: char.y + Math.sin(angle) * distance });
+    }
+    char.relicGems = 0;
+    this.floatingTexts.push({ x: char.x, y: char.y - 55, text: `💎 보석 ${count}개 드롭`, color: "#c084fc", life: 1.3 });
   }
 
   private finishTeamObjective(winningTeam: 1 | 2) {
@@ -315,45 +340,46 @@ export class GameLounge {
       return;
     }
 
-    const king = this.royalKing;
-    if (!king) return;
-
-    // 왕을 처단하는 레드팀이 전멸하면 블루가 즉시 왕을 지킨 것으로 판정한다.
-    if (!players.some((char) => char.teamId === 1)) {
-      this.finishTeamObjective(2);
-      return;
+    // 보석 균열 포탈은 전장 세 곳에서 보석을 주기적으로 생성한다.
+    this.relicSpawnTimer -= dt;
+    if (this.relicSpawnTimer <= 0 && this.relicGems.length < this.relicMaxOnField) {
+      const portals = [
+        { x: this.canvas.width * 0.25, y: this.canvas.height * 0.3 },
+        { x: this.canvas.width * 0.5, y: this.canvas.height * 0.68 },
+        { x: this.canvas.width * 0.75, y: this.canvas.height * 0.3 },
+      ];
+      const portal = portals[Math.floor(Math.random() * portals.length)];
+      this.relicGems.push({ x: portal.x, y: portal.y });
+      this.relicSpawnTimer = this.relicSpawnInterval;
+      this.floatingTexts.push({ x: portal.x, y: portal.y - 28, text: "💎 보석 생성", color: "#d8b4fe", life: 1 });
     }
 
-    // 왕은 블루 진영을 천천히 순찰한다. 경계에 닿으면 방향을 반전한다.
-    king.x += king.vx * dt;
-    king.y += king.vy * dt;
-    const padding = this.royalKingRadius + 24;
-    if (
-      king.x < this.canvas.width * 0.58 + padding ||
-      king.x > this.canvas.width - padding
-    )
-      king.vx *= -1;
-    if (king.y < padding || king.y > this.canvas.height - padding)
-      king.vy *= -1;
-    king.x = Math.max(
-      this.canvas.width * 0.58 + padding,
-      Math.min(this.canvas.width - padding, king.x),
-    );
-    king.y = Math.max(padding, Math.min(this.canvas.height - padding, king.y));
+    for (let index = this.relicGems.length - 1; index >= 0; index -= 1) {
+      const gem = this.relicGems[index];
+      const collector = players.find((char) => Math.hypot(char.x - gem.x, char.y - gem.y) <= char.radius + this.relicPickupRadius);
+      if (!collector) continue;
+      collector.relicGems = (collector.relicGems ?? 0) + 1;
+      this.relicGems.splice(index, 1);
+      this.floatingTexts.push({ x: collector.x, y: collector.y - 42, text: `💎 ${collector.relicGems}`, color: "#d8b4fe", life: 0.9 });
+    }
 
-    // 왕은 CharacterState가 아니므로 투사체/트랩/아군 공격의 대상이 될 수 없다.
-    // 레드팀만 왕의 호위 반경 안에서 직접 공성 피해를 줄 수 있다.
-    const attackers = players.filter(
-      (char) =>
-        char.teamId === 1 &&
-        Math.hypot(char.x - king.x, char.y - king.y) <=
-          this.royalKingDamageRange + char.radius,
-    );
-    const damagePerSecond =
-      attackers.reduce((total, char) => total + char.attackPower, 0) *
-      this.royalKingDamageMultiplier;
-    king.hp = Math.max(0, king.hp - damagePerSecond * dt);
-    if (king.hp <= 0) this.finishTeamObjective(1);
+    if (this.relicWinningTeam === null) {
+      const winningTeam = this.getTeamRelicCount(1) >= this.relicGoal ? 1 : this.getTeamRelicCount(2) >= this.relicGoal ? 2 : null;
+      if (winningTeam) {
+        this.relicWinningTeam = winningTeam;
+        this.relicWinCountdown = this.relicWinDelay;
+        this.onLogMessage?.(`💎 [보석 쟁탈전] ${winningTeam === 1 ? "레드" : "블루"}팀이 보석 10개 확보! 5초를 지켜내면 승리합니다.`, "skill");
+      }
+    } else {
+      if (this.getTeamRelicCount(this.relicWinningTeam) < this.relicGoal) {
+        this.onLogMessage?.("💎 [보석 쟁탈전] 보석이 떨어져 승리 카운트가 취소되었습니다!", "default");
+        this.relicWinningTeam = null;
+        this.relicWinCountdown = 0;
+      } else {
+        this.relicWinCountdown -= dt;
+        if (this.relicWinCountdown <= 0) this.finishTeamObjective(this.relicWinningTeam);
+      }
+    }
   }
 
   /**
@@ -380,17 +406,10 @@ export class GameLounge {
     this.eliminationCount = 0;
     this.teamGameType = teamGameType;
     this.controlScores = { red: 0, blue: 0 };
-    this.royalKing =
-      teamGameType === "siege"
-        ? {
-            x: this.canvas.width * 0.78,
-            y: this.canvas.height / 2,
-            vx: this.royalKingSpeed,
-            vy: this.royalKingSpeed * 0.55,
-            hp: this.royalKingHp,
-            maxHp: this.royalKingHp,
-          }
-        : null;
+    this.relicGems = [];
+    this.relicSpawnTimer = 0;
+    this.relicWinningTeam = null;
+    this.relicWinCountdown = 0;
 
     // 캐릭터 내부의 함수 객체(훅)들은 JSON.parse(JSON.stringify()) 과정에서 손실되므로,
     // 원본 selectedCharacters 리스트에서 함수들을 다시 찾아와 연결 복원
@@ -531,7 +550,7 @@ export class GameLounge {
       (c) => c.isBoss && !c.id.includes("clone"),
     );
 
-    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame) {
+    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame && !this.isObjectiveTeamMode()) {
       this.roundTimer -= dt;
       if (this.roundTimer <= 0) {
         this.roundTimer = 0;
@@ -549,9 +568,11 @@ export class GameLounge {
             ? this.characters.find((char) => char.teamId === winningTeam) ||
               null
             : null;
-        } else if (this.teamGameType === "siege") {
-          this.winnerCharacter =
-            this.characters.find((char) => char.teamId === 2) || null;
+        } else if (this.teamGameType === "relic") {
+          const redRelics = this.getTeamRelicCount(1);
+          const blueRelics = this.getTeamRelicCount(2);
+          const winningTeam = redRelics === blueRelics ? null : redRelics > blueRelics ? 1 : 2;
+          this.winnerCharacter = winningTeam ? this.characters.find((char) => char.teamId === winningTeam) || null : null;
         } else {
           // 판정: 체력 낮은 캐릭터 사망
           const sortedAlive = [...aliveRealPlayers].sort((a, b) => b.hp - a.hp);
@@ -806,6 +827,10 @@ export class GameLounge {
         char.stunTimeLeft > 0
       ) {
         char.stunTimeLeft -= dt;
+        // 기절은 공격만 막는 상태가 아니라 완전한 이동 정지다.
+        // 캐릭터 고유 업데이트가 속도를 다시 넣어도 공통 엔진에서 매 프레임 제거한다.
+        char.vx = 0;
+        char.vy = 0;
         if (char.stunTimeLeft <= 0) {
           char.isStunned = false;
           char.stunTimeLeft = 0;
@@ -1155,6 +1180,7 @@ export class GameLounge {
     if (target.hp <= 0) {
       target.hp = 0;
       target.isDead = true;
+      if (this.teamGameType === "relic") this.dropRelics(target);
       target.opacity = 0.8;
       if (
         this.isObjectiveTeamMode() &&
@@ -1354,32 +1380,31 @@ export class GameLounge {
       this.ctx.fillText("CAPTURE", centerX, centerY + 40);
       this.ctx.restore();
     }
-    if (this.teamGameType === "siege" && this.royalKing) {
-      const king = this.royalKing;
-      const healthRatio = king.hp / king.maxHp;
+    if (this.teamGameType === "relic") {
       this.ctx.save();
-      this.ctx.fillStyle = "rgba(0, 122, 255, 0.28)";
-      this.ctx.strokeStyle = "#00c6ff";
-      this.ctx.lineWidth = 5;
-      this.ctx.beginPath();
-      this.ctx.arc(king.x, king.y, this.royalKingRadius, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.stroke();
-      this.ctx.fillStyle = "#ffffff";
-      this.ctx.font = "44px sans-serif";
-      this.ctx.textAlign = "center";
-      this.ctx.fillText("👑", king.x, king.y + 16);
-      this.ctx.fillStyle = "#07111f";
-      this.ctx.fillRect(king.x - 66, king.y - 92, 132, 12);
-      this.ctx.fillStyle = "#00c6ff";
-      this.ctx.fillRect(king.x - 66, king.y - 92, 132 * healthRatio, 12);
-      this.ctx.fillStyle = "#ffffff";
-      this.ctx.font = "bold 13px Orbit";
-      this.ctx.fillText(
-        `BLUE KING ${Math.ceil(king.hp)}/${king.maxHp}`,
-        king.x,
-        king.y - 104,
-      );
+      const portals = [
+        { x: this.canvas.width * 0.25, y: this.canvas.height * 0.3 },
+        { x: this.canvas.width * 0.5, y: this.canvas.height * 0.68 },
+        { x: this.canvas.width * 0.75, y: this.canvas.height * 0.3 },
+      ];
+      portals.forEach((portal) => {
+        this.ctx.strokeStyle = "rgba(192,132,252,0.65)";
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(portal.x, portal.y, 28 + Math.sin(performance.now() / 260) * 4, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.fillStyle = "rgba(139,92,246,0.14)";
+        this.ctx.fill();
+      });
+      this.relicGems.forEach((gem) => {
+        this.ctx.fillStyle = "#d8b4fe";
+        this.ctx.shadowBlur = 14;
+        this.ctx.shadowColor = "#a855f7";
+        this.ctx.beginPath();
+        this.ctx.arc(gem.x, gem.y, 10, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+      this.ctx.shadowBlur = 0;
       this.ctx.restore();
     }
 
@@ -1389,7 +1414,7 @@ export class GameLounge {
       (c) => c.isBoss && !c.id.includes("clone"),
     );
 
-    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame) {
+    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame && !this.isObjectiveTeamMode()) {
       this.ctx.save();
       this.ctx.fillStyle = this.roundTimer <= 10.0 ? "#ff3366" : "#ffffff";
       this.ctx.shadowBlur = 15;

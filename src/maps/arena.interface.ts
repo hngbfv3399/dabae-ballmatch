@@ -1,4 +1,4 @@
-export type TeamGameType = 'deathmatch' | 'control' | 'siege';
+export type TeamGameType = 'deathmatch' | 'control' | 'relic';
 
 export interface ArenaConfig {
   id: string;

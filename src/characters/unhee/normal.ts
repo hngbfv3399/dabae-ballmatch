@@ -141,6 +141,8 @@ export const unheeConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   onCollisionWithTarget(char: CharacterState, opponent: CharacterState, ctx) {
     if (opponent.isDead || opponent.id.includes('clone')) return;
+    // 강제 쇠질은 적에게만 적용한다. 팀전/보스전의 아군 충돌은 CC를 발생시키지 않는다.
+    if (char.teamId !== undefined && opponent.teamId !== undefined && char.teamId === opponent.teamId) return;
 
     // Passive: 35% chance to force opponent to exercise (stun 1.5s) on contact (4s internal cooldown per target)
     const now = Date.now();

@@ -19,6 +19,7 @@ export interface CharacterConfig {
   id: string;
   name: string;
   image?: string;          // 캐릭터 초상화 이미지 경로 (선택 사항)
+  characterFamilyId?: string; // 일반/보스 버전을 묶는 동일 캐릭터 계열 ID
   radius?: number;         // 전용 보스 등 캐릭터별 기본 충돌 반지름
   maxHp: number;
   speed: number;          // 기본 속도 배율
@@ -105,6 +106,7 @@ export interface CharacterState extends CharacterConfig {
   isCcImmune?: boolean;
   knockbackInertiaLeft?: number;
   wasAboveKnockbackThreshold?: boolean;
+  relicGems?: number; // 보석 쟁탈전에서 현재 보유 중인 보석 수
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

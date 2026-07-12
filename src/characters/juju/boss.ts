@@ -116,6 +116,7 @@ function distanceToFault(target: CharacterState, fault: TemporalFault) {
 // ═══════════════════════════════════════════
 export const jujuSingularityBossConfig: CharacterConfig = {
   id: 'juju_singularity_boss',
+  characterFamilyId: 'juju',
   name: '주주',
   maxHp: SKILL_CONSTANTS.MAX_HP,
   radius: SKILL_CONSTANTS.RADIUS,

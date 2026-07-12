@@ -124,6 +124,38 @@ body {
   border-color: var(--text-secondary);
 }
 
+.tournament-bracket {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 0.65rem;
+  width: 100%;
+  margin-top: 1rem;
+  overflow-x: auto;
+  text-align: left;
+}
+
+.tournament-round {
+  display: flex;
+  min-width: 130px;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: #ffe08a;
+  font-size: 0.72rem;
+}
+
+.tournament-match {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.22);
+  color: var(--text-secondary);
+}
+
+.tournament-match.complete b { color: #39ff14; }
+
 /* ==================== LOBBY VIEW ==================== */
 .lobby-header {
   text-align: center;

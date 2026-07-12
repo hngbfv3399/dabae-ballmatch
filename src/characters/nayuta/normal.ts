@@ -46,6 +46,12 @@ export const nayutaConfig: CharacterConfig = {
     const chars = ctx.characters;
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
+      if (char.teamId !== undefined && enemy.teamId !== undefined && char.teamId === enemy.teamId) {
+        // Defensive cleanup for any legacy ally-domination state.
+        enemy.nayutaControlled = false;
+        enemy.nayutaControlTimeLeft = 0;
+        return;
+      }
       if (enemy.nayutaControlled) {
         if (enemy.skillActive) {
           enemy.skillActive = false;
@@ -97,6 +103,11 @@ export const nayutaConfig: CharacterConfig = {
     // A. Update domination duration timer on enemies
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
+      if (char.teamId !== undefined && enemy.teamId !== undefined && char.teamId === enemy.teamId) {
+        enemy.nayutaControlled = false;
+        enemy.nayutaControlTimeLeft = 0;
+        return;
+      }
       if (enemy.nayutaControlled) {
         if (enemy.nayutaControlTimeLeft !== undefined) {
           enemy.nayutaControlTimeLeft -= dt;
@@ -140,6 +151,9 @@ export const nayutaConfig: CharacterConfig = {
 
           chars.forEach((other) => {
             if (other.isDead || other.id === char.id || other.id === enemy.id || other.nayutaControlled) return;
+            // A dominated enemy must never target Nayuta or Nayuta's allies.
+            // It is forced to turn on its original side instead.
+            if (char.teamId !== undefined && other.teamId !== undefined && char.teamId === other.teamId) return;
             const dist = Math.hypot(other.x - enemy.x, other.y - enemy.y);
             if (dist < minDist) {
               minDist = dist;
@@ -160,7 +174,9 @@ export const nayutaConfig: CharacterConfig = {
               const lastDmg = enemy.lastContactDmgTime || 0;
               if (now - lastDmg > 800) {
                 enemy.lastContactDmgTime = now;
-                ctx.dealDamage(enemy, closestTarget, 25, '👁️ 돌진!');
+                // Deal damage as Nayuta so team-damage protection does not cancel
+                // a controlled enemy's attack against its original allies.
+                ctx.dealDamage(char, closestTarget, 25, '👁️ 지배 돌진!');
                 ctx.createExplosion(enemy.x, enemy.y, '#e52b50', 16);
                 console.log(`👁️ [지배 돌격] ${enemy.name} -> ${(closestTarget as CharacterState).name} 충돌! 대미지: 25`);
                 ctx.logMessage?.(`👁️ [지배 돌격] 조종된 ${enemy.name} ➡️ ${(closestTarget as CharacterState).name} 충돌 (25 피해)`, 'skill');
