@@ -86,6 +86,7 @@ export class GameLounge {
   private eliminationOrder: string[] = [];
   private teamGameType: TeamGameType = "deathmatch";
   private controlScores = { red: 0, blue: 0 };
+  private controlPoint = { x: 0, y: 0 };
   private relicGems: RelicGem[] = [];
   private bossDrops: BossDrop[] = [];
   private mapCuts: MapCut[] = [];
@@ -333,6 +334,7 @@ export class GameLounge {
       type: this.teamGameType,
       redScore: this.controlScores.red,
       blueScore: this.controlScores.blue,
+      controlPoint: this.controlPoint,
       scoreToWin: this.objectiveScoreToWin,
       redRelics: this.getTeamRelicCount(1),
       blueRelics: this.getTeamRelicCount(2),
@@ -345,6 +347,18 @@ export class GameLounge {
 
   private isObjectiveTeamMode(): boolean {
     return this.teamGameType === "control" || this.teamGameType === "relic";
+  }
+
+  private randomizeControlPoint() {
+    // 시작 지점과 벽에서 충분히 떨어진 전투 구역 안에서만 거점을 고른다.
+    const minX = this.canvas.width * 0.32;
+    const maxX = this.canvas.width * 0.68;
+    const minY = this.canvas.height * 0.2;
+    const maxY = this.canvas.height * 0.8;
+    this.controlPoint = {
+      x: minX + Math.random() * (maxX - minX),
+      y: minY + Math.random() * (maxY - minY),
+    };
   }
 
   private getTeamRelicCount(teamId: 1 | 2) {
@@ -416,8 +430,7 @@ export class GameLounge {
       (char) => !char.isDead && !char.id.includes("clone"),
     );
     if (this.teamGameType === "control") {
-      const centerX = this.canvas.width / 2;
-      const centerY = this.canvas.height / 2;
+      const { x: centerX, y: centerY } = this.controlPoint;
       const redCount = players.filter(
         (char) =>
           char.teamId === 1 &&
@@ -529,6 +542,7 @@ export class GameLounge {
     this.eliminationCount = 0;
     this.teamGameType = teamGameType;
     this.controlScores = { red: 0, blue: 0 };
+    this.randomizeControlPoint();
     this.relicGems = [];
     this.bossDrops = [];
     this.mapCuts = [];
@@ -1585,8 +1599,7 @@ export class GameLounge {
     });
 
     if (this.teamGameType === "control") {
-      const centerX = this.canvas.width / 2;
-      const centerY = this.canvas.height / 2;
+      const { x: centerX, y: centerY } = this.controlPoint;
       this.ctx.save();
       this.ctx.fillStyle = "rgba(255, 215, 0, 0.12)";
       this.ctx.strokeStyle = "#ffd700";
