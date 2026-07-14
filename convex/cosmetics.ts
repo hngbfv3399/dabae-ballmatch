@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { isV3CharacterId, kstDate, levelForExperience } from "./v3Constants";
+import { isV3CharacterId, kstDate } from "./v3Constants";
 import { ensureSeasonReset } from "./season";
 
 type Rarity = "common" | "rare" | "epic" | "legendary" | "unique";
@@ -120,10 +120,9 @@ export const getCharacterLoadouts = query({
 });
 
 export const draw = mutation({
-  args: { clientId: v.string(), targetCharacterId: v.string() },
+  args: { clientId: v.string() },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) throw new Error("Client ID is required");
-    assertCharacterId(args.targetCharacterId);
 
     const now = Date.now();
     const today = kstDate(now);
@@ -161,18 +160,6 @@ export const draw = mutation({
         unlockedAt: now,
         unlockedByClientId: args.clientId,
       });
-    } else {
-      const progress = await ctx.db
-        .query("characterProgress")
-        .withIndex("by_characterId", (q) => q.eq("characterId", args.targetCharacterId))
-        .unique();
-      if (!progress) throw new Error("Character progress has not been initialized");
-      const experience = progress.experience + experienceGranted;
-      await ctx.db.patch(progress._id, {
-        experience,
-        level: levelForExperience(experience),
-        updatedAt: now,
-      });
     }
 
     if (gachaState) {
@@ -181,6 +168,7 @@ export const draw = mutation({
         dailyDrawsUsed: dailyDrawsUsed + (hasDailyDraw ? 1 : 0),
         completedPlayCount,
         bonusDrawsUsed: bonusDrawsUsed + (hasDailyDraw ? 0 : 1),
+        experiencePoints: (gachaState.experiencePoints ?? 0) + experienceGranted,
         updatedAt: now,
       });
     } else {
@@ -190,13 +178,13 @@ export const draw = mutation({
         dailyDrawsUsed: 1,
         completedPlayCount: 0,
         bonusDrawsUsed: 0,
+        experiencePoints: experienceGranted,
         updatedAt: now,
       });
     }
 
     await ctx.db.insert("gachaDrawHistory", {
       clientId: args.clientId,
-      targetCharacterId: args.targetCharacterId,
       cosmeticId: cosmetic.cosmeticId,
       result: unlock ? "duplicateExperience" : "unlocked",
       experienceGranted,

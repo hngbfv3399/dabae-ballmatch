@@ -146,7 +146,44 @@ export const getClientGachaProgress = query({
       // 보너스 뽑기 카운트는 PvP 경기 수가 아닌 던전 클리어 수만 집계한다.
       completedDungeonClears: completedPlayCount,
       bonusDrawsAvailable: Math.max(0, Math.floor(completedPlayCount / 3) - bonusDrawsUsed),
+      experiencePoints: state?.experiencePoints ?? 0,
     };
+  },
+});
+
+export const spendExperiencePoints = mutation({
+  args: { clientId: v.string(), characterId: v.string(), amount: v.number() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    assertCharacterId(args.characterId);
+    if (!Number.isInteger(args.amount) || args.amount <= 0) throw new Error("Invalid experience point amount");
+
+    const gachaState = await ctx.db
+      .query("anonymousGachaStates")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .unique();
+    const availablePoints = gachaState?.experiencePoints ?? 0;
+    if (!gachaState || args.amount > availablePoints) throw new Error("Not enough experience points");
+
+    const characterProgress = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (!characterProgress) throw new Error("Character progress has not been initialized");
+
+    const now = Date.now();
+    const experience = characterProgress.experience + args.amount;
+    await ctx.db.patch(characterProgress._id, {
+      experience,
+      level: levelForExperience(experience),
+      updatedAt: now,
+    });
+    await ctx.db.patch(gachaState._id, {
+      experiencePoints: availablePoints - args.amount,
+      updatedAt: now,
+    });
+
+    return { experiencePoints: availablePoints - args.amount, ...growthSummary(experience) };
   },
 });
 
@@ -286,6 +323,7 @@ export const recordDungeonClear = mutation({
         dailyDrawsUsed: 0,
         completedPlayCount: nextCompletedPlayCount,
         bonusDrawsUsed: 0,
+        experiencePoints: 0,
         updatedAt: now,
       });
     }

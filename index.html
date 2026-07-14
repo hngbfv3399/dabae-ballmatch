@@ -204,12 +204,17 @@
             <div><span class="eyebrow">GACHA</span><h2>스킨 뽑기</h2></div>
           </div>
           <div class="gacha-controls">
-            <label id="gacha-target-wrap">중복 XP 대상
+            <label>경험치 포인트 사용 대상
               <select id="gacha-target-character"></select>
             </label>
+            <label>사용할 포인트
+              <input id="experience-point-amount" type="number" min="1" step="1" inputmode="numeric" value="1">
+            </label>
+            <button id="experience-point-use-btn" class="btn btn-secondary" type="button" disabled>포인트 사용</button>
             <p id="gacha-draw-status" class="gacha-draw-status">스킨 도감을 불러오는 중입니다.</p>
             <button id="gacha-draw-btn" class="btn btn-primary" type="button" disabled>뽑기</button>
           </div>
+          <p class="experience-point-help">중복 스킨을 획득하면 등급별 경험치 포인트가 적립됩니다. 보유 포인트 안에서 원하는 캐릭터를 선택해 나누어 사용할 수 있으며, 스킨 장착 여부와는 관계없습니다.</p>
           <p id="gacha-result" class="gacha-result" aria-live="polite"></p>
           <div class="gacha-preview-layout"><div id="gacha-catalog" class="gacha-catalog"></div><aside id="gacha-preview" class="gacha-preview">왼쪽 아이콘을 클릭하면 스킨 미리보기가 표시됩니다.</aside></div>
         </div>

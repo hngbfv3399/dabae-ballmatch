@@ -130,20 +130,21 @@ export default defineSchema({
     updatedByClientId: v.optional(v.string()),
   }).index("by_characterId", ["characterId"]),
 
-  // 로그인 없는 환경의 일일 뽑기·플레이 보상 상태. 브라우저 익명 ID 단위로만 관리한다.
+  // 로그인 없는 환경의 일일 뽑기·플레이·경험치 포인트 상태. 브라우저 익명 ID 단위로만 관리한다.
   anonymousGachaStates: defineTable({
     clientId: v.string(),
     dailyResetDate: v.string(),
     dailyDrawsUsed: v.number(),
     completedPlayCount: v.number(),
     bonusDrawsUsed: v.number(),
+    experiencePoints: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_clientId", ["clientId"]),
 
   // 가챠 이력은 계속 늘어나므로 상태 문서와 분리한다.
   gachaDrawHistory: defineTable({
     clientId: v.string(),
-    targetCharacterId: v.string(),
+    targetCharacterId: v.optional(v.string()),
     cosmeticId: v.string(),
     result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
     experienceGranted: v.number(),
