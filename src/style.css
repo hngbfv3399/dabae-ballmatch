@@ -2103,6 +2103,7 @@ body {
 .combat-setting-button.active { border-color: #00e5ff; background: linear-gradient(135deg, rgba(0, 159, 190, 0.72), rgba(65, 20, 164, 0.58)); color: #fff; box-shadow: 0 0 9px rgba(0, 229, 255, 0.22); }
 .random-match-button { width: 100%; min-height: 44px; margin-top: 0.75rem; border: 1px solid rgba(174, 81, 255, 0.75); background: linear-gradient(135deg, rgba(88, 20, 185, 0.9), rgba(228, 25, 133, 0.78)); color: #fff; font-size: 0.86rem; font-weight: 800; box-shadow: 0 0 14px rgba(158, 56, 255, 0.26); }
 .random-match-button:hover { border-color: #f1c4ff; filter: brightness(1.12); }
+.fill-random-slots-btn { width:100%; margin:-.35rem 0 1rem; border-color:rgba(250,204,21,.55); background:rgba(250,204,21,.08); color:#fef08a; font-size:.72rem; }
 
 .lobby-main { grid-template-columns: minmax(0, 1fr) 290px; align-items: start; gap: 1.25rem; }
 .roster-panel { min-width: 0; padding: 1.25rem; border-top: 1px solid rgba(255,255,255,0.14); background: rgba(6, 8, 20, 0.38); }

@@ -42,6 +42,7 @@ const pveCharacterList = document.getElementById("pve-character-list") as HTMLEl
 const pveStageSelect = document.getElementById("pve-stage-select") as HTMLSelectElement;
 const modeSettingsRow = document.getElementById("mode-settings-row") as HTMLElement;
 const matchSelectionSlots = document.getElementById("match-selection-slots") as HTMLElement;
+const fillRandomSlotsBtn = document.getElementById("fill-random-slots-btn") as HTMLButtonElement;
 const matchCharacterPickerModal = document.getElementById("match-character-picker-modal") as HTMLElement;
 const matchCharacterPickerClose = document.getElementById("match-character-picker-close") as HTMLButtonElement;
 const matchCharacterPickerList = document.getElementById("match-character-picker-list") as HTMLElement;
@@ -2586,6 +2587,26 @@ function renderMatchSlots() {
   });
 }
 
+function fillEmptyMatchSlotsRandomly() {
+  const preservedCharacterIds = new Set(matchSlotIds.filter((id): id is string => id !== null));
+  const candidates = availableCharacters.filter((character) => !preservedCharacterIds.has(character.id));
+  for (let index = candidates.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [candidates[index], candidates[randomIndex]] = [candidates[randomIndex], candidates[index]];
+  }
+
+  let candidateIndex = 0;
+  matchSlotIds = matchSlotIds.map((characterId) => characterId ?? candidates[candidateIndex++]?.id ?? null);
+  selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear();
+  matchSlotIds.forEach((characterId, index) => {
+    if (!characterId) return;
+    selectedIds.add(characterId);
+    if (currentMode === "team") (index < 3 ? selectedRedIds : selectedBlueIds).add(characterId);
+  });
+  renderMatchSlots();
+  updateStartButtonState();
+}
+
 function renderMatchCharacterPicker() {
   matchCharacterPickerList.innerHTML = "";
   const candidates = isPickingPveCharacter
@@ -2820,6 +2841,7 @@ updateTeamGameTypeVisibility();
   pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);
   pveCharacterModalClose.addEventListener("click", () => pveCharacterModal.classList.add("hidden"));
   pveStartBtn.addEventListener("click", startPveDungeon);
+  fillRandomSlotsBtn.addEventListener("click", fillEmptyMatchSlotsRandomly);
   initCosmetics();
   gachaDrawBtn.addEventListener("click", () => void drawGacha());
   matchCharacterPickerClose.addEventListener("click", () => matchCharacterPickerModal.classList.add("hidden"));
