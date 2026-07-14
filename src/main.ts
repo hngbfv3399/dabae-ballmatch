@@ -200,6 +200,8 @@ let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
 let pveProgressUnsubscribe: (() => void) | null = null;
+let pveDungeonClearCount = 0;
+let pveAdvancePending = false;
 type Cosmetic = { cosmeticId: string; name: string; rarity: "common" | "rare" | "epic" | "legendary" | "unique"; isUnlocked: boolean; style: CharacterCosmeticStyle };
 let cosmeticCatalog: Cosmetic[] = [];
 let cosmeticLoadouts = new Map<string, string>();
@@ -1598,6 +1600,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     const clearedStage = winner?.teamId === 1 && player && !player.isDead;
     if (!clearedStage || !player) {
       pveRun = null;
+      pveAdvancePending = false;
       if (winnerTitle) winnerTitle.textContent = "DUNGEON FAILED";
       winnerInfo.innerHTML = `<div class="winner-trophy">💀</div><div class="win-name" style="color:#ff5e5e">던전 실패</div><div class="win-desc">슬라임 소굴을 끝까지 돌파하지 못했습니다. 실패 시 경험치는 지급되지 않습니다.</div>`;
       modalCloseBtn.textContent = "던전 선택으로";
@@ -1607,15 +1610,20 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 
     run.currentHp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
     if (run.stage < SLIME_MEADOW_STAGE_COUNT) {
+      const clearedStageNumber = run.stage;
+      const dungeonExperience = pveDungeonClearCount === 0 ? 450 : 200;
       run.stage += 1;
-      gameStatusText.textContent = `스테이지 ${run.stage - 1} 클리어 · HP 25% 회복`;
-      window.setTimeout(() => {
-        if (pveRun === run) startPveStage();
-      }, 900);
+      pveAdvancePending = true;
+      gameStatusText.textContent = `던전 1-${clearedStageNumber} 클리어 · 다음 스테이지 대기 중`;
+      if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
+      winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 1-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>획득 예정 경험치</span><strong class="text-neon-yellow">+${dungeonExperience} XP</strong></div><div class="stat-row"><span>다음 전투</span><strong>던전 1-${run.stage}</strong></div></div><p class="win-desc" style="margin-top:0.9rem">경험치는 던전 1-5까지 모두 클리어하면 지급됩니다.</p>`;
+      modalCloseBtn.textContent = "다음 스테이지";
+      winnerModal.classList.remove("hidden");
       return;
     }
 
     pveRun = null;
+    pveAdvancePending = false;
     const clearTimeMs = Date.now() - run.startedAt;
     gameStatusText.textContent = "던전 클리어";
     void convexClient.mutation(api.progression.recordDungeonClear, {
@@ -1870,6 +1878,11 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 // Close Winner Modal and go to Lobby
 function closeWinnerModal() {
   winnerModal.classList.add("hidden");
+  if (currentMode === "pve" && pveAdvancePending && pveRun) {
+    pveAdvancePending = false;
+    startPveStage();
+    return;
+  }
   if (currentMode === "tournament" && tournamentState?.awaitingNext) {
     tournamentState.awaitingNext = false;
     launchNextTournamentMatch();
@@ -1882,6 +1895,7 @@ function goBackToLobby() {
   if (gameView.classList.contains("is-focus-mode")) void setFocusMode(false);
   isPracticeMode = false;
   pveRun = null;
+  pveAdvancePending = false;
   tournamentState = null;
   if (tournamentHeader) tournamentHeader.classList.add("hidden");
   if (gameLounge) {
@@ -2372,6 +2386,7 @@ function initPveProgressSubscription() {
   pveProgressUnsubscribe?.();
   pveProgressUnsubscribe = convexClient.onUpdate(api.progression.getOverview, {}, (overview) => {
     pveProgressByCharacter = new Map(overview.characters.map((progress) => [progress.characterId, progress]));
+    pveDungeonClearCount = overview.dungeon.clearCount;
     updatePveSelectionUI();
     if (!pveCharacterModal.classList.contains("hidden")) renderPveCharacterList();
     if (!collectionHubPanel.classList.contains("hidden")) renderCollection();
