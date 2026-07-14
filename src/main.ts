@@ -2102,6 +2102,11 @@ function initCombatSettings() {
   statsButtons.forEach((button) => {
     button.addEventListener("click", () => {
       selectedStatsMode = button.dataset.statsMode ?? "solo";
+      if (currentMode === "team" && selectedStatsMode.startsWith("team:")) {
+        teamGameType = selectedStatsMode.replace("team:", "") as TeamGameType;
+        teamGameTypeSelect.value = teamGameType;
+        updateStartButtonState();
+      }
       statsButtons.forEach((candidate) => {
         const isSelected = candidate === button;
         candidate.classList.toggle("active", isSelected);
