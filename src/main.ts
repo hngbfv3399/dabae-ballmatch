@@ -1581,10 +1581,7 @@ function goBackToLobby() {
 }
 
 function startRandomGame() {
-  const modeRadio = document.querySelector(
-    'input[name="random-game-mode"]:checked',
-  ) as HTMLInputElement;
-  const randMode = modeRadio ? modeRadio.value : "solo";
+  const randMode = currentMode;
 
   // 피셔-예이츠 셔플 알고리즘을 사용해 완전한 무작위 보장
   const shuffled = [...availableCharacters];
@@ -1597,36 +1594,6 @@ function startRandomGame() {
   selectedRedIds.clear();
   selectedBlueIds.clear();
   bossCharacterId = null;
-
-  // 탭 상태 비주얼 동기화 헬퍼
-  const syncModeTabs = (mode: GameMode) => {
-    currentMode = mode;
-    updateTeamGameTypeVisibility();
-    const modeTabs = document.querySelectorAll(".mode-tab");
-    const modeDesc = document.getElementById("mode-desc");
-    const modeDescriptions: Record<string, string> = {
-      solo: "⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)",
-      team: "🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.",
-      boss: "👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스 능력치는 각 보스 파일에서 독립적으로 정의됩니다.",
-      tournament: "🏆 토너먼트: 16명을 선택하면 무작위 대진표로 1대1 단일 토너먼트를 진행합니다.",
-    };
-    modeTabs.forEach((t) => {
-      t.classList.remove("active");
-      (t as HTMLElement).style.background = "transparent";
-      (t as HTMLElement).style.color = "#888";
-    });
-    const targetTab = document.querySelector(
-      `.mode-tab[data-mode="${mode}"]`,
-    ) as HTMLElement;
-    if (targetTab) {
-      targetTab.classList.add("active");
-      targetTab.style.background = "rgba(255, 255, 255, 0.1)";
-      targetTab.style.color = "#fff";
-    }
-    if (modeDesc) {
-      modeDesc.textContent = modeDescriptions[mode] || "";
-    }
-  };
 
   if (randMode === "team") {
     teamGameType = randomTeamGameTypeSelect.value as TeamGameType;
@@ -1641,7 +1608,6 @@ function startRandomGame() {
         selectedBlueIds.add(c.id); // 3명 BLUE
       }
     });
-    syncModeTabs("team");
   } else if (randMode === "boss") {
     if (availableBossCharacters.length === 0) {
       alert(
@@ -1667,17 +1633,14 @@ function startRandomGame() {
       selectedIds.add(c.id);
       selectedRedIds.add(c.id); // 4명 도전자 (RED)
     });
-    syncModeTabs("boss");
   } else if (randMode === "tournament") {
     shuffled.slice(0, 16).forEach((character) => selectedIds.add(character.id));
-    syncModeTabs("tournament");
   } else {
     // 개인전 랜덤 (지정 인원)
     const count = parseInt(randomPlayerCountSelect.value, 10);
     if (isNaN(count) || count < 1 || count > 6) return;
     const selected = shuffled.slice(0, count);
     selected.forEach((c) => selectedIds.add(c.id));
-    syncModeTabs("solo");
   }
 
   // 로비 카드 및 시작 버튼 갱신 후 플레이 개시
@@ -2051,6 +2014,7 @@ function initModeSelection() {
       const selectedMode = tab.getAttribute("data-mode") as GameMode;
       currentMode = selectedMode;
       updateTeamGameTypeVisibility();
+      updateRandomMatchPanel(selectedMode);
 
       if (modeDesc) {
         modeDesc.textContent = modeDescriptions[selectedMode] || "";
@@ -2068,11 +2032,7 @@ function initModeSelection() {
   });
 }
 
-// Initialize Random Game Mode Radio Change Listeners
-function initRandomModeRadioListeners() {
-  const radioButtons = document.querySelectorAll(
-    'input[name="random-game-mode"]',
-  );
+function updateRandomMatchPanel(mode: GameMode) {
   const countSettingItem = document.getElementById("random-count-setting-item");
   const randomConsole = document.getElementById("random-match-console");
   const randomModeMeta = document.getElementById("random-mode-meta");
@@ -2080,51 +2040,20 @@ function initRandomModeRadioListeners() {
   const randomModeDescription = document.getElementById("random-mode-description");
   const randomStartLabel = document.getElementById("random-start-label");
 
-  const updateRandomModePanel = (mode: GameMode) => {
-    const content: Record<GameMode, { meta: string; title: string; description: string; button: string }> = {
-      solo: {
-        meta: "2–6명 · 자유 난투",
-        title: "개인전 빠른 매치",
-        description: "인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.",
-        button: "개인전 랜덤 매치 시작",
-      },
-      team: {
-        meta: "3 vs 3 · 균등 편성",
-        title: "팀전 빠른 매치",
-        description: "6명의 캐릭터를 무작위로 뽑아 RED와 BLUE 팀에 3명씩 자동 배정합니다.",
-        button: "팀전 랜덤 매치 시작",
-      },
-      boss: {
-        meta: "BOSS 1명 vs 도전자 4명",
-        title: "보스 레이드 빠른 매치",
-        description: "등록된 보스 1명과 같은 계열을 제외한 무작위 도전자 4명을 자동 편성합니다.",
-        button: "보스 레이드 시작",
-      },
-      tournament: {
-        meta: "16명 · 단일 엘리미네이션",
-        title: "16강 토너먼트 빠른 매치",
-        description: "일반 캐릭터 16명을 무작위로 선발해 16강부터 결승까지 연속 진행합니다.",
-        button: "랜덤 토너먼트 시작",
-      },
-    };
-    const current = content[mode];
-    randomConsole?.setAttribute("data-mode", mode);
-    if (randomModeMeta) randomModeMeta.textContent = current.meta;
-    if (randomModeTitle) randomModeTitle.textContent = current.title;
-    if (randomModeDescription) randomModeDescription.textContent = current.description;
-    if (randomStartLabel) randomStartLabel.textContent = current.button;
-    if (countSettingItem) countSettingItem.style.display = mode === "solo" ? "flex" : "none";
-    randomTeamGameTypeSetting.classList.toggle("hidden", mode !== "team");
+  const content: Record<GameMode, { meta: string; title: string; description: string; button: string }> = {
+    solo: { meta: "2–6명 · 자유 난투", title: "개인전 빠른 매치", description: "인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.", button: "개인전 랜덤 매치 시작" },
+    team: { meta: "3 vs 3 · 균등 편성", title: "팀전 빠른 매치", description: "6명의 캐릭터를 무작위로 뽑아 RED와 BLUE 팀에 3명씩 자동 배정합니다.", button: "팀전 랜덤 매치 시작" },
+    boss: { meta: "BOSS 1명 vs 도전자 4명", title: "보스 레이드 빠른 매치", description: "등록된 보스 1명과 같은 계열을 제외한 무작위 도전자 4명을 자동 편성합니다.", button: "보스 레이드 시작" },
+    tournament: { meta: "16명 · 단일 엘리미네이션", title: "16강 토너먼트 빠른 매치", description: "일반 캐릭터 16명을 무작위로 선발해 16강부터 결승까지 연속 진행합니다.", button: "랜덤 토너먼트 시작" },
   };
-
-  radioButtons.forEach((radio) => {
-    radio.addEventListener("change", (e) => {
-      const targetVal = (e.target as HTMLInputElement).value;
-      updateRandomModePanel(targetVal as GameMode);
-    });
-  });
-  const selectedMode = document.querySelector('input[name="random-game-mode"]:checked') as HTMLInputElement | null;
-  updateRandomModePanel((selectedMode?.value ?? "solo") as GameMode);
+  const current = content[mode];
+  randomConsole?.setAttribute("data-mode", mode);
+  if (randomModeMeta) randomModeMeta.textContent = current.meta;
+  if (randomModeTitle) randomModeTitle.textContent = current.title;
+  if (randomModeDescription) randomModeDescription.textContent = current.description;
+  if (randomStartLabel) randomStartLabel.textContent = current.button;
+  if (countSettingItem) countSettingItem.style.display = mode === "solo" ? "flex" : "none";
+  randomTeamGameTypeSetting.classList.toggle("hidden", mode !== "team");
 }
 
 teamGameTypeSelect.addEventListener("change", () => {
@@ -2134,7 +2063,7 @@ teamGameTypeSelect.addEventListener("change", () => {
 
 // Start APP
 initModeSelection();
-initRandomModeRadioListeners();
+updateRandomMatchPanel(currentMode);
 updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
