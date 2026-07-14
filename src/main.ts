@@ -2428,7 +2428,7 @@ function startPveStage() {
   aliveCountEl.textContent = String(enemyStates.length + 1);
   gameStatusText.textContent = `슬라임 소굴 · ${pveRun.stage}/${SLIME_MEADOW_STAGE_COUNT} 스테이지`;
   if (!gameLounge) gameLounge = new GameLounge(gameCanvas, updateHUD, showWinner, updateCountdown, recordCharacterDeath);
-  gameLounge.init([player, ...enemyStates], gameSpeedMultiplier, "deathmatch");
+  gameLounge.init([player, ...enemyStates], gameSpeedMultiplier, "deathmatch", true);
 }
 
 // Initialize Game Mode Tab Selection

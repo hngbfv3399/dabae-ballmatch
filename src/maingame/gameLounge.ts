@@ -77,6 +77,8 @@ export class GameLounge {
   private lastTime: number = 0;
   private simulationSpeed: number = 1.0;
   private roundTimer: number = 90.0;
+  private isPveMode: boolean = false;
+  private pveNoDamageTimer: number = 0;
 
   // 게임 오버 애니메이션 지연을 위한 변수들
   private isGameOver: boolean = false;
@@ -107,6 +109,8 @@ export class GameLounge {
   private readonly relicCarrierSlowCap = 0.18;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
+  private readonly pveSteeringStrength = 3.2;
+  private readonly pveStalemateSeconds = 10;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -525,6 +529,7 @@ export class GameLounge {
     selectedCharacters: CharacterState[],
     simulationSpeed: number = 1.0,
     teamGameType: TeamGameType = "deathmatch",
+    isPveMode: boolean = false,
   ) {
     this.characters = JSON.parse(JSON.stringify(selectedCharacters)); // 딥카피로 초기 상태 보존
     this.simulationSpeed = simulationSpeed;
@@ -539,6 +544,8 @@ export class GameLounge {
     this.gameOverTimer = 0;
     this.winnerCharacter = null;
     this.roundTimer = 90.0;
+    this.isPveMode = isPveMode;
+    this.pveNoDamageTimer = 0;
     this.eliminationOrder = [];
     this.eliminationCount = 0;
     this.teamGameType = teamGameType;
@@ -684,6 +691,59 @@ export class GameLounge {
   /**
    * 게임 상태 업데이트
    */
+  private steerPveCharacterTowardEnemy(
+    char: CharacterState,
+    aliveCharacters: CharacterState[],
+    dt: number,
+  ) {
+    if (!this.isPveMode || char.isStunned || char.isConfused || char.isTyping) return;
+    let closestEnemy: CharacterState | null = null;
+    let closestDistance = Infinity;
+    for (const candidate of aliveCharacters) {
+      if (candidate.id === char.id || candidate.teamId === char.teamId) continue;
+      const distance = Math.hypot(candidate.x - char.x, candidate.y - char.y);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestEnemy = candidate;
+      }
+    }
+    if (!closestEnemy) return;
+
+    const engageDistance = char.baseAttackRange + closestEnemy.radius;
+    if (closestDistance <= engageDistance * 0.85) return;
+    const directionX = (closestEnemy.x - char.x) / closestDistance;
+    const directionY = (closestEnemy.y - char.y) / closestDistance;
+    const desiredSpeed = 3.5 * char.speed;
+    const blend = Math.min(1, dt * this.pveSteeringStrength);
+    char.vx += (directionX * desiredSpeed - char.vx) * blend;
+    char.vy += (directionY * desiredSpeed - char.vy) * blend;
+  }
+
+  private resolvePveStalemate(aliveCharacters: CharacterState[]) {
+    const player = aliveCharacters.find((char) => char.teamId === 1);
+    if (!player) return;
+    const enemy = aliveCharacters
+      .filter((char) => char.teamId === 2)
+      .sort((left, right) => Math.hypot(left.x - player.x, left.y - player.y) - Math.hypot(right.x - player.x, right.y - player.y))[0];
+    if (!enemy) return;
+
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+    const separation = Math.max(player.radius + enemy.radius + 14, 64);
+    player.x = centerX - separation / 2;
+    player.y = centerY;
+    enemy.x = centerX + separation / 2;
+    enemy.y = centerY;
+    const playerSpeed = 3.5 * player.speed;
+    const enemySpeed = 3.5 * enemy.speed;
+    player.vx = playerSpeed;
+    player.vy = 0;
+    enemy.vx = -enemySpeed;
+    enemy.vy = 0;
+    this.pveNoDamageTimer = 0;
+    this.floatingTexts.push({ x: centerX, y: centerY - 50, text: "⚔️ 전투 재개!", color: "#facc15", life: 1.4 });
+  }
+
   private update(dt: number) {
     if (!this.isPrepared) {
       // 1. 준비 단계 (3초 카운트다운)
@@ -741,7 +801,7 @@ export class GameLounge {
       (c) => c.isBoss && !c.id.includes("clone"),
     );
 
-    if (this.isPrepared && !this.isGameOver && !isPractice && !isBossGame && !this.isObjectiveTeamMode()) {
+    if (this.isPrepared && !this.isPveMode && !this.isGameOver && !isPractice && !isBossGame && !this.isObjectiveTeamMode()) {
       this.roundTimer -= dt;
       if (this.roundTimer <= 0) {
         this.roundTimer = 0;
@@ -946,6 +1006,11 @@ export class GameLounge {
 
     const context = this.getBehaviorContext();
 
+    if (this.isPveMode) {
+      this.pveNoDamageTimer += dt;
+      if (this.pveNoDamageTimer >= this.pveStalemateSeconds) this.resolvePveStalemate(aliveCharacters);
+    }
+
     aliveCharacters.forEach((char) => {
       // 보스 시네마틱 중 도전자는 스킬·이동·공격을 모두 멈춘다.
       if (this.isCinematicLocked() && !char.isBoss) {
@@ -968,6 +1033,7 @@ export class GameLounge {
       }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
+      this.steerPveCharacterTowardEnemy(char, aliveCharacters, dt);
       if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
       this.updateKnockbackInertia(char, dt);
 
@@ -1322,6 +1388,7 @@ export class GameLounge {
     if (target && target.totalDamageTaken !== undefined) {
       target.totalDamageTaken += statDamage;
     }
+    if (this.isPveMode && statDamage > 0) this.pveNoDamageTimer = 0;
 
     target.hp -= finalDamage;
 
