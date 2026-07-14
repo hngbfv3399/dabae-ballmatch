@@ -250,3 +250,17 @@ export const equipForCharacter = mutation({
     return { characterId: args.characterId, cosmeticId: args.cosmeticId };
   },
 });
+
+export const clearForCharacter = mutation({
+  args: { clientId: v.string(), characterId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    assertCharacterId(args.characterId);
+    const loadout = await ctx.db
+      .query("characterCosmeticLoadouts")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (loadout) await ctx.db.delete(loadout._id);
+    return { characterId: args.characterId, cosmeticId: null };
+  },
+});

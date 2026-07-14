@@ -370,6 +370,15 @@ async function equipCosmetic(characterId: string, cosmeticId: string) {
   }
 }
 
+async function clearCosmetic(characterId: string) {
+  try {
+    await convexClient.mutation(api.cosmetics.clearForCharacter, { clientId: anonymousClientId, characterId });
+    gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}의 기본 외형을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
+  } catch {
+    gachaResult.textContent = "기본 외형 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
+  }
+}
+
 async function drawGacha() {
   const targetCharacterId = gachaTargetCharacter.value;
   if (!targetCharacterId) return;
@@ -2600,10 +2609,20 @@ function renderManagedCharacter() {
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
   collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
+  const basicSkin = document.createElement("button");
+  basicSkin.type = "button";
+  basicSkin.className = `management-skin management-basic-skin ${cosmeticLoadouts.has(character.id) ? "" : "equipped"}`;
+  basicSkin.style.setProperty("--skin-border", character.color);
+  basicSkin.style.setProperty("--skin-fill", "#121225");
+  basicSkin.style.setProperty("--skin-text", character.color);
+  basicSkin.style.setProperty("--skin-glow", character.color);
+  basicSkin.innerHTML = `<span class="skin-visual skin-visual-management" aria-hidden="true"><b>${character.name.slice(0, 1)}</b></span><span>기본 외형${cosmeticLoadouts.has(character.id) ? "" : " ✓"}</span>`;
+  basicSkin.addEventListener("click", () => void clearCosmetic(character.id));
+  skinGrid.appendChild(basicSkin);
   skins.forEach((skin) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "management-skin";
+    button.className = `management-skin ${cosmeticLoadouts.get(character.id) === skin.cosmeticId ? "equipped" : ""}`;
     button.style.setProperty("--skin-border", skin.style.borderColor); button.style.setProperty("--skin-fill", skin.style.fillColor); button.style.setProperty("--skin-text", skin.style.textColor); button.style.setProperty("--skin-glow", skin.style.glowColor);
     button.innerHTML = `${getSkinVisualMarkup(skin.style, "SKIN", "management")}<span>${skin.name}${cosmeticLoadouts.get(character.id) === skin.cosmeticId ? " ✓" : ""}</span>`;
     button.addEventListener("click", () => void equipCosmetic(character.id, skin.cosmeticId));
