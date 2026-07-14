@@ -260,6 +260,15 @@ function applyCharacterLevel(state: CharacterState) {
   return state;
 }
 
+function getSkinVisualMarkup(
+  style: CharacterCosmeticStyle,
+  label: string,
+  size: "icon" | "preview" | "management" | "reveal",
+) {
+  const contextClass = size === "reveal" ? " gacha-reveal-orb" : size === "preview" ? " gacha-preview-orb" : "";
+  return `<span class="skin-visual skin-visual-${size}${contextClass} anim-${style.borderAnimation} trail-${style.trail}" aria-hidden="true"><i></i><i></i><i></i><b>${label}</b></span>`;
+}
+
 function renderGachaCatalog() {
   if (!gachaCatalog) return;
   gachaCatalog.innerHTML = "";
@@ -271,7 +280,7 @@ function renderGachaCatalog() {
     card.style.setProperty("--skin-fill", cosmetic.style.fillColor);
     card.style.setProperty("--skin-text", cosmetic.style.textColor);
     card.style.setProperty("--skin-glow", cosmetic.style.glowColor);
-    card.innerHTML = `<span class="cosmetic-preview">${cosmetic.isUnlocked ? "SKIN" : "?"}</span><small class="rarity-${cosmetic.rarity}">${cosmetic.name}</small>`;
+    card.innerHTML = `${getSkinVisualMarkup(cosmetic.style, cosmetic.isUnlocked ? "SKIN" : "?", "icon")}<small class="rarity-${cosmetic.rarity}">${cosmetic.name}</small>`;
     card.addEventListener("click", () => { previewGachaCosmeticId = cosmetic.cosmeticId; renderGachaCatalog(); });
     gachaCatalog.appendChild(card);
   });
@@ -282,7 +291,7 @@ function renderGachaPreview() {
   const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === previewGachaCosmeticId) ?? cosmeticCatalog[0];
   if (!cosmetic) { gachaPreview.textContent = "스킨을 불러오는 중입니다."; return; }
   const effect = `${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`;
-  gachaPreview.innerHTML = `<div class="skin-preview-stage anim-${cosmetic.style.borderAnimation} trail-${cosmetic.style.trail}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${cosmetic.style.glowColor}"><i></i><i></i><i></i><span class="gacha-preview-orb">SKIN</span></div><span class="eyebrow">${cosmetic.isUnlocked ? "획득함" : "미획득"} · ${cosmetic.rarity.toUpperCase()}</span><h3>${cosmetic.name}</h3><p>공통 스킨</p><div class="skill-slot"><b>외형 효과 미리보기</b><br>${effect}</div><p class="gacha-preview-note">위 오브에서 테두리 애니메이션과 이동 흔적을 미리 볼 수 있습니다. 가챠 탭에서는 장착할 수 없으며, 장착은 캐릭터 관리에서만 가능합니다.</p>`;
+  gachaPreview.innerHTML = `<div class="skin-preview-stage" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${cosmetic.style.glowColor}">${getSkinVisualMarkup(cosmetic.style, "SKIN", "preview")}</div><span class="eyebrow">${cosmetic.isUnlocked ? "획득함" : "미획득"} · ${cosmetic.rarity.toUpperCase()}</span><h3>${cosmetic.name}</h3><p>공통 스킨</p><div class="skill-slot"><b>외형 효과 미리보기</b><br>${effect}</div><p class="gacha-preview-note">아이콘·미리보기·전투에 같은 색상, 테두리 효과, 이동 흔적 설정이 적용됩니다. 가챠 탭에서는 장착할 수 없으며, 장착은 캐릭터 관리에서만 가능합니다.</p>`;
 }
 
 function updateGachaUI() {
@@ -317,7 +326,7 @@ function showGachaRevealResult(result: { result: string; cosmetic: GachaRevealCo
   const isDuplicate = result.result === "duplicateExperience";
   const effect = `${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`;
   const specialClass = cosmetic.rarity === "legendary" || cosmetic.rarity === "unique" ? "is-special" : "";
-  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ${specialClass}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${glowColor}"><span class="eyebrow rarity-${cosmetic.rarity}">${rarityLabel[cosmetic.rarity].toUpperCase()} SKIN</span><div class="gacha-reveal-orb anim-${cosmetic.style.borderAnimation} trail-${cosmetic.style.trail}"><i></i><i></i><i></i><b>SKIN</b></div><h2>${cosmetic.name}</h2><p>${isDuplicate ? `중복 스킨 · 선택 캐릭터에게 +${result.experienceGranted} XP` : "새 공통 스킨을 획득했습니다!"}</p><div class="gacha-reveal-effect">${effect}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ${specialClass}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${glowColor}"><span class="eyebrow rarity-${cosmetic.rarity}">${rarityLabel[cosmetic.rarity].toUpperCase()} SKIN</span>${getSkinVisualMarkup({ ...cosmetic.style, glowColor }, "SKIN", "reveal")}<h2>${cosmetic.name}</h2><p>${isDuplicate ? `중복 스킨 · 선택 캐릭터에게 +${result.experienceGranted} XP` : "새 공통 스킨을 획득했습니다!"}</p><div class="gacha-reveal-effect">${effect}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
   document.getElementById("gacha-reveal-close")?.addEventListener("click", closeGachaReveal);
 }
 
@@ -2595,8 +2604,8 @@ function renderManagedCharacter() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "management-skin";
-    button.style.setProperty("--skin-border", skin.style.borderColor); button.style.setProperty("--skin-fill", skin.style.fillColor); button.style.setProperty("--skin-text", skin.style.textColor);
-    button.textContent = cosmeticLoadouts.get(character.id) === skin.cosmeticId ? `${skin.name} ✓` : skin.name;
+    button.style.setProperty("--skin-border", skin.style.borderColor); button.style.setProperty("--skin-fill", skin.style.fillColor); button.style.setProperty("--skin-text", skin.style.textColor); button.style.setProperty("--skin-glow", skin.style.glowColor);
+    button.innerHTML = `${getSkinVisualMarkup(skin.style, "SKIN", "management")}<span>${skin.name}${cosmeticLoadouts.get(character.id) === skin.cosmeticId ? " ✓" : ""}</span>`;
     button.addEventListener("click", () => void equipCosmetic(character.id, skin.cosmeticId));
     skinGrid.appendChild(button);
   });

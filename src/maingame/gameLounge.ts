@@ -79,6 +79,7 @@ export class GameLounge {
   private roundTimer: number = 90.0;
   private isPveMode: boolean = false;
   private pveNoDamageTimer: number = 0;
+  private cosmeticTrailElapsed: Map<string, number> = new Map();
 
   // 게임 오버 애니메이션 지연을 위한 변수들
   private isGameOver: boolean = false;
@@ -790,6 +791,7 @@ export class GameLounge {
 
     // 2. 캐릭터 상태 및 위치 업데이트
     const aliveCharacters = this.characters.filter((c) => !c.isDead);
+    this.emitCosmeticTrails(aliveCharacters, dt);
     // 분신(eunsu_clone)은 플레이어가 아니므로 승리 조건 판정에서 제외
     const aliveRealPlayers = aliveCharacters.filter(
       (c) => !c.id.includes("eunsu_clone"),
@@ -1532,6 +1534,40 @@ export class GameLounge {
       size,
       life,
       maxLife: life,
+    });
+  }
+
+  /** Keeps the equipped skin's trail visible while its owner is actually moving. */
+  private emitCosmeticTrails(characters: CharacterState[], dt: number) {
+    const aliveIds = new Set(characters.map((char) => char.id));
+    this.cosmeticTrailElapsed.forEach((_, id) => {
+      if (!aliveIds.has(id)) this.cosmeticTrailElapsed.delete(id);
+    });
+
+    characters.forEach((char) => {
+      const trail = char.cosmeticStyle?.trail;
+      if (!trail || trail === "none") return;
+
+      const speed = Math.hypot(char.vx, char.vy);
+      if (speed < 0.2) return;
+
+      const elapsed = (this.cosmeticTrailElapsed.get(char.id) ?? 0) + dt;
+      const interval = trail === "spark" ? 0.11 : 0.2;
+      if (elapsed < interval) {
+        this.cosmeticTrailElapsed.set(char.id, elapsed);
+        return;
+      }
+      this.cosmeticTrailElapsed.set(char.id, 0);
+
+      const directionX = char.vx / speed;
+      const directionY = char.vy / speed;
+      this.createParticle(
+        char.x - directionX * char.radius * 0.85,
+        char.y - directionY * char.radius * 0.85,
+        char.cosmeticStyle?.glowColor ?? char.color,
+        trail === "spark" ? 3 : Math.max(4, char.radius * 0.2),
+        trail === "spark" ? 16 : 24,
+      );
     });
   }
 
