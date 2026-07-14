@@ -41,6 +41,9 @@ function createSpawnedState(parent: CharacterState, config: CharacterConfig, suf
     totalDamageDealt: 0,
     totalDamageTaken: 0,
     kills: 0,
+    // 부모의 분열/보스 훅을 물려받으면 작은 슬라임이 다시 분열하는 재귀가 생긴다.
+    onDeath: config.onDeath,
+    onUpdate: config.onUpdate,
     pveSpawned: true,
   };
 }

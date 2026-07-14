@@ -112,6 +112,10 @@ export class GameLounge {
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
   private readonly pveSteeringStrength = 3.2;
   private readonly pveStalemateSeconds = 10;
+  private readonly pveCombatDistancePadding = 10;
+  private readonly pveCombatDistanceTolerance = 14;
+  private readonly pveBasicAttackTargetKnockback = 4.2;
+  private readonly pveBasicAttackRecoil = 1.6;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -692,6 +696,13 @@ export class GameLounge {
   /**
    * 게임 상태 업데이트
    */
+  private getPvePreferredDistance(char: CharacterState, target: CharacterState): number {
+    const attackDistance = char.baseAttackRange + target.radius;
+    const physicalDistance = char.radius + target.radius + 8;
+    // 사거리 안에 머무르되 서로 겹치지는 않는 거리. 기본 사거리가 긴 캐릭터는 자연스럽게 더 멀리 유지한다.
+    return Math.max(physicalDistance, attackDistance - this.pveCombatDistancePadding);
+  }
+
   private steerPveCharacterTowardEnemy(
     char: CharacterState,
     aliveCharacters: CharacterState[],
@@ -710,14 +721,18 @@ export class GameLounge {
     }
     if (!closestEnemy) return;
 
-    const engageDistance = char.baseAttackRange + closestEnemy.radius;
-    if (closestDistance <= engageDistance * 0.85) return;
+    const preferredDistance = this.getPvePreferredDistance(char, closestEnemy);
     const directionX = (closestEnemy.x - char.x) / closestDistance;
     const directionY = (closestEnemy.y - char.y) / closestDistance;
     const desiredSpeed = 3.5 * char.speed;
     const blend = Math.min(1, dt * this.pveSteeringStrength);
-    char.vx += (directionX * desiredSpeed - char.vx) * blend;
-    char.vy += (directionY * desiredSpeed - char.vy) * blend;
+    if (closestDistance > preferredDistance + this.pveCombatDistanceTolerance) {
+      char.vx += (directionX * desiredSpeed - char.vx) * blend;
+      char.vy += (directionY * desiredSpeed - char.vy) * blend;
+    } else if (closestDistance < preferredDistance - this.pveCombatDistanceTolerance) {
+      char.vx += (-directionX * desiredSpeed - char.vx) * blend;
+      char.vy += (-directionY * desiredSpeed - char.vy) * blend;
+    }
   }
 
   private resolvePveStalemate(aliveCharacters: CharacterState[]) {
@@ -730,7 +745,10 @@ export class GameLounge {
 
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
-    const separation = Math.max(player.radius + enemy.radius + 14, 64);
+    const separation = Math.max(
+      this.getPvePreferredDistance(player, enemy),
+      this.getPvePreferredDistance(enemy, player),
+    ) + this.pveCombatDistanceTolerance * 2;
     player.x = centerX - separation / 2;
     player.y = centerY;
     enemy.x = centerX + separation / 2;
@@ -1280,6 +1298,7 @@ export class GameLounge {
     attacker.baseAttackCooldown = 1.2; // 1.2초 공격 쿨타임
 
     this.dealDamage(attacker, target, attacker.attackPower);
+    if (this.isPveMode && !target.isDead) this.applyPveBasicAttackSpacing(attacker, target);
     attacker.onBasicAttack?.(attacker, target, this.getBehaviorContext());
 
     // 나유타 지배 판정은 충돌(resolveCollision)에서만 수행 — 기본 공격 중복 판정 제거
@@ -1307,6 +1326,22 @@ export class GameLounge {
     if (!attacker.skillActive && !attacker.nayutaControlled) {
       attacker.skillGauge = Math.min(100, attacker.skillGauge + 10);
     }
+  }
+
+  /** PvE 기본 공격은 짧은 반동을 줘서 근접 캐릭터가 겹친 채 공격만 반복하지 않게 한다. */
+  private applyPveBasicAttackSpacing(attacker: CharacterState, target: CharacterState) {
+    const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+    target.vx += Math.cos(angle) * this.pveBasicAttackTargetKnockback;
+    target.vy += Math.sin(angle) * this.pveBasicAttackTargetKnockback;
+    attacker.vx -= Math.cos(angle) * this.pveBasicAttackRecoil;
+    attacker.vy -= Math.sin(angle) * this.pveBasicAttackRecoil;
+    this.floatingTexts.push({
+      x: (attacker.x + target.x) / 2,
+      y: (attacker.y + target.y) - 28,
+      text: "↔",
+      color: "#a5f3fc",
+      life: 0.45,
+    });
   }
 
   /**
