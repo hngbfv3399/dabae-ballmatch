@@ -15,6 +15,7 @@ interface EsState extends CharacterState {
   fuseParticleTimer?: number;
   detonationSpeedStacks?: number;
   detonationSpeedLeft?: number;
+  _charactersRef?: CharacterState[];
 }
 // #endregion TYPES
 
@@ -39,6 +40,13 @@ const SKILL_CONSTANTS = {
   SPEED_BONUS_DURATION: 1.5,
   FUSE_PARTICLE_INTERVAL: 0.28,
   EXPLOSION_PARTICLE_COUNT: 12,
+  FUSE_RING_PADDING: 10,
+  FUSE_RING_PULSE: 5,
+  FUSE_LABEL_OFFSET: 18,
+  FUSE_LABEL_PADDING_X: 10,
+  FUSE_LABEL_HEIGHT: 24,
+  FUSE_CONNECTION_DASH: 7,
+  FUSE_CONNECTION_GAP: 6,
 };
 // #endregion CONSTANTS
 
@@ -112,6 +120,7 @@ export const esConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   onUpdate(char: CharacterState, dt: number, ctx: CharacterBehaviorContext) {
     const state = char as EsState;
+    state._charactersRef = ctx.characters;
     const marks = getFuseMarks(char);
     marks.forEach((mark) => {
       mark.timeLeft -= dt;
@@ -200,8 +209,11 @@ export const esConfig: CharacterConfig = {
   // #region RENDER
   // ═══════════════════════════════════════════
   onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
-    const markCount = getFuseMarks(char).length;
+    const marks = getFuseMarks(char);
+    const markCount = marks.length;
     if (markCount === 0) return;
+
+    // 에스 본체의 현재 표식 수를 보여주는 게이지
     canvasCtx.save();
     canvasCtx.strokeStyle = char.color;
     canvasCtx.globalAlpha = 0.45 + markCount * 0.15;
@@ -210,6 +222,49 @@ export const esConfig: CharacterConfig = {
     canvasCtx.arc(char.x, char.y, currentRadius + 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (markCount / SKILL_CONSTANTS.MAX_MARKED_TARGETS));
     canvasCtx.stroke();
     canvasCtx.restore();
+
+    // 대상 위에 도화선 중첩·남은 시간을 직접 표시한다. 작은 파티클만으로는
+    // 전투 중 표식을 식별하기 어려워, 연결선과 폭발 경고 링을 함께 그린다.
+    const pulse = Math.abs(Math.sin(Date.now() / 150));
+    marks.forEach((mark) => {
+      const target = (char as EsState)._charactersRef?.find((candidate) => candidate.id === mark.targetId);
+      if (!target || target.isDead || !isEnemy(char, target)) return;
+
+      const ringRadius = target.radius + SKILL_CONSTANTS.FUSE_RING_PADDING + pulse * SKILL_CONSTANTS.FUSE_RING_PULSE;
+      const label = `💣 ${mark.stacks}/${SKILL_CONSTANTS.MAX_FUSE_STACKS} · ${Math.max(0, mark.timeLeft).toFixed(1)}s`;
+
+      canvasCtx.save();
+      canvasCtx.strokeStyle = char.color;
+      canvasCtx.globalAlpha = 0.45 + pulse * 0.4;
+      canvasCtx.lineWidth = 2.5;
+      canvasCtx.setLineDash([SKILL_CONSTANTS.FUSE_CONNECTION_DASH, SKILL_CONSTANTS.FUSE_CONNECTION_GAP]);
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(char.x, char.y);
+      canvasCtx.lineTo(target.x, target.y);
+      canvasCtx.stroke();
+      canvasCtx.setLineDash([]);
+
+      canvasCtx.lineWidth = 3;
+      canvasCtx.beginPath();
+      canvasCtx.arc(target.x, target.y, ringRadius, 0, Math.PI * 2);
+      canvasCtx.stroke();
+
+      canvasCtx.font = 'bold 13px Orbit, sans-serif';
+      const textWidth = canvasCtx.measureText(label).width;
+      const labelWidth = textWidth + SKILL_CONSTANTS.FUSE_LABEL_PADDING_X * 2;
+      const labelX = target.x - labelWidth / 2;
+      const labelY = target.y - ringRadius - SKILL_CONSTANTS.FUSE_LABEL_OFFSET;
+      canvasCtx.fillStyle = 'rgba(23, 8, 4, 0.9)';
+      canvasCtx.fillRect(labelX, labelY - SKILL_CONSTANTS.FUSE_LABEL_HEIGHT, labelWidth, SKILL_CONSTANTS.FUSE_LABEL_HEIGHT);
+      canvasCtx.strokeStyle = char.color;
+      canvasCtx.globalAlpha = 0.95;
+      canvasCtx.strokeRect(labelX, labelY - SKILL_CONSTANTS.FUSE_LABEL_HEIGHT, labelWidth, SKILL_CONSTANTS.FUSE_LABEL_HEIGHT);
+      canvasCtx.fillStyle = '#fff7ed';
+      canvasCtx.textAlign = 'center';
+      canvasCtx.textBaseline = 'middle';
+      canvasCtx.fillText(label, target.x, labelY - SKILL_CONSTANTS.FUSE_LABEL_HEIGHT / 2);
+      canvasCtx.restore();
+    });
   },
   getStatusEffects(char: CharacterState): CharacterStatusEffect[] {
     const marks = getFuseMarks(char);
