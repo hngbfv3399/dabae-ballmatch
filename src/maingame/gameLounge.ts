@@ -78,7 +78,7 @@ export class GameLounge {
   private simulationSpeed: number = 1.0;
   private roundTimer: number = 90.0;
   private isPveMode: boolean = false;
-  private pveNoDamageTimer: number = 0;
+  private noCombatHitTimer: number = 0;
   private cosmeticTrailElapsed: Map<string, number> = new Map();
 
   // 게임 오버 애니메이션 지연을 위한 변수들
@@ -110,7 +110,7 @@ export class GameLounge {
   private readonly relicCarrierSlowCap = 0.18;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
-  private readonly pveStalemateSeconds = 10;
+  private readonly combatReengageSeconds = 3;
   private readonly pveBasicAttackTargetKnockback = 4.2;
   private readonly pveBasicAttackRecoil = 1.6;
 
@@ -547,7 +547,7 @@ export class GameLounge {
     this.winnerCharacter = null;
     this.roundTimer = 90.0;
     this.isPveMode = isPveMode;
-    this.pveNoDamageTimer = 0;
+    this.noCombatHitTimer = 0;
     this.eliminationOrder = [];
     this.eliminationCount = 0;
     this.teamGameType = teamGameType;
@@ -693,29 +693,50 @@ export class GameLounge {
   /**
    * 게임 상태 업데이트
    */
-  private resolvePveStalemate(aliveCharacters: CharacterState[]) {
-    const player = aliveCharacters.find((char) => char.teamId === 1);
-    if (!player) return;
-    const enemy = aliveCharacters
-      .filter((char) => char.teamId === 2)
-      .sort((left, right) => Math.hypot(left.x - player.x, left.y - player.y) - Math.hypot(right.x - player.x, right.y - player.y))[0];
-    if (!enemy) return;
+  private areCombatOpponents(left: CharacterState, right: CharacterState): boolean {
+    if (left.id === right.id || left.isDead || right.isDead) return false;
+    if (left.teamId !== undefined && right.teamId !== undefined && left.teamId === right.teamId) return false;
+    if (
+      (left.id === "eunsu" && right.id.includes("eunsu_clone")) ||
+      (left.id.includes("eunsu_clone") && right.id === "eunsu") ||
+      (left.id.includes("eunsu_clone") && right.id.includes("eunsu_clone"))
+    ) return false;
+    return true;
+  }
 
-    const centerX = this.canvas.width / 2;
-    const centerY = this.canvas.height / 2;
-    const separation = Math.max(player.radius + enemy.radius + 14, 64);
-    player.x = centerX - separation / 2;
-    player.y = centerY;
-    enemy.x = centerX + separation / 2;
-    enemy.y = centerY;
-    const playerSpeed = 3.5 * player.speed;
-    const enemySpeed = 3.5 * enemy.speed;
-    player.vx = playerSpeed;
-    player.vy = 0;
-    enemy.vx = -enemySpeed;
-    enemy.vy = 0;
-    this.pveNoDamageTimer = 0;
-    this.floatingTexts.push({ x: centerX, y: centerY - 50, text: "⚔️ 전투 재개!", color: "#facc15", life: 1.4 });
+  /** A one-shot nudge after a quiet fight, not continuous target tracking. */
+  private resolveCombatStalemate(aliveCharacters: CharacterState[]) {
+    let closestPair: [CharacterState, CharacterState] | null = null;
+    let closestDistance = Infinity;
+    for (let index = 0; index < aliveCharacters.length; index += 1) {
+      for (let otherIndex = index + 1; otherIndex < aliveCharacters.length; otherIndex += 1) {
+        const left = aliveCharacters[index];
+        const right = aliveCharacters[otherIndex];
+        if (!this.areCombatOpponents(left, right)) continue;
+        const distance = Math.hypot(right.x - left.x, right.y - left.y);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestPair = [left, right];
+        }
+      }
+    }
+    if (!closestPair) return;
+
+    const [left, right] = closestPair;
+    const directionX = (right.x - left.x) / closestDistance;
+    const directionY = (right.y - left.y) / closestDistance;
+    if (!left.isStunned && !left.isTyping) {
+      const speed = 3.5 * left.speed;
+      left.vx = directionX * speed;
+      left.vy = directionY * speed;
+    }
+    if (!right.isStunned && !right.isTyping) {
+      const speed = 3.5 * right.speed;
+      right.vx = -directionX * speed;
+      right.vy = -directionY * speed;
+    }
+    this.noCombatHitTimer = 0;
+    this.floatingTexts.push({ x: (left.x + right.x) / 2, y: (left.y + right.y) / 2 - 50, text: "⚔️ 교전 유도", color: "#facc15", life: 1.1 });
   }
 
   private update(dt: number) {
@@ -981,10 +1002,8 @@ export class GameLounge {
 
     const context = this.getBehaviorContext();
 
-    if (this.isPveMode) {
-      this.pveNoDamageTimer += dt;
-      if (this.pveNoDamageTimer >= this.pveStalemateSeconds) this.resolvePveStalemate(aliveCharacters);
-    }
+    this.noCombatHitTimer += dt;
+    if (this.noCombatHitTimer >= this.combatReengageSeconds) this.resolveCombatStalemate(aliveCharacters);
 
     aliveCharacters.forEach((char) => {
       // 보스 시네마틱 중 도전자는 스킬·이동·공격을 모두 멈춘다.
@@ -1379,7 +1398,7 @@ export class GameLounge {
     if (target && target.totalDamageTaken !== undefined) {
       target.totalDamageTaken += statDamage;
     }
-    if (this.isPveMode && statDamage > 0) this.pveNoDamageTimer = 0;
+    if (this.isCombatHit(attacker, target, statDamage, customText)) this.noCombatHitTimer = 0;
 
     target.hp -= finalDamage;
 
@@ -1475,6 +1494,17 @@ export class GameLounge {
         life: 1.5,
       });
     }
+  }
+
+  private isCombatHit(
+    attacker: CharacterState,
+    target: CharacterState,
+    damage: number,
+    customText?: string,
+  ): boolean {
+    if (damage <= 0 || attacker.id === target.id) return false;
+    // CC에 부수적으로 붙는 피해는 교전 판정에 포함하지 않아 3초 보정을 막지 않는다.
+    return !customText || !/(stun|기절|매혹|charm|지배|domination|석고화|dunk slam)/i.test(customText);
   }
 
   /**
