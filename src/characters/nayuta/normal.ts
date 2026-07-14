@@ -13,6 +13,24 @@ const SKILL_CONSTANTS = {
 // #endregion CONSTANTS
 
 // ═══════════════════════════════════════════
+// #region HELPERS
+// ═══════════════════════════════════════════
+function isSameTeam(source: CharacterState, target: CharacterState): boolean {
+  return source.teamId !== undefined && source.teamId === target.teamId;
+}
+
+function isControlledBy(char: CharacterState, target: CharacterState): boolean {
+  return target.nayutaControlled === true && target.nayutaControllerId === char.id;
+}
+
+function releaseDomination(target: CharacterState): void {
+  target.nayutaControlled = false;
+  target.nayutaControlTimeLeft = 0;
+  target.nayutaControllerId = undefined;
+}
+// #endregion HELPERS
+
+// ═══════════════════════════════════════════
 // #region CONFIG — character stats & metadata
 // ═══════════════════════════════════════════
 export const nayutaConfig: CharacterConfig = {
@@ -46,13 +64,12 @@ export const nayutaConfig: CharacterConfig = {
     const chars = ctx.characters;
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
-      if (char.teamId !== undefined && enemy.teamId !== undefined && char.teamId === enemy.teamId) {
+      if (isSameTeam(char, enemy)) {
         // Defensive cleanup for any legacy ally-domination state.
-        enemy.nayutaControlled = false;
-        enemy.nayutaControlTimeLeft = 0;
+        releaseDomination(enemy);
         return;
       }
-      if (enemy.nayutaControlled) {
+      if (isControlledBy(char, enemy)) {
         if (enemy.skillActive) {
           enemy.skillActive = false;
           enemy.skillDurationLeft = 0;
@@ -74,7 +91,7 @@ export const nayutaConfig: CharacterConfig = {
     if (target.id === char.id || target.isDead || target.nayutaControlled) return;
     // Free-for-all characters have no team. In team and boss modes, allies
     // must never be selected for domination.
-    if (char.teamId !== undefined && target.teamId !== undefined && char.teamId === target.teamId) return;
+    if (isSameTeam(char, target)) return;
     if (Math.random() >= SKILL_CONSTANTS.CONTROL_CHANCE) return;
 
     if (!ctx.applyDomination(char, target, SKILL_CONSTANTS.CONTROL_DURATION)) return;
@@ -103,17 +120,15 @@ export const nayutaConfig: CharacterConfig = {
     // A. Update domination duration timer on enemies
     chars.forEach((enemy) => {
       if (enemy.isDead || enemy.id === char.id) return;
-      if (char.teamId !== undefined && enemy.teamId !== undefined && char.teamId === enemy.teamId) {
-        enemy.nayutaControlled = false;
-        enemy.nayutaControlTimeLeft = 0;
+      if (isSameTeam(char, enemy)) {
+        releaseDomination(enemy);
         return;
       }
-      if (enemy.nayutaControlled) {
+      if (isControlledBy(char, enemy)) {
         if (enemy.nayutaControlTimeLeft !== undefined) {
           enemy.nayutaControlTimeLeft -= dt;
           if (enemy.nayutaControlTimeLeft <= 0) {
-            enemy.nayutaControlled = false;
-            enemy.nayutaControlTimeLeft = 0;
+            releaseDomination(enemy);
             ctx.addFloatingText(enemy.x, enemy.y - 25, '해제', '#00ffcc', 1.0);
             console.log(`👁️ [지배 자연해제] ${enemy.name}의 지배 상태가 10초 경과되어 자연 해제되었습니다.`);
           }
@@ -128,7 +143,12 @@ export const nayutaConfig: CharacterConfig = {
       // Dominated enemies control logic
       chars.forEach((enemy) => {
         if (enemy.isDead || enemy.id === char.id) return;
-        if (enemy.nayutaControlled) {
+        if (isSameTeam(char, enemy)) {
+          // 지배 상태가 남아 있어도 같은 팀에는 디버프·조종을 적용하지 않는다.
+          releaseDomination(enemy);
+          return;
+        }
+        if (isControlledBy(char, enemy)) {
           // 1. Maintain skill cancellation
           if (enemy.skillActive) {
             enemy.skillActive = false;
@@ -153,7 +173,7 @@ export const nayutaConfig: CharacterConfig = {
             if (other.isDead || other.id === char.id || other.id === enemy.id || other.nayutaControlled) return;
             // A dominated enemy must never target Nayuta or Nayuta's allies.
             // It is forced to turn on its original side instead.
-            if (char.teamId !== undefined && other.teamId !== undefined && char.teamId === other.teamId) return;
+            if (isSameTeam(char, other)) return;
             const dist = Math.hypot(other.x - enemy.x, other.y - enemy.y);
             if (dist < minDist) {
               minDist = dist;
@@ -216,12 +236,11 @@ export const nayutaConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   // #region DEATH — release all controlled enemies on death
   // ═══════════════════════════════════════════
-  onDeath(_char: CharacterState, _killer: CharacterState, ctx: CharacterBehaviorContext) {
+  onDeath(char: CharacterState, _killer: CharacterState, ctx: CharacterBehaviorContext) {
     // Release all targets dominated by Nayuta
     ctx.characters.forEach((enemy) => {
-      if (enemy.nayutaControlled) {
-        enemy.nayutaControlled = false;
-        enemy.nayutaControlTimeLeft = 0;
+      if (isControlledBy(char, enemy)) {
+        releaseDomination(enemy);
         ctx.addFloatingText(enemy.x, enemy.y - 25, '해제 (나유타 사망)', '#00ffcc', 1.0);
         console.log(`👁️ [지배 해제] 나유타 사망으로 인해 ${enemy.name}의 지배가 해제되었습니다.`);
       }
@@ -239,7 +258,7 @@ export const nayutaConfig: CharacterConfig = {
        if (enemy.isDead || enemy.id === char.id) return;
 
        // Red pulsing collar rings around controlled targets
-       if (enemy.nayutaControlled) {
+       if (isControlledBy(char, enemy)) {
           canvasCtx.save();
           canvasCtx.strokeStyle = 'rgba(229, 43, 80, 0.75)';
           canvasCtx.lineWidth = 3.0;

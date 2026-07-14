@@ -231,6 +231,7 @@ export class GameLounge {
         if (target.isCcImmune) return false;
         target.nayutaControlled = true;
         target.nayutaControlTimeLeft = Math.max(target.nayutaControlTimeLeft ?? 0, duration);
+        target.nayutaControllerId = source.id;
         source.totalCcDuration = (source.totalCcDuration ?? 0) + duration;
         return true;
       },
@@ -1038,7 +1039,7 @@ export class GameLounge {
         let canCharge = true;
         if (char.id === "nayuta") {
           const hasControlled = this.characters.some(
-            (c) => !c.isDead && c.nayutaControlled,
+            (c) => !c.isDead && c.nayutaControlled && c.nayutaControllerId === char.id,
           );
           if (!hasControlled) {
             canCharge = false;

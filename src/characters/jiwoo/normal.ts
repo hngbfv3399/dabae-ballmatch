@@ -32,7 +32,7 @@ function clearDebuffs(char: CharacterState): void {
   char.isCharmed = false; char.charmTimeLeft = 0;
   char.isPoisoned = false; char.poisonTimeLeft = 0;
   char.isConfused = false; char.confusedTimeLeft = 0;
-  char.nayutaControlled = false; char.nayutaControlTimeLeft = 0;
+  char.nayutaControlled = false; char.nayutaControlTimeLeft = 0; char.nayutaControllerId = undefined;
 }
 // #endregion HELPERS
 

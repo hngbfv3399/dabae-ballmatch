@@ -134,6 +134,7 @@ export interface CharacterState extends CharacterConfig {
   scaleMultiplier: number;    // 도윤 덩크 슬램 도약 시 렌더링 크기 스케일 배율
   nayutaControlled?: boolean; // 나유타 지배 상태 여부
   nayutaControlTimeLeft?: number; // 나유타 지배 상태 남은 시간 (초)
+  nayutaControllerId?: string; // 지배를 적용한 캐릭터 ID
   lastContactDmgTime?: number; // 나유타 지배 인형 자폭 충돌 피해 간격 쿨타임 (ms)
   doyunShield?: number; // 도윤 덩크슛 실드 양
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
