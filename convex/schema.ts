@@ -40,4 +40,10 @@ export default defineSchema({
     tier: v.string(),        // 판정된 티어 ('S' | 'A' | 'B' | 'C')
     updatedAt: v.number(),   // 업데이트 시점
   }).index("by_char", ["characterId"]),
+
+  bossStats: defineTable({
+    bossId: v.string(),
+    games: v.number(),
+    clears: v.number(),
+  }).index("by_boss", ["bossId"]),
 });

@@ -130,7 +130,7 @@ const emptyRoleNotice = document.getElementById(
 let lobbyTotalGames = 0;
 let currentRoleFilter = "all";
 let gameSpeedMultiplier = 1;
-let selectedStatsMode = "all";
+let selectedStatsMode = "solo";
 
 // Winner Modal Elements
 const winnerModal = document.getElementById("winner-modal") as HTMLElement;
@@ -270,6 +270,13 @@ interface DamageRankingEntry {
   avgDamageDealt: number;
 }
 
+interface BossDifficultyEntry {
+  bossId: string;
+  games: number;
+  clears: number;
+  clearRate: number;
+}
+
 const DEFAULT_TIERS: Record<string, "S" | "A" | "B" | "C" | "D" | "E" | "F"> = {
   chanhwi: "S",
   juju: "S",
@@ -290,10 +297,19 @@ const DEFAULT_TIERS: Record<string, "S" | "A" | "B" | "C" | "D" | "E" | "F"> = {
 let statsUnsubscribe: (() => void) | null = null;
 let countersUnsubscribe: (() => void) | null = null;
 let damageRankingUnsubscribe: (() => void) | null = null;
+let bossDifficultyUnsubscribe: (() => void) | null = null;
 
 let currentGlobalStats: GlobalCharacterStats[] = [];
 let currentGlobalCounters: GlobalCounterStats[] = [];
 let currentGlobalDamageRanking: DamageRankingEntry[] = [];
+let currentBossDifficulty: BossDifficultyEntry[] = [];
+
+function getCurrentStatsMode() {
+  if (currentMode === "team") return `team:${teamGameType}`;
+  if (currentMode === "boss") return "boss";
+  if (currentMode === "tournament") return "2";
+  return selectedIds.size.toString();
+}
 
 function getStoredStats(): Record<string, Record<string, CharacterStats>> {
   const record: Record<string, Record<string, CharacterStats>> = {};
@@ -470,12 +486,16 @@ async function recordCharacterDeath(
     await convexClient.mutation(api.stats.recordCharacterDeath, {
       victimId,
       killerId,
-      mode: playerCount.toString(),
+      mode: currentMode === "solo" ? playerCount.toString() : getCurrentStatsMode(),
     });
   } catch (err) {}
 }
 
 function renderTierList() {
+  if (selectedStatsMode === "boss") {
+    renderBossDifficultyList();
+    return;
+  }
   const statsAll = getStoredStats();
   const mode = selectedStatsMode;
   const stats = statsAll[mode] || {};
@@ -581,6 +601,33 @@ function renderTierList() {
         container.appendChild(chip);
       });
     }
+  });
+}
+
+function bossTier(clearRate: number): "S" | "A" | "B" | "C" | "D" {
+  if (clearRate < 15) return "S";
+  if (clearRate < 30) return "A";
+  if (clearRate < 50) return "B";
+  if (clearRate < 70) return "C";
+  return "D";
+}
+
+function renderBossDifficultyList() {
+  const tiers = ["s", "a", "b", "c", "d", "e", "f"] as const;
+  tiers.forEach((tier) => {
+    const container = document.getElementById(`tier-chars-${tier}`);
+    if (container) container.innerHTML = "";
+  });
+  currentBossDifficulty.forEach((entry) => {
+    const boss = availableBossCharacters.find((character) => character.id === entry.bossId);
+    if (!boss) return;
+    const tier = bossTier(entry.clearRate).toLowerCase();
+    const container = document.getElementById(`tier-chars-${tier}`);
+    if (!container) return;
+    const chip = document.createElement("div");
+    chip.className = `tier-char-chip-premium tier-chip-${tier}`;
+    chip.innerHTML = `<div class="tier-char-avatar">${getAvatarHTML(boss.name, boss.image, "tier-avatar-img")}</div><div class="tier-char-info"><span class="tier-char-name" style="color: ${boss.color};">${boss.name}</span><span class="tier-char-winrate" style="font-size: 0.72rem;">처치율 ${entry.clearRate.toFixed(0)}% · ${entry.clears}/${entry.games}회 클리어</span></div>`;
+    container.appendChild(chip);
   });
 }
 
@@ -1047,12 +1094,7 @@ function startGame() {
   aliveCountEl.textContent = total.toString();
 
   // 게임 시작 기록 (참여 판수 증가)
-  const gameModeStr =
-    currentMode === "team"
-      ? "team"
-      : currentMode === "boss"
-        ? "boss"
-        : total.toString();
+  const gameModeStr = getCurrentStatsMode();
   recordGameStart(
     selectedConfigs.map((c) => c.id),
     gameModeStr,
@@ -1345,13 +1387,17 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   }
 
   // 승리 정보 기록 (승리 판수 증가 및 티어 갱신)
-  const gameModeStr =
-    currentMode === "team"
-      ? "team"
-      : currentMode === "boss"
-        ? "boss"
-        : allChars.length.toString();
+  const gameModeStr = currentMode === "solo" ? allChars.length.toString() : getCurrentStatsMode();
   recordGameEnd(winner ? winner.id : "draw", allChars, gameModeStr);
+  if (currentMode === "boss") {
+    const boss = allChars.find((character) => character.isBoss);
+    if (boss) {
+      void convexClient.mutation(api.stats.recordBossResult, {
+        bossId: boss.id,
+        cleared: winner !== null && !winner.isBoss,
+      });
+    }
+  }
 
   if (isPracticeMode) {
     const player = allChars.find(
@@ -1673,6 +1719,7 @@ function subscribeToGlobalData() {
   if (statsUnsubscribe) statsUnsubscribe();
   if (countersUnsubscribe) countersUnsubscribe();
   if (damageRankingUnsubscribe) damageRankingUnsubscribe();
+  if (bossDifficultyUnsubscribe) bossDifficultyUnsubscribe();
 
   const mode = selectedStatsMode;
 
@@ -1702,6 +1749,19 @@ function subscribeToGlobalData() {
       updateLobbyUI();
     },
   );
+
+  if (mode === "boss") {
+    bossDifficultyUnsubscribe = convexClient.onUpdate(
+      api.stats.getBossDifficulty,
+      {},
+      (bosses) => {
+        currentBossDifficulty = bosses;
+        updateLobbyUI();
+      },
+    );
+  } else {
+    currentBossDifficulty = [];
+  }
 }
 
 function updateLobbyUI() {
@@ -2039,7 +2099,7 @@ function initCombatSettings() {
   const statsButtons = document.querySelectorAll<HTMLButtonElement>("[data-stats-mode]");
   statsButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      selectedStatsMode = button.dataset.statsMode ?? "all";
+      selectedStatsMode = button.dataset.statsMode ?? "solo";
       statsButtons.forEach((candidate) => {
         const isSelected = candidate === button;
         candidate.classList.toggle("active", isSelected);
@@ -2053,20 +2113,18 @@ function initCombatSettings() {
 function updateStatsModeControls(mode: GameMode) {
   const statsContextLabel = document.getElementById("stats-context-label");
   const statsButtons = document.getElementById("stats-mode-buttons");
-  const context: Record<GameMode, { label: string; statsMode: string; showChoices: boolean }> = {
-    solo: { label: "개인전 전적", statsMode: selectedStatsMode === "team" || selectedStatsMode === "boss" ? "all" : selectedStatsMode, showChoices: true },
-    team: { label: "팀전 전적", statsMode: "team", showChoices: false },
-    boss: { label: "보스전 전적", statsMode: "boss", showChoices: false },
-    tournament: { label: "토너먼트 전적", statsMode: "2", showChoices: false },
+  const context: Record<GameMode, { label: string; statsMode: string; buttonContext: string | null }> = {
+    solo: { label: "개인전 전적", statsMode: ["solo", "2", "3", "4", "5", "6"].includes(selectedStatsMode) ? selectedStatsMode : "solo", buttonContext: "solo" },
+    team: { label: "팀전 전적", statsMode: "team", buttonContext: "team" },
+    boss: { label: "보스 난이도", statsMode: "boss", buttonContext: null },
+    tournament: { label: "토너먼트 전적", statsMode: "2", buttonContext: null },
   };
   const next = context[mode];
   selectedStatsMode = next.statsMode;
   if (statsContextLabel) statsContextLabel.textContent = next.label;
-  if (statsButtons) {
-    statsButtons.classList.toggle("hidden", !next.showChoices);
-    statsButtons.setAttribute("aria-label", `${next.label} 기준`);
-  }
+  if (statsButtons) statsButtons.setAttribute("aria-label", `${next.label} 기준`);
   document.querySelectorAll<HTMLButtonElement>("[data-stats-mode]").forEach((button) => {
+    button.classList.toggle("hidden", button.dataset.statsContext !== next.buttonContext);
     const isSelected = button.dataset.statsMode === selectedStatsMode;
     button.classList.toggle("active", isSelected);
     button.setAttribute("aria-pressed", String(isSelected));

@@ -60,14 +60,16 @@
               <div class="combat-setting-block">
                 <span id="stats-context-label">개인전 전적</span>
                 <div id="stats-mode-buttons" class="combat-setting-buttons stats-mode-buttons" role="group" aria-label="개인전 전적 기준">
-                  <button type="button" class="combat-setting-button active" data-stats-mode="all" aria-pressed="true">전체</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="2" aria-pressed="false">2인</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="3" aria-pressed="false">3인</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="4" aria-pressed="false">4인</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="5" aria-pressed="false">5인</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="6" aria-pressed="false">6인</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="team" aria-pressed="false">팀전</button>
-                  <button type="button" class="combat-setting-button" data-stats-mode="boss" aria-pressed="false">보스전</button>
+                  <button type="button" class="combat-setting-button active" data-stats-context="solo" data-stats-mode="solo" aria-pressed="true">전체</button>
+                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="2" aria-pressed="false">2인</button>
+                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="3" aria-pressed="false">3인</button>
+                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="4" aria-pressed="false">4인</button>
+                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="5" aria-pressed="false">5인</button>
+                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="6" aria-pressed="false">6인</button>
+                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team" aria-pressed="false">전체</button>
+                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:deathmatch" aria-pressed="false">데스매치</button>
+                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:control" aria-pressed="false">점령전</button>
+                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:relic" aria-pressed="false">쟁탈전</button>
                 </div>
               </div>
             </div>
@@ -301,7 +303,7 @@
           <div class="stats-reset-zone">
             <div>
               <strong>전적 DB 초기화</strong>
-              <span>승률·피해량·상성·1대1 티어 기록을 모두 삭제합니다.</span>
+                <span>개인전·팀전·보스 난이도·피해량·상성·1대1 티어 기록을 모두 삭제합니다.</span>
             </div>
             <button id="reset-stats-btn" class="btn stats-reset-btn" type="button">전적 전체 초기화</button>
           </div>

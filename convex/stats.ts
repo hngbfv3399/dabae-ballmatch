@@ -7,7 +7,7 @@ const CHARACTER_IDS = new Set([
   "doyun", "jiho", "su", "chanik", "chanhwi", "nayuta", "unhee", "dongjun", "seyeon", "puman",
   "eunsu", "myeongseok", "juju", "juyeon", "sungjae", "mongshil", "seojun", "jiwoo", "junseok", "es", "juju_singularity_boss",
 ]);
-const MODES = new Set(["all", "2", "3", "4", "5", "6", "team", "boss"]);
+const MODES = new Set(["all", "solo", "2", "3", "4", "5", "6", "team", "team:deathmatch", "team:control", "team:relic", "boss"]);
 const MAX_PARTICIPANTS = 6;
 
 function assertCharacterId(characterId: string): void {
@@ -16,6 +16,12 @@ function assertCharacterId(characterId: string): void {
 
 function assertMode(mode: string): void {
   if (!MODES.has(mode)) throw new Error("Unknown game mode");
+}
+
+function aggregateModes(mode: string): string[] {
+  if (mode.startsWith("team:")) return ["all", "team", mode];
+  if (/^[2-6]$/.test(mode)) return ["all", "solo", mode];
+  return ["all", mode];
 }
 
 // 1. Get all character stats for a specific mode
@@ -57,7 +63,7 @@ export const recordGameStart = mutation({
     }
     args.participantIds.forEach(assertCharacterId);
     assertMode(args.mode);
-    const modes = ["all", args.mode];
+    const modes = aggregateModes(args.mode);
     for (const mode of modes) {
       for (const charId of args.participantIds) {
         const existing = await ctx.db
@@ -113,7 +119,7 @@ export const recordGameEnd = mutation({
     if (args.winnerId !== "draw") assertCharacterId(args.winnerId);
     assertMode(args.mode);
     args.allChars.forEach((char) => assertCharacterId(char.characterId));
-    const modes = ["all", args.mode];
+    const modes = aggregateModes(args.mode);
     for (const mode of modes) {
       // Increment win for winner (if valid character)
       const hasWinner = args.winnerId && args.winnerId !== "draw";
@@ -190,7 +196,7 @@ export const recordCharacterDeath = mutation({
     assertCharacterId(args.victimId);
     assertCharacterId(args.killerId);
     assertMode(args.mode);
-    const modes = ["all", args.mode];
+    const modes = aggregateModes(args.mode);
     for (const mode of modes) {
       const existing = await ctx.db
         .query("globalCounters")
@@ -221,12 +227,13 @@ async function clearMatchHistoryBatch(ctx: MutationCtx) {
   const stats = await ctx.db.query("globalStats").take(RESET_BATCH_SIZE);
   const counters = await ctx.db.query("globalCounters").take(RESET_BATCH_SIZE);
   const tiers = await ctx.db.query("oneOnOneTiers").take(RESET_BATCH_SIZE);
+  const bosses = await ctx.db.query("bossStats").take(RESET_BATCH_SIZE);
 
-  for (const doc of [...stats, ...counters, ...tiers]) {
+  for (const doc of [...stats, ...counters, ...tiers, ...bosses]) {
     await ctx.db.delete(doc._id);
   }
 
-  return stats.length === RESET_BATCH_SIZE || counters.length === RESET_BATCH_SIZE || tiers.length === RESET_BATCH_SIZE;
+  return stats.length === RESET_BATCH_SIZE || counters.length === RESET_BATCH_SIZE || tiers.length === RESET_BATCH_SIZE || bosses.length === RESET_BATCH_SIZE;
 }
 
 // 전적 초기화는 실수 방지를 위한 확인 문자열을 요구하며, 대용량 DB는 여러 작업으로 나누어 비운다.
@@ -247,6 +254,27 @@ export const resetMatchHistoryBatch = internalMutation({
     if (await clearMatchHistoryBatch(ctx)) {
       await ctx.scheduler.runAfter(0, internal.stats.resetMatchHistoryBatch, {});
     }
+  },
+});
+
+export const recordBossResult = mutation({
+  args: { bossId: v.string(), cleared: v.boolean() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.bossId);
+    const existing = await ctx.db.query("bossStats").withIndex("by_boss", (q) => q.eq("bossId", args.bossId)).unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, { games: existing.games + 1, clears: existing.clears + (args.cleared ? 1 : 0) });
+    } else {
+      await ctx.db.insert("bossStats", { bossId: args.bossId, games: 1, clears: args.cleared ? 1 : 0 });
+    }
+  },
+});
+
+export const getBossDifficulty = query({
+  args: {},
+  handler: async (ctx) => {
+    const bosses = await ctx.db.query("bossStats").take(50);
+    return bosses.map((boss) => ({ ...boss, clearRate: boss.games > 0 ? (boss.clears / boss.games) * 100 : 0 })).sort((left, right) => right.clearRate - left.clearRate);
   },
 });
 
