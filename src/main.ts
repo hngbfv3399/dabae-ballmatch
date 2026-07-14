@@ -2142,9 +2142,14 @@ function updateRandomMatchButtonLabel() {
     randomStartBtn.textContent = `🎲 ${count}인 랜덤전 시작`;
     return;
   }
+  const teamRuleLabels: Record<TeamGameType, string> = {
+    deathmatch: "데스매치",
+    control: "점령전",
+    relic: "보석 쟁탈전",
+  };
   const labels: Record<Exclude<GameMode, "solo">, string> = {
-    team: "🎲 팀전 랜덤전 시작",
-    boss: "🎲 보스전 랜덤전 시작",
+    team: `🎲 ${teamRuleLabels[teamGameType]} 랜덤 팀전 시작`,
+    boss: "🎲 보스 1 vs 도전자 4 랜덤전 시작",
     tournament: "🎲 토너먼트 랜덤전 시작",
   };
   randomStartBtn.textContent = labels[currentMode];
@@ -2153,6 +2158,7 @@ function updateRandomMatchButtonLabel() {
 teamGameTypeSelect.addEventListener("change", () => {
   teamGameType = teamGameTypeSelect.value as TeamGameType;
   updateStartButtonState();
+  updateRandomMatchButtonLabel();
 });
 
 // Start APP
