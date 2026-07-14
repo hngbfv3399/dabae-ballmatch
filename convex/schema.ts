@@ -137,8 +137,16 @@ export default defineSchema({
     dailyDrawsUsed: v.number(),
     completedPlayCount: v.number(),
     bonusDrawsUsed: v.number(),
+    // v3.1.1 이전에 숫자로 보관하던 포인트. 도감 아이템으로 한 번 사용할 때까지 유지한다.
     experiencePoints: v.optional(v.number()),
     updatedAt: v.number(),
+  }).index("by_clientId", ["clientId"]),
+
+  experiencePointItems: defineTable({
+    clientId: v.string(),
+    amount: v.number(),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    createdAt: v.number(),
   }).index("by_clientId", ["clientId"]),
 
   // 가챠 이력은 계속 늘어나므로 상태 문서와 분리한다.

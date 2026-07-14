@@ -161,6 +161,14 @@ export const draw = mutation({
         unlockedByClientId: args.clientId,
       });
     }
+    if (experienceGranted > 0) {
+      await ctx.db.insert("experiencePointItems", {
+        clientId: args.clientId,
+        amount: experienceGranted,
+        rarity: cosmetic.rarity,
+        createdAt: now,
+      });
+    }
 
     if (gachaState) {
       await ctx.db.patch(gachaState._id, {
@@ -168,7 +176,6 @@ export const draw = mutation({
         dailyDrawsUsed: dailyDrawsUsed + (hasDailyDraw ? 1 : 0),
         completedPlayCount,
         bonusDrawsUsed: bonusDrawsUsed + (hasDailyDraw ? 0 : 1),
-        experiencePoints: (gachaState.experiencePoints ?? 0) + experienceGranted,
         updatedAt: now,
       });
     } else {
@@ -178,7 +185,7 @@ export const draw = mutation({
         dailyDrawsUsed: 1,
         completedPlayCount: 0,
         bonusDrawsUsed: 0,
-        experiencePoints: experienceGranted,
+        experiencePoints: 0,
         updatedAt: now,
       });
     }

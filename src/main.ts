@@ -203,12 +203,15 @@ let pveProgressByCharacter = new Map<string, PveProgress>();
 let pveProgressUnsubscribe: (() => void) | null = null;
 let pveAdvancePending = false;
 type Cosmetic = { cosmeticId: string; name: string; rarity: "common" | "rare" | "epic" | "legendary" | "unique"; isUnlocked: boolean; style: CharacterCosmeticStyle };
+type ExperiencePointItem = { _id: string; amount: number; rarity: Cosmetic["rarity"]; createdAt: number; isLegacy?: boolean };
 let cosmeticCatalog: Cosmetic[] = [];
 let cosmeticLoadouts = new Map<string, string>();
+let experiencePointItems: ExperiencePointItem[] = [];
 let gachaProgress = { dailyDrawsRemaining: 0, completedDungeonClears: 0, bonusDrawsAvailable: 0, experiencePoints: 0 };
 let cosmeticCatalogUnsubscribe: (() => void) | null = null;
 let cosmeticLoadoutUnsubscribe: (() => void) | null = null;
 let gachaProgressUnsubscribe: (() => void) | null = null;
+let experiencePointItemsUnsubscribe: (() => void) | null = null;
 let managedCharacterId: string | null = null;
 let activeMatchSlot = -1;
 let matchSlotIds: Array<string | null> = [];
@@ -307,7 +310,7 @@ function renderGachaPreview() {
 
 function updateGachaUI() {
   const dungeonClearProgress = gachaProgress.completedDungeonClears % 3;
-  gachaDrawStatus.textContent = `보유 경험치 포인트 ${gachaProgress.experiencePoints}P · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 현재 공통 스킨 풀에서 뽑습니다.`;
+  gachaDrawStatus.textContent = `보유 경험치 포인트 아이템 ${experiencePointItems.length}개 · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 현재 공통 스킨 풀에서 뽑습니다.`;
   gachaDrawBtn.disabled = cosmeticCatalog.length === 0 || (gachaProgress.dailyDrawsRemaining + gachaProgress.bonusDrawsAvailable <= 0);
   gachaDrawBtn.textContent = "뽑기";
   renderGachaCatalog();
@@ -412,21 +415,19 @@ function initCosmetics() {
   cosmeticCatalogUnsubscribe?.();
   cosmeticLoadoutUnsubscribe?.();
   gachaProgressUnsubscribe?.();
+  experiencePointItemsUnsubscribe?.();
   cosmeticCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listCatalog, {}, (catalog) => { cosmeticCatalog = catalog as Cosmetic[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
   cosmeticLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getCharacterLoadouts, {}, (loadouts) => { cosmeticLoadouts = new Map(loadouts.map((loadout) => [loadout.characterId, loadout.cosmeticId])); updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
-  gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = progress; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
+  gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = { ...progress, experiencePoints: progress.experiencePoints ?? 0 }; updateGachaUI(); });
+  experiencePointItemsUnsubscribe = convexClient.onUpdate(api.progression.listExperiencePointItems, { clientId: anonymousClientId }, (items) => { experiencePointItems = items as ExperiencePointItem[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
 }
 
-async function spendExperiencePoints(characterId: string, amountInput: HTMLInputElement, resultElement: HTMLElement, useButton: HTMLButtonElement) {
-  const amount = Number.parseInt(amountInput.value, 10);
-  if (!Number.isInteger(amount) || amount <= 0 || amount > gachaProgress.experiencePoints) return;
-
+async function useExperiencePointItem(characterId: string, item: ExperiencePointItem, resultElement: HTMLElement, useButton: HTMLButtonElement) {
   useButton.disabled = true;
   try {
-    const result = await convexClient.mutation(api.progression.spendExperiencePoints, { clientId: anonymousClientId, characterId, amount });
+    const result = await convexClient.mutation(api.progression.useExperiencePointItem, { clientId: anonymousClientId, characterId, itemId: item._id as never });
     const characterName = availableCharacters.find((character) => character.id === characterId)?.name ?? "선택 캐릭터";
-    resultElement.textContent = `${characterName}에게 ${amount}P를 사용했습니다. 현재 Lv.${result.level} · 남은 포인트 ${result.experiencePoints}P`;
-    amountInput.value = "1";
+    resultElement.textContent = `${item.amount} XP 아이템을 사용했습니다. ${characterName}은(는) 현재 Lv.${result.level}입니다.`;
   } catch (error) {
     resultElement.textContent = error instanceof Error ? error.message : "경험치 포인트 사용에 실패했습니다.";
     useButton.disabled = false;
@@ -2655,16 +2656,21 @@ function renderManagedCharacter() {
   if (!character) { collectionDetail.textContent = "왼쪽에서 관리할 캐릭터를 선택하세요."; return; }
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
-  const canSpendExperiencePoints = gachaProgress.experiencePoints > 0;
+  const canSpendExperiencePoints = false;
   collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
-  const experienceAmountInput = document.getElementById("collection-experience-point-amount") as HTMLInputElement;
-  const experienceUseButton = document.getElementById("collection-experience-point-use") as HTMLButtonElement;
+  const experienceSection = collectionDetail.querySelector(".experience-point-spend") as HTMLElement;
+  experienceSection.innerHTML = `<div><span class="eyebrow">ITEM INVENTORY</span><strong>경험치 포인트 아이템</strong><p>아이템을 누르면 ${character.name}에게 즉시 경험치가 적용됩니다.</p></div><div id="collection-experience-point-items" class="experience-point-item-grid"></div><small id="collection-experience-point-result" aria-live="polite">중복 스킨을 획득하면 경험치 포인트 아이템이 추가됩니다.</small>`;
+  const experienceItemGrid = document.getElementById("collection-experience-point-items") as HTMLElement;
   const experienceResult = document.getElementById("collection-experience-point-result") as HTMLElement;
-  experienceAmountInput?.addEventListener("input", () => {
-    const amount = Number.parseInt(experienceAmountInput.value, 10);
-    experienceUseButton.disabled = !Number.isInteger(amount) || amount <= 0 || amount > gachaProgress.experiencePoints;
+  if (experiencePointItems.length === 0) experienceItemGrid.innerHTML = `<p class="experience-point-empty">보유한 경험치 포인트 아이템이 없습니다.</p>`;
+  experiencePointItems.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `experience-point-item rarity-${item.rarity}`;
+    button.innerHTML = `<b>✦ 경험치 포인트</b><strong>+${item.amount} XP</strong><small>${item.isLegacy ? "기존 보관 포인트" : "클릭하여 즉시 사용"}</small>`;
+    button.addEventListener("click", () => void useExperiencePointItem(character.id, item, experienceResult, button));
+    experienceItemGrid.appendChild(button);
   });
-  experienceUseButton?.addEventListener("click", () => void spendExperiencePoints(character.id, experienceAmountInput, experienceResult, experienceUseButton));
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
   const basicSkin = document.createElement("button");
   basicSkin.type = "button";

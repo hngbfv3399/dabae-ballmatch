@@ -151,19 +151,43 @@ export const getClientGachaProgress = query({
   },
 });
 
-export const spendExperiencePoints = mutation({
-  args: { clientId: v.string(), characterId: v.string(), amount: v.number() },
+export const listExperiencePointItems = query({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) return [];
+    const items = await ctx.db
+      .query("experiencePointItems")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .order("desc")
+      .take(100);
+    const legacyPoints = (await ctx.db
+      .query("anonymousGachaStates")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .unique())?.experiencePoints ?? 0;
+    return [...items, ...(legacyPoints > 0 ? [{ _id: "legacy-points", amount: legacyPoints, rarity: "common" as const, createdAt: 0, isLegacy: true }] : [])];
+  },
+});
+
+export const useExperiencePointItem = mutation({
+  args: { clientId: v.string(), characterId: v.string(), itemId: v.union(v.id("experiencePointItems"), v.literal("legacy-points")) },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) throw new Error("Client ID is required");
     assertCharacterId(args.characterId);
-    if (!Number.isInteger(args.amount) || args.amount <= 0) throw new Error("Invalid experience point amount");
 
     const gachaState = await ctx.db
       .query("anonymousGachaStates")
       .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
       .unique();
-    const availablePoints = gachaState?.experiencePoints ?? 0;
-    if (!gachaState || args.amount > availablePoints) throw new Error("Not enough experience points");
+    let amount: number;
+    if (args.itemId === "legacy-points") {
+      amount = gachaState?.experiencePoints ?? 0;
+      if (amount <= 0 || !gachaState) throw new Error("Experience point item not found");
+    } else {
+      const item = await ctx.db.get(args.itemId);
+      if (!item || item.clientId !== args.clientId) throw new Error("Experience point item not found");
+      amount = item.amount;
+      await ctx.db.delete(item._id);
+    }
 
     const characterProgress = await ctx.db
       .query("characterProgress")
@@ -172,18 +196,17 @@ export const spendExperiencePoints = mutation({
     if (!characterProgress) throw new Error("Character progress has not been initialized");
 
     const now = Date.now();
-    const experience = characterProgress.experience + args.amount;
+    const experience = characterProgress.experience + amount;
     await ctx.db.patch(characterProgress._id, {
       experience,
       level: levelForExperience(experience),
       updatedAt: now,
     });
-    await ctx.db.patch(gachaState._id, {
-      experiencePoints: availablePoints - args.amount,
-      updatedAt: now,
-    });
+    if (args.itemId === "legacy-points" && gachaState) {
+      await ctx.db.patch(gachaState._id, { experiencePoints: 0, updatedAt: now });
+    }
 
-    return { experiencePoints: availablePoints - args.amount, ...growthSummary(experience) };
+    return { amount, ...growthSummary(experience) };
   },
 });
 
