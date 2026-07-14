@@ -112,23 +112,22 @@
               </button>
             </div>
 
-            <details class="optional-modes">
-              <summary>🎲 빠른 시작 · 연습 모드</summary>
-              <!-- 랜덤전 카드 -->
-              <div class="random-match">
-              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">🎲 랜덤전</h3>
-              <div class="random-mode-selector" style="margin-bottom: 0.8rem; font-size: 0.82rem; display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.08); padding-bottom: 0.6rem;">
-                <span style="color: var(--text-secondary);">모드:</span>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="solo" checked style="margin: 0;"> 개인</label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="team" style="margin: 0;"> 팀전</label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="boss" style="margin: 0;"> 👑 보스 레이드</label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="random-game-mode" value="tournament" style="margin: 0;"> 🏆 16강</label>
+            <section id="random-match-console" class="random-match-console" data-mode="solo" aria-label="랜덤 매치">
+              <div class="quick-match-heading"><div><span class="eyebrow">QUICK MATCH</span><h3>랜덤 매치</h3></div><span>자동 편성</span></div>
+              <div class="random-mode-selector" role="radiogroup" aria-label="랜덤 매치 종류">
+                <label class="random-mode-tile"><input type="radio" name="random-game-mode" value="solo" checked><span>⚔️</span><b>개인전</b></label>
+                <label class="random-mode-tile"><input type="radio" name="random-game-mode" value="team"><span>🔴🔵</span><b>팀전</b></label>
+                <label class="random-mode-tile"><input type="radio" name="random-game-mode" value="boss"><span>👑</span><b>보스전</b></label>
+                <label class="random-mode-tile"><input type="radio" name="random-game-mode" value="tournament"><span>🏆</span><b>토너먼트</b></label>
               </div>
-              <p id="random-boss-description" class="hidden" style="margin: -0.2rem 0 0.8rem; color: #d8b4fe; font-size: 0.78rem; line-height: 1.4;">🌌 등록된 보스 1명과 무작위 도전자 3명을 자동 편성합니다.</p>
-              <p id="random-tournament-description" class="hidden" style="margin: -0.2rem 0 0.8rem; color: #ffe08a; font-size: 0.78rem; line-height: 1.4;">🏆 일반 캐릭터 16명을 무작위 선발·배치해 1대1 토너먼트를 시작합니다.</p>
-              <div id="random-count-setting-item" class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <label for="random-player-count" style="font-size: 0.9rem; color: var(--text-secondary);">참가 인원: </label>
-                <select id="random-player-count" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
+              <div class="random-mode-preview">
+                <span id="random-mode-meta">2–6명 · 자유 난투</span>
+                <strong id="random-mode-title">개인전 빠른 매치</strong>
+                <p id="random-mode-description">인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.</p>
+              </div>
+              <div id="random-count-setting-item" class="random-option-row">
+                <label for="random-player-count">참가 인원</label>
+                <select id="random-player-count">
                   <option value="1">1인전</option>
                   <option value="2" selected>2인전</option>
                   <option value="3">3인전</option>
@@ -137,20 +136,21 @@
                   <option value="6">6인전</option>
                 </select>
               </div>
-              <div id="random-team-game-type-setting" class="setting-item hidden" style="margin-bottom: 1rem;">
-                <label for="random-team-game-type" style="font-size: 0.9rem; color: var(--text-secondary);">팀전 규칙</label>
-                <select id="random-team-game-type" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
+              <div id="random-team-game-type-setting" class="random-option-row hidden">
+                <label for="random-team-game-type">팀전 규칙</label>
+                <select id="random-team-game-type">
                   <option value="deathmatch">데스매치 · 전원 섬멸</option>
                   <option value="control">점령전 · 중앙 거점 100점</option>
                   <option value="relic">보석 쟁탈전 · 보석 10개 확보</option>
                 </select>
               </div>
-              <button id="random-start-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, #7f00ff 0%, #ff007f 100%); color: #fff; box-shadow: 0 0 10px rgba(127, 0, 255, 0.4); border: none; font-size: 0.95rem; font-weight: 700; height: 42px;">
-                <span>랜덤전 시작!</span>
+              <button id="random-start-btn" class="btn btn-secondary random-start-btn">
+                <span id="random-start-label">개인전 랜덤 매치 시작</span>
               </button>
-              </div>
+            </section>
 
-              <!-- 연습모드 카드 -->
+            <details class="practice-tools">
+              <summary>🏋️ 연습 도구 열기</summary>
               <div class="practice-match">
               <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">🏋️ 연습모드</h3>
               <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.45;">

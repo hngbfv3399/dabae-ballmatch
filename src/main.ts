@@ -2074,29 +2074,57 @@ function initRandomModeRadioListeners() {
     'input[name="random-game-mode"]',
   );
   const countSettingItem = document.getElementById("random-count-setting-item");
-  const bossDescription = document.getElementById("random-boss-description");
-  const tournamentDescription = document.getElementById("random-tournament-description");
+  const randomConsole = document.getElementById("random-match-console");
+  const randomModeMeta = document.getElementById("random-mode-meta");
+  const randomModeTitle = document.getElementById("random-mode-title");
+  const randomModeDescription = document.getElementById("random-mode-description");
+  const randomStartLabel = document.getElementById("random-start-label");
+
+  const updateRandomModePanel = (mode: GameMode) => {
+    const content: Record<GameMode, { meta: string; title: string; description: string; button: string }> = {
+      solo: {
+        meta: "2–6명 · 자유 난투",
+        title: "개인전 빠른 매치",
+        description: "인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.",
+        button: "개인전 랜덤 매치 시작",
+      },
+      team: {
+        meta: "3 vs 3 · 균등 편성",
+        title: "팀전 빠른 매치",
+        description: "6명의 캐릭터를 무작위로 뽑아 RED와 BLUE 팀에 3명씩 자동 배정합니다.",
+        button: "팀전 랜덤 매치 시작",
+      },
+      boss: {
+        meta: "BOSS 1명 vs 도전자 4명",
+        title: "보스 레이드 빠른 매치",
+        description: "등록된 보스 1명과 같은 계열을 제외한 무작위 도전자 4명을 자동 편성합니다.",
+        button: "보스 레이드 시작",
+      },
+      tournament: {
+        meta: "16명 · 단일 엘리미네이션",
+        title: "16강 토너먼트 빠른 매치",
+        description: "일반 캐릭터 16명을 무작위로 선발해 16강부터 결승까지 연속 진행합니다.",
+        button: "랜덤 토너먼트 시작",
+      },
+    };
+    const current = content[mode];
+    randomConsole?.setAttribute("data-mode", mode);
+    if (randomModeMeta) randomModeMeta.textContent = current.meta;
+    if (randomModeTitle) randomModeTitle.textContent = current.title;
+    if (randomModeDescription) randomModeDescription.textContent = current.description;
+    if (randomStartLabel) randomStartLabel.textContent = current.button;
+    if (countSettingItem) countSettingItem.style.display = mode === "solo" ? "flex" : "none";
+    randomTeamGameTypeSetting.classList.toggle("hidden", mode !== "team");
+  };
 
   radioButtons.forEach((radio) => {
     radio.addEventListener("change", (e) => {
       const targetVal = (e.target as HTMLInputElement).value;
-      if (countSettingItem) {
-        if (targetVal === "solo") {
-          // 개인전일 때만 인원 선택기 활성화 및 노출
-          countSettingItem.style.display = "flex";
-        } else {
-          // 팀전/보스전/토너먼트는 인원수가 고정이므로 숨김
-          countSettingItem.style.display = "none";
-        }
-      }
-      randomTeamGameTypeSetting.classList.toggle(
-        "hidden",
-        targetVal !== "team",
-      );
-      bossDescription?.classList.toggle("hidden", targetVal !== "boss");
-      tournamentDescription?.classList.toggle("hidden", targetVal !== "tournament");
+      updateRandomModePanel(targetVal as GameMode);
     });
   });
+  const selectedMode = document.querySelector('input[name="random-game-mode"]:checked') as HTMLInputElement | null;
+  updateRandomModePanel((selectedMode?.value ?? "solo") as GameMode);
 }
 
 teamGameTypeSelect.addEventListener("change", () => {
