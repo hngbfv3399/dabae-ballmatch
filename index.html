@@ -58,8 +58,8 @@
                 </div>
               </div>
               <div class="combat-setting-block">
-                <span>전적 보기</span>
-                <div class="combat-setting-buttons stats-mode-buttons" role="group" aria-label="전적 기준">
+                <span id="stats-context-label">개인전 전적</span>
+                <div id="stats-mode-buttons" class="combat-setting-buttons stats-mode-buttons" role="group" aria-label="개인전 전적 기준">
                   <button type="button" class="combat-setting-button active" data-stats-mode="all" aria-pressed="true">전체</button>
                   <button type="button" class="combat-setting-button" data-stats-mode="2" aria-pressed="false">2인</button>
                   <button type="button" class="combat-setting-button" data-stats-mode="3" aria-pressed="false">3인</button>
@@ -118,6 +118,10 @@
                 <span>게임 시작하기</span>
               </button>
             </div>
+
+            <button id="random-start-btn" class="btn random-match-button" type="button">
+              🎲 현재 모드 랜덤전 시작
+            </button>
 
             <details class="practice-tools">
               <summary>🏋️ 연습 도구 열기</summary>

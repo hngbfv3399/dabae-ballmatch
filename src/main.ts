@@ -47,6 +47,9 @@ const totalCountEl = document.getElementById("total-count") as HTMLElement;
 const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
 const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
+const randomStartBtn = document.getElementById(
+  "random-start-btn",
+) as HTMLButtonElement;
 const tierListNotice = document.getElementById(
   "tier-list-notice",
 ) as HTMLElement;
@@ -1567,10 +1570,56 @@ function goBackToLobby() {
   initLobby();
 }
 
+function startRandomGame() {
+  const shuffled = [...availableCharacters];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  selectedIds.clear();
+  selectedRedIds.clear();
+  selectedBlueIds.clear();
+  bossCharacterId = null;
+
+  if (currentMode === "team") {
+    shuffled.slice(0, 6).forEach((character, index) => {
+      selectedIds.add(character.id);
+      (index < 3 ? selectedRedIds : selectedBlueIds).add(character.id);
+    });
+  } else if (currentMode === "boss") {
+    const boss = availableBossCharacters[Math.floor(Math.random() * availableBossCharacters.length)];
+    if (!boss) {
+      alert("등록된 보스 캐릭터가 없습니다.");
+      return;
+    }
+    bossCharacterId = boss.id;
+    selectedIds.add(boss.id);
+    shuffled
+      .filter((character) => getCharacterFamilyId(character) !== getCharacterFamilyId(boss))
+      .slice(0, BOSS_CHALLENGER_COUNT)
+      .forEach((character) => {
+        selectedIds.add(character.id);
+        selectedRedIds.add(character.id);
+      });
+  } else if (currentMode === "tournament") {
+    shuffled.slice(0, 16).forEach((character) => selectedIds.add(character.id));
+  } else {
+    const count = 2 + Math.floor(Math.random() * 5);
+    shuffled.slice(0, count).forEach((character) => selectedIds.add(character.id));
+  }
+
+  initLobby(true);
+  updateStartButtonState();
+  if (currentMode === "tournament") startTournament();
+  else startGame();
+}
+
 // Listeners
 startBtn.addEventListener("click", startGame);
 backToLobbyBtn.addEventListener("click", goBackToLobby);
 modalCloseBtn.addEventListener("click", closeWinnerModal);
+randomStartBtn.addEventListener("click", startRandomGame);
 
 const practiceStartBtn = document.getElementById("practice-start-btn");
 if (practiceStartBtn) {
@@ -1956,6 +2005,7 @@ function initModeSelection() {
       const selectedMode = tab.getAttribute("data-mode") as GameMode;
       currentMode = selectedMode;
       updateTeamGameTypeVisibility();
+      updateStatsModeControls(selectedMode);
 
       if (modeDesc) {
         modeDesc.textContent = modeDescriptions[selectedMode] || "";
@@ -2000,6 +2050,30 @@ function initCombatSettings() {
   });
 }
 
+function updateStatsModeControls(mode: GameMode) {
+  const statsContextLabel = document.getElementById("stats-context-label");
+  const statsButtons = document.getElementById("stats-mode-buttons");
+  const context: Record<GameMode, { label: string; statsMode: string; showChoices: boolean }> = {
+    solo: { label: "개인전 전적", statsMode: selectedStatsMode === "team" || selectedStatsMode === "boss" ? "all" : selectedStatsMode, showChoices: true },
+    team: { label: "팀전 전적", statsMode: "team", showChoices: false },
+    boss: { label: "보스전 전적", statsMode: "boss", showChoices: false },
+    tournament: { label: "토너먼트 전적", statsMode: "2", showChoices: false },
+  };
+  const next = context[mode];
+  selectedStatsMode = next.statsMode;
+  if (statsContextLabel) statsContextLabel.textContent = next.label;
+  if (statsButtons) {
+    statsButtons.classList.toggle("hidden", !next.showChoices);
+    statsButtons.setAttribute("aria-label", `${next.label} 기준`);
+  }
+  document.querySelectorAll<HTMLButtonElement>("[data-stats-mode]").forEach((button) => {
+    const isSelected = button.dataset.statsMode === selectedStatsMode;
+    button.classList.toggle("active", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+  subscribeToGlobalData();
+}
+
 teamGameTypeSelect.addEventListener("change", () => {
   teamGameType = teamGameTypeSelect.value as TeamGameType;
   updateStartButtonState();
@@ -2008,6 +2082,7 @@ teamGameTypeSelect.addEventListener("change", () => {
 // Start APP
 initModeSelection();
 initCombatSettings();
+updateStatsModeControls(currentMode);
 updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
