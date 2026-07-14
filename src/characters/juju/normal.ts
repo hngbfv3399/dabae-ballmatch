@@ -18,10 +18,43 @@ interface JujuState extends CharacterState {
 // #endregion TYPES
 
 // ═══════════════════════════════════════════
+// #region CONSTANTS
+// ═══════════════════════════════════════════
+const SKILL_CONSTANTS = {
+  BLACK_HOLE_DURATION: 3.0,
+  BLACK_HOLE_RADIUS: 250,
+  BLACK_HOLE_PULL_SPEED: 4.8,
+  BLACK_HOLE_COLLAPSE_DAMAGE: 30,
+  BLACK_HOLE_KNOCKBACK_SPEED: 28.5,
+  EMERGENCY_HP_RATIO: 0.10,
+  EMERGENCY_ENEMY_STUN_DURATION: 1.0,
+  EMERGENCY_IMMUNITY_DURATION: 3.0,
+  EMERGENCY_SAFE_MARGIN: 72,
+  EMERGENCY_PULL_RING_RADIUS: 14,
+} as const;
+// #endregion CONSTANTS
+
+// ═══════════════════════════════════════════
 // #region HELPERS
 // ═══════════════════════════════════════════
 function isEnemy(char: CharacterState, target: CharacterState) {
   return char.teamId === undefined || target.teamId === undefined || char.teamId !== target.teamId;
+}
+
+function findSafestEscapePoint(target: CharacterState, enemies: CharacterState[], ctx: CharacterBehaviorContext) {
+  const margin = Math.max(target.radius + SKILL_CONSTANTS.EMERGENCY_SAFE_MARGIN, SKILL_CONSTANTS.EMERGENCY_SAFE_MARGIN);
+  const candidates = [
+    { x: margin, y: margin },
+    { x: ctx.arenaWidth - margin, y: margin },
+    { x: margin, y: ctx.arenaHeight - margin },
+    { x: ctx.arenaWidth - margin, y: ctx.arenaHeight - margin },
+  ];
+
+  return candidates.reduce((safest, candidate) => {
+    const candidateDistance = Math.min(...enemies.map((enemy) => Math.hypot(candidate.x - enemy.x, candidate.y - enemy.y)));
+    const safestDistance = Math.min(...enemies.map((enemy) => Math.hypot(safest.x - enemy.x, safest.y - enemy.y)));
+    return candidateDistance > safestDistance ? candidate : safest;
+  });
 }
 // #endregion HELPERS
 
@@ -37,12 +70,12 @@ export const jujuConfig: CharacterConfig = {
   attackPower: 14,
   baseAttackRange: 45,
   skillName: '전술적 특이점 블랙홀',
-  skillDescription: '7초 쿨타임. 스킬 시전 시 현재 위치에 3초간 블랙홀을 소환합니다. 주변 250px 내 적들의 움직임을 원천 봉쇄(기절)하고 블랙홀 중심부로 강력하게 끌고 들어갑니다. 블랙홀 지속 중 주주는 완전 무적입니다. 만료 시 30 광역 충격파 피해와 초강력 넉백을 선사합니다. 패시브: 죽음 직전 위기(체력 10% 이하) 처할 시 1회 한정으로 최다 HP 생존자와 자리를 바꾸고 3초 무적 보호막을 얻습니다.',
+  skillDescription: '7초 쿨타임. 스킬 시전 시 현재 위치에 3초간 블랙홀을 소환합니다. 주변 250px 내 적들의 움직임을 원천 봉쇄(기절)하고 블랙홀 중심부로 강력하게 끌고 들어갑니다. 블랙홀 지속 중 주주는 완전 무적입니다. 만료 시 30 광역 충격파 피해와 초강력 넉백을 선사합니다. 패시브: 죽음 직전 위기(체력 10% 이하) 처할 시 1회 한정으로 블랙홀을 즉시 생성해 모든 적을 가두고, 가장 안전한 전장 가장자리로 탈출해 3초 무적을 얻습니다.',
   color: '#00bfff', // 홀로그램 하늘색
   skillChargeRate: 14.3, // 7초 쿨타임
   tier: 'S',
   role: 'Disabler',
-  detailedDescription: '주주는 다수를 일거에 무력화하는 무적 영역 전개 능력을 가진 제어형 특수 포지션 캐릭터입니다. 스킬 작동 시 3초 동안 자신은 완전 무적(Invulnerable) 상태가 되며 적들을 기절시킨 채 한 지점으로 빨아들이는 블랙홀을 배치합니다. 소멸 시 강력한 충격파를 주고 튕겨내며, 빈사 상태 돌입 시 전장에 가장 건강한 적과 자리를 바꾸고 3초 보호막을 받는 강력한 생존 패시브도 탑재하고 있습니다.',
+  detailedDescription: '주주는 다수를 일거에 무력화하는 무적 영역 전개 능력을 가진 제어형 특수 포지션 캐릭터입니다. 스킬 작동 시 3초 동안 자신은 완전 무적(Invulnerable) 상태가 되며 적들을 기절시킨 채 한 지점으로 빨아들이는 블랙홀을 배치합니다. 소멸 시 강력한 충격파를 주고 튕겨내며, 빈사 상태 돌입 시 블랙홀에 적 전원을 강제 이동시킨 뒤 가장 안전한 전장 가장자리로 탈출하는 생존 패시브도 탑재하고 있습니다.',
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════
@@ -50,7 +83,7 @@ export const jujuConfig: CharacterConfig = {
   // ═══════════════════════════════════════════
   onSkillTrigger(char: CharacterState, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = 3.0; // 3 seconds duration
+    char.skillDurationLeft = SKILL_CONSTANTS.BLACK_HOLE_DURATION;
 
     const js = char as JujuState;
     // Set center of black hole at current location
@@ -59,7 +92,7 @@ export const jujuConfig: CharacterConfig = {
     
     // Apply damage immunity
     char.isImmune = true;
-    char.immuneTimeLeft = 3.0;
+    char.immuneTimeLeft = SKILL_CONSTANTS.BLACK_HOLE_DURATION;
 
     ctx.addFloatingText(char.x, char.y - 65, '🌀 특이점 블랙홀 소환! (무적)', '#00bfff', 1.8);
     ctx.createExplosion(char.x, char.y, '#00bfff', 15);
@@ -96,7 +129,7 @@ export const jujuConfig: CharacterConfig = {
           const dy = bY - enemy.y;
           const dist = Math.hypot(dx, dy);
 
-          if (dist <= 250) {
+          if (dist <= SKILL_CONSTANTS.BLACK_HOLE_RADIUS) {
             // A. Stun opponent to block movement (refresh 0.2s duration)
             if (!ctx.applyStun(char, enemy, 0.2)) return;
 
@@ -106,7 +139,7 @@ export const jujuConfig: CharacterConfig = {
 
             // C. Force coordinate draw towards center
             if (dist > 15) {
-              const pullSpeed = 4.8;
+              const pullSpeed = SKILL_CONSTANTS.BLACK_HOLE_PULL_SPEED;
               const angle = Math.atan2(dy, dx);
               enemy.x += Math.cos(angle) * pullSpeed * (dt * 60);
               enemy.y += Math.sin(angle) * pullSpeed * (dt * 60);
@@ -145,13 +178,13 @@ export const jujuConfig: CharacterConfig = {
             const dy = enemy.y - bY;
             const dist = Math.hypot(dx, dy);
 
-            if (dist <= 250) {
-              ctx.dealDamage(js, enemy, 30, '💥 SINGULARITY!');
+            if (dist <= SKILL_CONSTANTS.BLACK_HOLE_RADIUS) {
+              ctx.dealDamage(js, enemy, SKILL_CONSTANTS.BLACK_HOLE_COLLAPSE_DAMAGE, '💥 SINGULARITY!');
               
               // Knockback outwards (speed 28.5)
               const angle = Math.atan2(dy, dx);
-              enemy.vx = Math.cos(angle) * 28.5;
-              enemy.vy = Math.sin(angle) * 28.5;
+              enemy.vx = Math.cos(angle) * SKILL_CONSTANTS.BLACK_HOLE_KNOCKBACK_SPEED;
+              enemy.vy = Math.sin(angle) * SKILL_CONSTANTS.BLACK_HOLE_KNOCKBACK_SPEED;
             }
           });
 
@@ -178,7 +211,7 @@ export const jujuConfig: CharacterConfig = {
   // #endregion UPDATE
 
   // ═══════════════════════════════════════════
-  // #region DAMAGE — damage immunity & emergency dimension swap
+  // #region DAMAGE — damage immunity & emergency black-hole escape
   // ═══════════════════════════════════════════
   onTakeDamage(target: CharacterState, _attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) {
     // 1. Damage immunity (Black hole active state etc.)
@@ -187,56 +220,47 @@ export const jujuConfig: CharacterConfig = {
       return { finalDamage: 0, blocked: true };
     }
 
-    // 2. Emergency Swap Passive (triggers once when HP drops to 10% or below)
+    // 2. Emergency Black-Hole Escape Passive (triggers once when HP drops to 10% or below)
     const js = target as JujuState;
     if (!js.hasEmergencySwapped) {
       const nextHp = target.hp - damage;
-      if (nextHp <= target.maxHp * 0.10) {
+      if (nextHp <= target.maxHp * SKILL_CONSTANTS.EMERGENCY_HP_RATIO) {
         js.hasEmergencySwapped = true;
+        const origin = { x: target.x, y: target.y };
+        const enemies = ctx.characters.filter((enemy) => !enemy.isDead && enemy.id !== target.id && isEnemy(target, enemy));
 
-        // Find the alive survivor with the highest HP
-        let maxHp = -Infinity;
-        let swapTarget: any = null;
-        ctx.characters.forEach((enemy) => {
-          if (enemy.isDead || enemy.id === 'juju' || !isEnemy(target, enemy)) return;
-          if (enemy.hp > maxHp) {
-            maxHp = enemy.hp;
-            swapTarget = enemy;
-          }
+        // Form the black hole first, then place every enemy inside its core on a small ring.
+        target.skillActive = true;
+        target.skillDurationLeft = SKILL_CONSTANTS.BLACK_HOLE_DURATION;
+        js.blackHoleX = origin.x;
+        js.blackHoleY = origin.y;
+        const escapePoint = enemies.length > 0 ? findSafestEscapePoint(target, enemies, ctx) : origin;
+        enemies.forEach((enemy, index) => {
+          const angle = (Math.PI * 2 * index) / Math.max(1, enemies.length);
+          enemy.x = origin.x + Math.cos(angle) * SKILL_CONSTANTS.EMERGENCY_PULL_RING_RADIUS;
+          enemy.y = origin.y + Math.sin(angle) * SKILL_CONSTANTS.EMERGENCY_PULL_RING_RADIUS;
+          enemy.vx = 0;
+          enemy.vy = 0;
+          ctx.applyStun(target, enemy, SKILL_CONSTANTS.EMERGENCY_ENEMY_STUN_DURATION);
         });
 
-        if (swapTarget) {
-          const jX = target.x;
-          const jY = target.y;
-          const tX = swapTarget.x;
-          const tY = swapTarget.y;
+        target.x = escapePoint.x;
+        target.y = escapePoint.y;
+        target.vx = 0;
+        target.vy = 0;
+        target.isImmune = true;
+        target.immuneTimeLeft = SKILL_CONSTANTS.EMERGENCY_IMMUNITY_DURATION;
 
-          // Swap positions
-          target.x = tX;
-          target.y = tY;
-          swapTarget.x = jX;
-          swapTarget.y = jY;
-
-          // Grant 3 seconds immunity shield
-          target.isImmune = true;
-          target.immuneTimeLeft = 3.0;
-
-          // Portal trails
-          if (!js.swapPortals) js.swapPortals = [];
-          js.swapPortals.push({ x: jX, y: jY, life: 0.8 });
-          js.swapPortals.push({ x: tX, y: tY, life: 0.8 });
-
-          ctx.createExplosion(jX, jY, '#00bfff', 18);
-          ctx.createExplosion(tX, tY, '#00bfff', 18);
-          ctx.addFloatingText(target.x, target.y - 70, '🛡️ 비상 차원 탈출! (무적 3초)', '#00bfff', 2.0);
-          console.log(`🛡️ [비상 탈출] 주주가 치사 피해를 회피하고 ${(swapTarget as CharacterState).name}와 스왑 후 3초 무적막을 얻었습니다!`);
-        } else {
-          // If only self survives, grant 3 seconds immunity
-          target.isImmune = true;
-          target.immuneTimeLeft = 3.0;
-          ctx.addFloatingText(target.x, target.y - 70, '🛡️ 비상 무적! (3초)', '#00bfff', 2.0);
-        }
-        return { finalDamage: 0, blocked: true }; // Negate original damage completely
+        if (!js.swapPortals) js.swapPortals = [];
+        js.swapPortals.push({ x: origin.x, y: origin.y, life: 0.8 });
+        js.swapPortals.push({ x: escapePoint.x, y: escapePoint.y, life: 0.8 });
+        ctx.createExplosion(origin.x, origin.y, '#1c0d24', 28);
+        ctx.createExplosion(origin.x, origin.y, '#00bfff', 22);
+        ctx.createExplosion(escapePoint.x, escapePoint.y, '#00bfff', 18);
+        ctx.addFloatingText(origin.x, origin.y - 65, '🌀 비상 블랙홀!', '#00bfff', 1.8);
+        ctx.addFloatingText(target.x, target.y - 70, '🛡️ 안전 지대로 탈출! (무적 3초)', '#00bfff', 2.0);
+        ctx.logMessage?.(`🌀 [비상 블랙홀 탈출] 주주 ➡️ 체력 10% 이하에서 적 ${enemies.length}명을 특이점에 강제 이동시키고 안전 지대로 이탈!`, 'skill');
+        return { finalDamage: 0, blocked: true };
       }
     }
 
