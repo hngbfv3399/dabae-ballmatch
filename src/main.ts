@@ -64,6 +64,8 @@ const gachaDrawStatus = document.getElementById("gacha-draw-status") as HTMLElem
 const gachaResult = document.getElementById("gacha-result") as HTMLElement;
 const gachaCatalog = document.getElementById("gacha-catalog") as HTMLElement;
 const gachaPreview = document.getElementById("gacha-preview") as HTMLElement;
+const gachaRevealModal = document.getElementById("gacha-reveal-modal") as HTMLElement;
+const gachaRevealContent = document.getElementById("gacha-reveal-content") as HTMLElement;
 
 function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
   gameCanvas.width = arena.width;
@@ -291,6 +293,34 @@ function updateGachaUI() {
   renderGachaCatalog();
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function closeGachaReveal() {
+  gachaRevealModal.classList.add("hidden");
+}
+
+function showGachaRevealRolling() {
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal rolling"><span class="eyebrow">SKIN SIGNAL DETECTED</span><div class="gacha-reveal-orb"><i></i><i></i><i></i><b>?</b></div><h2>스킨을 해석하는 중…</h2><p>빛의 색이 결과를 알려줍니다.</p></div>`;
+  gachaRevealModal.classList.remove("hidden");
+}
+
+type GachaRevealCosmetic = Omit<Cosmetic, "isUnlocked" | "style"> & {
+  style: Omit<CharacterCosmeticStyle, "glowColor"> & { glowColor?: string };
+};
+
+function showGachaRevealResult(result: { result: string; cosmetic: GachaRevealCosmetic; experienceGranted: number }) {
+  const { cosmetic } = result;
+  const glowColor = cosmetic.style.glowColor ?? cosmetic.style.borderColor;
+  const rarityLabel: Record<Cosmetic["rarity"], string> = { common: "일반", rare: "희귀", epic: "에픽", legendary: "레전드", unique: "유니크" };
+  const isDuplicate = result.result === "duplicateExperience";
+  const effect = `${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`;
+  const specialClass = cosmetic.rarity === "legendary" || cosmetic.rarity === "unique" ? "is-special" : "";
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ${specialClass}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${glowColor}"><span class="eyebrow rarity-${cosmetic.rarity}">${rarityLabel[cosmetic.rarity].toUpperCase()} SKIN</span><div class="gacha-reveal-orb anim-${cosmetic.style.borderAnimation} trail-${cosmetic.style.trail}"><i></i><i></i><i></i><b>SKIN</b></div><h2>${cosmetic.name}</h2><p>${isDuplicate ? `중복 스킨 · 선택 캐릭터에게 +${result.experienceGranted} XP` : "새 공통 스킨을 획득했습니다!"}</p><div class="gacha-reveal-effect">${effect}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
+  document.getElementById("gacha-reveal-close")?.addEventListener("click", closeGachaReveal);
+}
+
 function formatSeasonDate(timestamp: number): string {
   return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(timestamp);
 }
@@ -335,13 +365,17 @@ async function drawGacha() {
   const targetCharacterId = gachaTargetCharacter.value;
   if (!targetCharacterId) return;
   gachaDrawBtn.disabled = true;
+  showGachaRevealRolling();
   try {
     await convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
     const result = await convexClient.mutation(api.cosmetics.draw, { clientId: anonymousClientId, targetCharacterId });
+    await delay(900);
+    showGachaRevealResult(result);
     gachaResult.textContent = result.result === "unlocked"
       ? `획득! ${result.cosmetic.name} (${result.cosmetic.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
       : `중복! ${result.cosmetic.name} · ${availableCharacters.find((character) => character.id === targetCharacterId)?.name ?? "선택 캐릭터"}에게 ${result.experienceGranted} XP를 지급했습니다.`;
   } catch (error) {
+    closeGachaReveal();
     gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
   }
 }
