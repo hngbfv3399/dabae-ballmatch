@@ -1651,7 +1651,9 @@ function startRandomGame() {
   } else if (currentMode === "tournament") {
     shuffled.slice(0, 16).forEach((character) => selectedIds.add(character.id));
   } else {
-    const count = 2 + Math.floor(Math.random() * 5);
+    const count = /^[2-6]$/.test(selectedStatsMode)
+      ? Number(selectedStatsMode)
+      : 2;
     shuffled.slice(0, count).forEach((character) => selectedIds.add(character.id));
   }
 
@@ -2105,6 +2107,7 @@ function initCombatSettings() {
         candidate.classList.toggle("active", isSelected);
         candidate.setAttribute("aria-pressed", String(isSelected));
       });
+      updateRandomMatchButtonLabel();
       subscribeToGlobalData();
     });
   });
@@ -2130,6 +2133,21 @@ function updateStatsModeControls(mode: GameMode) {
     button.setAttribute("aria-pressed", String(isSelected));
   });
   subscribeToGlobalData();
+  updateRandomMatchButtonLabel();
+}
+
+function updateRandomMatchButtonLabel() {
+  if (currentMode === "solo") {
+    const count = /^[2-6]$/.test(selectedStatsMode) ? selectedStatsMode : "2";
+    randomStartBtn.textContent = `🎲 ${count}인 랜덤전 시작`;
+    return;
+  }
+  const labels: Record<Exclude<GameMode, "solo">, string> = {
+    team: "🎲 팀전 랜덤전 시작",
+    boss: "🎲 보스전 랜덤전 시작",
+    tournament: "🎲 토너먼트 랜덤전 시작",
+  };
+  randomStartBtn.textContent = labels[currentMode];
 }
 
 teamGameTypeSelect.addEventListener("change", () => {
