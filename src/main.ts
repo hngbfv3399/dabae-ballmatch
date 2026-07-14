@@ -58,6 +58,7 @@ const gameModeModal = document.getElementById("game-mode-modal") as HTMLElement;
 const gameModeModalClose = document.getElementById("game-mode-modal-close") as HTMLButtonElement;
 const gameModeSetupHost = document.getElementById("game-mode-setup-host") as HTMLElement;
 const gachaModal = document.getElementById("gacha-modal") as HTMLElement;
+const gachaTargetCharacter = document.getElementById("gacha-target-character") as HTMLSelectElement;
 const gachaDrawBtn = document.getElementById("gacha-draw-btn") as HTMLButtonElement;
 const gachaDrawStatus = document.getElementById("gacha-draw-status") as HTMLElement;
 const gachaResult = document.getElementById("gacha-result") as HTMLElement;
@@ -206,11 +207,9 @@ type Cosmetic = { cosmeticId: string; name: string; rarity: "common" | "rare" | 
 let cosmeticCatalog: Cosmetic[] = [];
 let cosmeticLoadouts = new Map<string, string>();
 let gachaProgress = { dailyDrawsRemaining: 0, completedDungeonClears: 0, bonusDrawsAvailable: 0 };
-let experiencePointBalance = 0;
 let cosmeticCatalogUnsubscribe: (() => void) | null = null;
 let cosmeticLoadoutUnsubscribe: (() => void) | null = null;
 let gachaProgressUnsubscribe: (() => void) | null = null;
-let experiencePointBalanceUnsubscribe: (() => void) | null = null;
 let managedCharacterId: string | null = null;
 let activeMatchSlot = -1;
 let matchSlotIds: Array<string | null> = [];
@@ -309,7 +308,7 @@ function renderGachaPreview() {
 
 function updateGachaUI() {
   const dungeonClearProgress = gachaProgress.completedDungeonClears % 3;
-  gachaDrawStatus.textContent = `보유 경험치 포인트 ${experiencePointBalance.toLocaleString()}P · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3)`;
+  gachaDrawStatus.textContent = `오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 현재 공통 스킨 풀에서 뽑습니다. 캐릭터 스킨은 같은 뽑기 풀에 추가될 예정입니다.`;
   gachaDrawBtn.disabled = cosmeticCatalog.length === 0 || (gachaProgress.dailyDrawsRemaining + gachaProgress.bonusDrawsAvailable <= 0);
   gachaDrawBtn.textContent = "뽑기";
   renderGachaCatalog();
@@ -339,7 +338,7 @@ function showGachaRevealResult(result: { result: string; cosmetic: GachaRevealCo
   const isDuplicate = result.result === "duplicateExperience";
   const effect = `${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`;
   const specialClass = cosmetic.rarity === "legendary" || cosmetic.rarity === "unique" ? "is-special" : "";
-  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ${specialClass}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${glowColor}"><span class="eyebrow rarity-${cosmetic.rarity}">${rarityLabel[cosmetic.rarity].toUpperCase()} SKIN</span>${getSkinVisualMarkup({ ...cosmetic.style, glowColor }, "SKIN", "reveal")}<h2>${cosmetic.name}</h2><p>${isDuplicate ? `중복 스킨 · 경험치 포인트 +${result.experienceGranted}P 획득` : "새 공통 스킨을 획득했습니다!"}</p><div class="gacha-reveal-effect">${effect}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ${specialClass}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${glowColor}"><span class="eyebrow rarity-${cosmetic.rarity}">${rarityLabel[cosmetic.rarity].toUpperCase()} SKIN</span>${getSkinVisualMarkup({ ...cosmetic.style, glowColor }, "SKIN", "reveal")}<h2>${cosmetic.name}</h2><p>${isDuplicate ? `중복 스킨 · 선택 캐릭터에게 +${result.experienceGranted} XP` : "새 공통 스킨을 획득했습니다!"}</p><div class="gacha-reveal-effect">${effect}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
   document.getElementById("gacha-reveal-close")?.addEventListener("click", closeGachaReveal);
 }
 
@@ -392,34 +391,19 @@ async function clearCosmetic(characterId: string) {
   }
 }
 
-async function spendExperiencePoints(characterId: string, requestedAmount: number | "all") {
-  const amount = requestedAmount === "all" ? experiencePointBalance : Math.min(requestedAmount, experiencePointBalance);
-  if (amount <= 0) return;
-  const character = availableCharacters.find((entry) => entry.id === characterId);
-  try {
-    const result = await convexClient.mutation(api.progression.spendExperiencePoints, {
-      clientId: anonymousClientId,
-      characterId,
-      amount,
-    });
-    gachaResult.textContent = `${character?.name ?? "캐릭터"}에게 경험치 포인트 ${result.spent.toLocaleString()}P를 지급했습니다. 남은 포인트 ${result.remainingPoints.toLocaleString()}P.`;
-    renderManagedCharacter();
-  } catch (error) {
-    gachaResult.textContent = error instanceof Error ? error.message : "경험치 포인트 사용에 실패했습니다.";
-  }
-}
-
 async function drawGacha() {
+  const targetCharacterId = gachaTargetCharacter.value;
+  if (!targetCharacterId) return;
   gachaDrawBtn.disabled = true;
   showGachaRevealRolling();
   try {
     await convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
-    const result = await convexClient.mutation(api.cosmetics.draw, { clientId: anonymousClientId });
+    const result = await convexClient.mutation(api.cosmetics.draw, { clientId: anonymousClientId, targetCharacterId });
     await delay(900);
     showGachaRevealResult(result);
     gachaResult.textContent = result.result === "unlocked"
       ? `획득! ${result.cosmetic.name} (${result.cosmetic.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
-      : `중복! ${result.cosmetic.name} · 경험치 포인트 ${result.experienceGranted}P를 획득했습니다. 캐릭터 관리에서 원하는 캐릭터에게 사용하세요.`;
+      : `중복! ${result.cosmetic.name} · ${availableCharacters.find((character) => character.id === targetCharacterId)?.name ?? "선택 캐릭터"}에게 ${result.experienceGranted} XP를 지급했습니다.`;
   } catch (error) {
     closeGachaReveal();
     gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
@@ -427,15 +411,14 @@ async function drawGacha() {
 }
 
 function initCosmetics() {
+  gachaTargetCharacter.innerHTML = availableCharacters.map((character) => `<option value="${character.id}">${character.name} · 중복 XP 대상</option>`).join("");
   void convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
   cosmeticCatalogUnsubscribe?.();
   cosmeticLoadoutUnsubscribe?.();
   gachaProgressUnsubscribe?.();
-  experiencePointBalanceUnsubscribe?.();
   cosmeticCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listCatalog, {}, (catalog) => { cosmeticCatalog = catalog as Cosmetic[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
   cosmeticLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getCharacterLoadouts, {}, (loadouts) => { cosmeticLoadouts = new Map(loadouts.map((loadout) => [loadout.characterId, loadout.cosmeticId])); updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
   gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = progress; updateGachaUI(); });
-  experiencePointBalanceUnsubscribe = convexClient.onUpdate(api.cosmetics.getExperiencePointBalance, { clientId: anonymousClientId }, (result) => { experiencePointBalance = result.balance; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderManagedCharacter(); });
 }
 
 function getCharacterFamilyId(character: { id: string; characterFamilyId?: string }) {
@@ -2660,11 +2643,7 @@ function renderManagedCharacter() {
   if (!character) { collectionDetail.textContent = "왼쪽에서 관리할 캐릭터를 선택하세요."; return; }
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
-  const pointActions = [60, 120, 250].map((amount) => `<button class="experience-point-use" type="button" data-experience-points="${amount}" ${experiencePointBalance < amount ? "disabled" : ""}>+${amount}P 사용</button>`).join("");
-  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="experience-point-panel"><div><span class="eyebrow">EXPERIENCE POINTS</span><strong>보유 ${experiencePointBalance.toLocaleString()}P</strong></div><p>중복 스킨에서 얻은 포인트입니다. 이 캐릭터에게 즉시 지급되며, 사용 후 되돌릴 수 없습니다.</p><div class="experience-point-actions">${pointActions}<button class="experience-point-use all" type="button" data-experience-points="all" ${experiencePointBalance === 0 ? "disabled" : ""}>전부 사용</button></div></section><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
-  collectionDetail.querySelectorAll<HTMLButtonElement>("[data-experience-points]").forEach((button) => {
-    button.addEventListener("click", () => void spendExperiencePoints(character.id, button.dataset.experiencePoints === "all" ? "all" : Number(button.dataset.experiencePoints)));
-  });
+  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
   const basicSkin = document.createElement("button");
   basicSkin.type = "button";
@@ -2815,6 +2794,7 @@ updateTeamGameTypeVisibility();
   pveCharacterModalClose.addEventListener("click", () => pveCharacterModal.classList.add("hidden"));
   pveStartBtn.addEventListener("click", startPveDungeon);
   initCosmetics();
+  gachaTargetCharacter.addEventListener("change", renderGachaCatalog);
   gachaDrawBtn.addEventListener("click", () => void drawGacha());
   matchCharacterPickerClose.addEventListener("click", () => matchCharacterPickerModal.classList.add("hidden"));
   selectGameplayMode("pve");

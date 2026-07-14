@@ -150,43 +150,6 @@ export const getClientGachaProgress = query({
   },
 });
 
-// 중복 스킨에서 얻은 경험치 포인트를 선택한 캐릭터 성장치로 전환한다.
-export const spendExperiencePoints = mutation({
-  args: { clientId: v.string(), characterId: v.string(), amount: v.number() },
-  handler: async (ctx, args) => {
-    if (!args.clientId.trim()) throw new Error("Client ID is required");
-    assertCharacterId(args.characterId);
-    if (!Number.isInteger(args.amount) || args.amount <= 0) throw new Error("Invalid experience point amount");
-
-    const now = Date.now();
-    const pointBalance = await ctx.db
-      .query("anonymousExperiencePointBalances")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique();
-    if (!pointBalance || pointBalance.balance < args.amount) throw new Error("보유 경험치 포인트가 부족합니다.");
-
-    const characterProgress = await ctx.db
-      .query("characterProgress")
-      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
-      .unique();
-    if (!characterProgress) throw new Error("Character progress has not been initialized");
-
-    const experience = characterProgress.experience + args.amount;
-    await ctx.db.patch(pointBalance._id, { balance: pointBalance.balance - args.amount, updatedAt: now });
-    await ctx.db.patch(characterProgress._id, {
-      experience,
-      level: levelForExperience(experience),
-      updatedAt: now,
-    });
-
-    return {
-      spent: args.amount,
-      remainingPoints: pointBalance.balance - args.amount,
-      ...growthSummary(experience),
-    };
-  },
-});
-
 export const recordDungeonStageClear = mutation({
   args: { characterId: v.string(), dungeonId: v.string(), stageNumber: v.number() },
   handler: async (ctx, args) => {

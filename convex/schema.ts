@@ -140,18 +140,10 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_clientId", ["clientId"]),
 
-  // 중복 스킨 보상은 캐릭터에 바로 주입하지 않고, 클라이언트별 경험치 포인트로 보관한다.
-  // 포인트는 캐릭터 관리 화면에서 원하는 캐릭터에게 직접 사용할 수 있다.
-  anonymousExperiencePointBalances: defineTable({
-    clientId: v.string(),
-    balance: v.number(),
-    updatedAt: v.number(),
-  }).index("by_clientId", ["clientId"]),
-
   // 가챠 이력은 계속 늘어나므로 상태 문서와 분리한다.
   gachaDrawHistory: defineTable({
     clientId: v.string(),
-    targetCharacterId: v.optional(v.string()),
+    targetCharacterId: v.string(),
     cosmeticId: v.string(),
     result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
     experienceGranted: v.number(),
