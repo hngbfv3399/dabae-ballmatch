@@ -62,6 +62,26 @@ function getFuseMarks(char: CharacterState): FuseMark[] {
   state.fuseMarks ??= [];
   return state.fuseMarks;
 }
+
+function syncFuseStatusEffects(char: CharacterState, characters: CharacterState[]): void {
+  characters.forEach((target) => {
+    target.statusIndicators = (target.statusIndicators ?? []).filter(
+      (effect) => !effect.label.startsWith('도화선 '),
+    );
+  });
+
+  getFuseMarks(char).forEach((mark) => {
+    const target = characters.find((candidate) => candidate.id === mark.targetId);
+    if (!target || target.isDead || !isEnemy(char, target)) return;
+    target.statusIndicators?.push({
+      icon: '💣',
+      label: `도화선 ${mark.stacks}/${SKILL_CONSTANTS.MAX_FUSE_STACKS}`,
+      timeLeft: mark.timeLeft,
+      duration: SKILL_CONSTANTS.FUSE_DURATION,
+      color: char.color,
+    });
+  });
+}
 // #endregion HELPERS
 
 // ═══════════════════════════════════════════
@@ -86,6 +106,7 @@ export const esConfig: CharacterConfig = {
       return !!target && !target.isDead && isEnemy(char, target);
     });
     state.fuseMarks = [];
+    syncFuseStatusEffects(char, ctx.characters);
     char.skillActive = false;
 
     if (activeMarks.length === 0) {
@@ -130,6 +151,7 @@ export const esConfig: CharacterConfig = {
       const target = ctx.characters.find((candidate) => candidate.id === mark.targetId);
       return mark.timeLeft > 0 && !!target && !target.isDead && isEnemy(char, target);
     });
+    syncFuseStatusEffects(char, ctx.characters);
 
     state.fuseParticleTimer = (state.fuseParticleTimer ?? 0) - dt;
     if (state.fuseParticleTimer <= 0) {
@@ -200,6 +222,7 @@ export const esConfig: CharacterConfig = {
       char.speed /= 1 + state.detonationSpeedStacks! * SKILL_CONSTANTS.SPEED_BONUS_PER_TARGET;
     }
     state.fuseMarks = [];
+    syncFuseStatusEffects(char, _ctx.characters);
     state.detonationSpeedStacks = 0;
     state.detonationSpeedLeft = 0;
   },

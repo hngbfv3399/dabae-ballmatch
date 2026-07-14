@@ -3,11 +3,11 @@ import type {
   CharacterBehaviorContext,
   BossDropDefinition,
   MapCutDefinition,
-  CharacterStatusEffect,
   CinematicRequest,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
 import { finalizeMatchResults } from "./matchResults";
+import { getCharacterStatusEffects } from "./statusEffects";
 import type { TeamGameType } from "../maps";
 
 interface Particle {
@@ -1477,18 +1477,7 @@ export class GameLounge {
   }
 
   private renderStatusEffects(char: CharacterState, currentRadius: number) {
-    const timed = (icon: string, label: string, timeLeft: number | undefined, color: string): CharacterStatusEffect => ({
-      icon, label, timeLeft: Math.max(0, timeLeft ?? 0), duration: Math.max(1, timeLeft ?? 1), color,
-    });
-    const effects: CharacterStatusEffect[] = [
-      ...(char.isStunned ? [timed('💫', '기절', char.stunTimeLeft, '#facc15')] : []),
-      ...(char.isConfused ? [timed('🌀', '혼란', char.confusedTimeLeft, '#fb7185')] : []),
-      ...(char.nayutaControlled ? [timed('⛓', '지배', char.nayutaControlTimeLeft, '#ef4444')] : []),
-      ...(char.isPoisoned ? [timed('☠', '독', char.poisonTimeLeft, '#84cc16')] : []),
-      ...(char.isImmune || char.isSuInvisible ? [timed('🛡', '무적', char.immuneTimeLeft, '#67e8f9')] : []),
-      ...(char.statusIndicators ?? []),
-      ...(char.getStatusEffects?.(char) ?? []),
-    ].slice(0, 3);
+    const effects = getCharacterStatusEffects(char);
     if (effects.length === 0) return;
 
     const width = Math.max(82, currentRadius * 2.7);

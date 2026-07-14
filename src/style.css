@@ -646,6 +646,39 @@ body {
   background: linear-gradient(90deg, #7f00ff, var(--neon-cyan));
 }
 
+.hud-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.05rem;
+}
+
+.hud-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  max-width: 100%;
+  padding: 0.14rem 0.34rem;
+  border: 1px solid color-mix(in srgb, var(--status-color) 75%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-color) 14%, rgba(7, 8, 18, 0.96));
+  color: #f8fafc;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: inset 0 0 8px color-mix(in srgb, var(--status-color) 18%, transparent);
+}
+
+.hud-status-chip strong {
+  color: var(--status-color);
+  font-size: 0.6rem;
+}
+
+.hud-status-icon {
+  font-size: 0.72rem;
+}
+
 @media (max-width: 980px) {
   #app { padding: 1rem; justify-content: flex-start; }
   .game-main { gap: 1rem; }

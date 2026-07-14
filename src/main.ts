@@ -12,6 +12,7 @@ import {
   type TeamGameType,
 } from "./maps";
 import { GameLounge } from "./maingame/gameLounge";
+import { getCharacterStatusEffects } from "./maingame/statusEffects";
 import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 
@@ -1298,6 +1299,14 @@ function updateHUD(characters: CharacterState[]) {
     const hpPercent = (char.hp / char.maxHp) * 100;
     const skillPercent = char.skillGauge;
     const isSkillReady = char.skillGauge >= 100;
+    const statusEffects = char.isDead ? [] : getCharacterStatusEffects(char);
+    const statusBadges = statusEffects.map((effect) => `
+      <span class="hud-status-chip" style="--status-color: ${effect.color}">
+        <span class="hud-status-icon">${effect.icon}</span>
+        <span>${effect.label}</span>
+        <strong>${Math.max(0, effect.timeLeft).toFixed(1)}s</strong>
+      </span>
+    `).join("");
 
     const item = document.createElement("div");
     item.className = `hud-item ${char.isDead ? "dead" : ""}`;
@@ -1335,6 +1344,7 @@ function updateHUD(characters: CharacterState[]) {
         <div class="bar-container">
           <div class="bar bar-skill" style="width: ${skillPercent}%; background: ${char.isDead ? "#333" : isSkillReady ? "#ffd700" : ""};"></div>
         </div>
+        ${statusBadges ? `<div class="hud-status-list">${statusBadges}</div>` : ""}
       </div>
       ${isSkillReady && !char.isDead ? '<div class="skill-indicator">READY</div>' : ""}
       ${char.skillActive && !char.isDead ? '<div class="skill-indicator" style="color: #ff3366;">ACTIVE</div>' : ""}
