@@ -16,15 +16,16 @@ export function currentSeasonWindow(timestamp: number) {
 
 async function clearSeasonDataBatch(ctx: MutationCtx, seasonId: string) {
   const dungeonRecords = await ctx.db.query("dungeonCharacterRecords").take(RESET_BATCH_SIZE);
+  const stageRecords = await ctx.db.query("dungeonStageRecords").take(RESET_BATCH_SIZE);
   const gachaStates = await ctx.db.query("anonymousGachaStates").take(RESET_BATCH_SIZE);
   const gachaHistory = await ctx.db.query("gachaDrawHistory").take(RESET_BATCH_SIZE);
-  for (const entry of [...dungeonRecords, ...gachaStates, ...gachaHistory]) await ctx.db.delete(entry._id);
+  for (const entry of [...dungeonRecords, ...stageRecords, ...gachaStates, ...gachaHistory]) await ctx.db.delete(entry._id);
 
   const firstDungeon = await ctx.db.query("dungeonProgress").withIndex("by_dungeonId", (q) => q.eq("dungeonId", FIRST_DUNGEON_ID)).unique();
   if (firstDungeon) await ctx.db.replace(firstDungeon._id, { dungeonId: FIRST_DUNGEON_ID, isUnlocked: true, clearCount: 0 });
   else await ctx.db.insert("dungeonProgress", { dungeonId: FIRST_DUNGEON_ID, isUnlocked: true, clearCount: 0 });
 
-  if (dungeonRecords.length === RESET_BATCH_SIZE || gachaStates.length === RESET_BATCH_SIZE || gachaHistory.length === RESET_BATCH_SIZE) {
+  if (dungeonRecords.length === RESET_BATCH_SIZE || stageRecords.length === RESET_BATCH_SIZE || gachaStates.length === RESET_BATCH_SIZE || gachaHistory.length === RESET_BATCH_SIZE) {
     await ctx.scheduler.runAfter(0, internal.season.continueReset, { seasonId });
   }
 }

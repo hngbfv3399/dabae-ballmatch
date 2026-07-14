@@ -15,6 +15,8 @@ import { ensureSeasonReset } from "./season";
 
 const MAX_DUNGEON_CLEAR_TIME_MS = 30 * 60 * 1000;
 const MIN_DUNGEON_CLEAR_TIME_MS = 1_000;
+const FIRST_STAGE_FIRST_CLEAR_EXPERIENCE = FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE / 5;
+const FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE = FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE / 5;
 
 function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) throw new Error("Unknown character ID");
@@ -148,6 +150,54 @@ export const getClientGachaProgress = query({
   },
 });
 
+export const recordDungeonStageClear = mutation({
+  args: { characterId: v.string(), dungeonId: v.string(), stageNumber: v.number() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    assertFirstDungeon(args.dungeonId);
+    if (!Number.isInteger(args.stageNumber) || args.stageNumber < 1 || args.stageNumber > 5) {
+      throw new Error("Invalid dungeon stage");
+    }
+
+    const now = Date.now();
+    await ensureSeasonReset(ctx, now);
+    const characterProgress = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (!characterProgress) throw new Error("Character progress has not been initialized");
+
+    const stageRecord = await ctx.db
+      .query("dungeonStageRecords")
+      .withIndex("by_dungeonId_and_characterId_and_stageNumber", (q) =>
+        q.eq("dungeonId", args.dungeonId).eq("characterId", args.characterId).eq("stageNumber", args.stageNumber),
+      )
+      .unique();
+    const experienceGranted = stageRecord
+      ? FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE
+      : FIRST_STAGE_FIRST_CLEAR_EXPERIENCE;
+    const experience = characterProgress.experience + experienceGranted;
+
+    await ctx.db.patch(characterProgress._id, {
+      experience,
+      level: levelForExperience(experience),
+      updatedAt: now,
+    });
+    if (stageRecord) {
+      await ctx.db.patch(stageRecord._id, { clearCount: stageRecord.clearCount + 1, updatedAt: now });
+    } else {
+      await ctx.db.insert("dungeonStageRecords", {
+        dungeonId: args.dungeonId,
+        characterId: args.characterId,
+        stageNumber: args.stageNumber,
+        clearCount: 1,
+        updatedAt: now,
+      });
+    }
+    return { experienceGranted, ...growthSummary(experience) };
+  },
+});
+
 export const recordDungeonClear = mutation({
   args: {
     clientId: v.string(),
@@ -176,15 +226,7 @@ export const recordDungeonClear = mutation({
         q.eq("dungeonId", args.dungeonId).eq("characterId", args.characterId),
       )
       .unique();
-    const experienceGranted = characterRecord
-      ? FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE
-      : FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE;
-    const experience = characterProgress.experience + experienceGranted;
-    const level = levelForExperience(experience);
-
     await ctx.db.patch(characterProgress._id, {
-      experience,
-      level,
       totalDungeonClears: characterProgress.totalDungeonClears + 1,
       updatedAt: now,
     });
@@ -249,8 +291,7 @@ export const recordDungeonClear = mutation({
     }
 
     return {
-      experienceGranted,
-      ...growthSummary(experience),
+      ...growthSummary(characterProgress.experience),
       totalDungeonClears: characterProgress.totalDungeonClears + 1,
       completedDungeonClears: nextCompletedPlayCount,
       bonusDrawsAvailable: Math.floor(nextCompletedPlayCount / 3) - (gachaState?.bonusDrawsUsed ?? 0),

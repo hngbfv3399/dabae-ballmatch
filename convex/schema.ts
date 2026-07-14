@@ -42,6 +42,15 @@ export default defineSchema({
     .index("by_dungeonId_and_characterId", ["dungeonId", "characterId"])
     .index("by_dungeonId_and_fastestClearMs", ["dungeonId", "fastestClearMs"]),
 
+  // 스테이지 보상은 개별 클리어 단위로 지급하되, 첫 클리어와 반복 클리어를 구분한다.
+  dungeonStageRecords: defineTable({
+    dungeonId: v.string(),
+    characterId: v.string(),
+    stageNumber: v.number(),
+    clearCount: v.number(),
+    updatedAt: v.number(),
+  }).index("by_dungeonId_and_characterId_and_stageNumber", ["dungeonId", "characterId", "stageNumber"]),
+
   // 시즌별 개인전·팀전·토너먼트 캐릭터 랭킹. 한 시즌은 8주다.
   pvpSeasons: defineTable({
     seasonId: v.string(),
