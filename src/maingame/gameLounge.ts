@@ -110,10 +110,7 @@ export class GameLounge {
   private readonly relicCarrierSlowCap = 0.18;
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
-  private readonly pveSteeringStrength = 3.2;
   private readonly pveStalemateSeconds = 10;
-  private readonly pveCombatDistancePadding = 10;
-  private readonly pveCombatDistanceTolerance = 14;
   private readonly pveBasicAttackTargetKnockback = 4.2;
   private readonly pveBasicAttackRecoil = 1.6;
 
@@ -696,45 +693,6 @@ export class GameLounge {
   /**
    * 게임 상태 업데이트
    */
-  private getPvePreferredDistance(char: CharacterState, target: CharacterState): number {
-    const attackDistance = char.baseAttackRange + target.radius;
-    const physicalDistance = char.radius + target.radius + 8;
-    // 사거리 안에 머무르되 서로 겹치지는 않는 거리. 기본 사거리가 긴 캐릭터는 자연스럽게 더 멀리 유지한다.
-    return Math.max(physicalDistance, attackDistance - this.pveCombatDistancePadding);
-  }
-
-  private steerPveCharacterTowardEnemy(
-    char: CharacterState,
-    aliveCharacters: CharacterState[],
-    dt: number,
-  ) {
-    if (!this.isPveMode || char.isStunned || char.isConfused || char.isTyping) return;
-    let closestEnemy: CharacterState | null = null;
-    let closestDistance = Infinity;
-    for (const candidate of aliveCharacters) {
-      if (candidate.id === char.id || candidate.teamId === char.teamId) continue;
-      const distance = Math.hypot(candidate.x - char.x, candidate.y - char.y);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestEnemy = candidate;
-      }
-    }
-    if (!closestEnemy) return;
-
-    const preferredDistance = this.getPvePreferredDistance(char, closestEnemy);
-    const directionX = (closestEnemy.x - char.x) / closestDistance;
-    const directionY = (closestEnemy.y - char.y) / closestDistance;
-    const desiredSpeed = 3.5 * char.speed;
-    const blend = Math.min(1, dt * this.pveSteeringStrength);
-    if (closestDistance > preferredDistance + this.pveCombatDistanceTolerance) {
-      char.vx += (directionX * desiredSpeed - char.vx) * blend;
-      char.vy += (directionY * desiredSpeed - char.vy) * blend;
-    } else if (closestDistance < preferredDistance - this.pveCombatDistanceTolerance) {
-      char.vx += (-directionX * desiredSpeed - char.vx) * blend;
-      char.vy += (-directionY * desiredSpeed - char.vy) * blend;
-    }
-  }
-
   private resolvePveStalemate(aliveCharacters: CharacterState[]) {
     const player = aliveCharacters.find((char) => char.teamId === 1);
     if (!player) return;
@@ -745,10 +703,7 @@ export class GameLounge {
 
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
-    const separation = Math.max(
-      this.getPvePreferredDistance(player, enemy),
-      this.getPvePreferredDistance(enemy, player),
-    ) + this.pveCombatDistanceTolerance * 2;
+    const separation = Math.max(player.radius + enemy.radius + 14, 64);
     player.x = centerX - separation / 2;
     player.y = centerY;
     enemy.x = centerX + separation / 2;
@@ -1053,7 +1008,6 @@ export class GameLounge {
       }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
-      this.steerPveCharacterTowardEnemy(char, aliveCharacters, dt);
       if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
       this.updateKnockbackInertia(char, dt);
 
