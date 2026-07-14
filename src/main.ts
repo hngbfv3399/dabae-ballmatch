@@ -53,12 +53,6 @@ const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElem
 const randomStartBtn = document.getElementById(
   "random-start-btn",
 ) as HTMLButtonElement;
-const randomPlayerCountSelect = document.getElementById(
-  "random-player-count",
-) as HTMLSelectElement;
-const randomTeamGameTypeSelect = document.getElementById(
-  "random-team-game-type",
-) as HTMLSelectElement;
 const randomTeamGameTypeSetting = document.getElementById(
   "random-team-game-type-setting",
 ) as HTMLElement;
@@ -130,6 +124,9 @@ const openStatsBtn = document.getElementById(
 const closeStatsBtn = document.getElementById(
   "close-stats-btn",
 ) as HTMLButtonElement;
+const resetStatsBtn = document.getElementById(
+  "reset-stats-btn",
+) as HTMLButtonElement;
 const statsCenterModal = document.getElementById(
   "stats-center-modal",
 ) as HTMLElement;
@@ -141,6 +138,8 @@ const emptyRoleNotice = document.getElementById(
 ) as HTMLElement;
 let lobbyTotalGames = 0;
 let currentRoleFilter = "all";
+let randomPlayerCount = 2;
+let randomTeamGameType: TeamGameType = "deathmatch";
 
 // Winner Modal Elements
 const winnerModal = document.getElementById("winner-modal") as HTMLElement;
@@ -1596,7 +1595,7 @@ function startRandomGame() {
   bossCharacterId = null;
 
   if (randMode === "team") {
-    teamGameType = randomTeamGameTypeSelect.value as TeamGameType;
+    teamGameType = randomTeamGameType;
     teamGameTypeSelect.value = teamGameType;
     // 팀전 랜덤 (무조건 6명)
     const selected = shuffled.slice(0, 6);
@@ -1637,8 +1636,7 @@ function startRandomGame() {
     shuffled.slice(0, 16).forEach((character) => selectedIds.add(character.id));
   } else {
     // 개인전 랜덤 (지정 인원)
-    const count = parseInt(randomPlayerCountSelect.value, 10);
-    if (isNaN(count) || count < 1 || count > 6) return;
+    const count = randomPlayerCount;
     const selected = shuffled.slice(0, count);
     selected.forEach((c) => selectedIds.add(c.id));
   }
@@ -1675,6 +1673,36 @@ if (openStatsBtn && statsCenterModal) {
 if (closeStatsBtn && statsCenterModal) {
   closeStatsBtn.addEventListener("click", () => {
     statsCenterModal.classList.add("hidden");
+  });
+}
+
+if (resetStatsBtn) {
+  resetStatsBtn.addEventListener("click", async () => {
+    const confirmed = window.confirm(
+      "모든 전적, 피해량, 상성, 1대1 티어 기록을 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+    );
+    if (!confirmed) return;
+
+    const originalLabel = resetStatsBtn.textContent;
+    resetStatsBtn.disabled = true;
+    resetStatsBtn.textContent = "전적 초기화 중…";
+
+    try {
+      const result = await convexClient.mutation(api.stats.resetMatchHistory, {
+        confirmation: "RESET_MATCH_HISTORY",
+      });
+      alert(
+        result.scheduled
+          ? "전적 DB 정리를 시작했습니다. 데이터 양에 따라 잠시 후 모두 비워집니다."
+          : "전적 DB를 초기화했습니다.",
+      );
+    } catch (error) {
+      console.error("Failed to reset match history", error);
+      alert("전적 초기화에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      resetStatsBtn.disabled = false;
+      resetStatsBtn.textContent = originalLabel;
+    }
   });
 }
 
@@ -2056,6 +2084,32 @@ function updateRandomMatchPanel(mode: GameMode) {
   randomTeamGameTypeSetting.classList.toggle("hidden", mode !== "team");
 }
 
+function initRandomMatchControls() {
+  const countButtons = document.querySelectorAll<HTMLButtonElement>("[data-random-count]");
+  countButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      randomPlayerCount = Number(button.dataset.randomCount);
+      countButtons.forEach((candidate) => {
+        const isSelected = candidate === button;
+        candidate.classList.toggle("active", isSelected);
+        candidate.setAttribute("aria-pressed", String(isSelected));
+      });
+    });
+  });
+
+  const ruleButtons = document.querySelectorAll<HTMLButtonElement>("[data-random-team-rule]");
+  ruleButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      randomTeamGameType = button.dataset.randomTeamRule as TeamGameType;
+      ruleButtons.forEach((candidate) => {
+        const isSelected = candidate === button;
+        candidate.classList.toggle("active", isSelected);
+        candidate.setAttribute("aria-pressed", String(isSelected));
+      });
+    });
+  });
+}
+
 teamGameTypeSelect.addEventListener("change", () => {
   teamGameType = teamGameTypeSelect.value as TeamGameType;
   updateStartButtonState();
@@ -2063,6 +2117,7 @@ teamGameTypeSelect.addEventListener("change", () => {
 
 // Start APP
 initModeSelection();
+initRandomMatchControls();
 updateRandomMatchPanel(currentMode);
 updateTeamGameTypeVisibility();
 initLobby();

@@ -1,4 +1,6 @@
 import { internalMutation, query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 
 const CHARACTER_IDS = new Set([
@@ -213,17 +215,37 @@ export const recordCharacterDeath = mutation({
   },
 });
 
-// 6. Reset all global stats and counters
-export const resetStats = internalMutation({
+const RESET_BATCH_SIZE = 100;
+
+async function clearMatchHistoryBatch(ctx: MutationCtx) {
+  const stats = await ctx.db.query("globalStats").take(RESET_BATCH_SIZE);
+  const counters = await ctx.db.query("globalCounters").take(RESET_BATCH_SIZE);
+  const tiers = await ctx.db.query("oneOnOneTiers").take(RESET_BATCH_SIZE);
+
+  for (const doc of [...stats, ...counters, ...tiers]) {
+    await ctx.db.delete(doc._id);
+  }
+
+  return stats.length === RESET_BATCH_SIZE || counters.length === RESET_BATCH_SIZE || tiers.length === RESET_BATCH_SIZE;
+}
+
+// 전적 초기화는 실수 방지를 위한 확인 문자열을 요구하며, 대용량 DB는 여러 작업으로 나누어 비운다.
+export const resetMatchHistory = mutation({
+  args: { confirmation: v.literal("RESET_MATCH_HISTORY") },
+  handler: async (ctx) => {
+    const scheduled = await clearMatchHistoryBatch(ctx);
+    if (scheduled) {
+      await ctx.scheduler.runAfter(0, internal.stats.resetMatchHistoryBatch, {});
+    }
+    return { scheduled };
+  },
+});
+
+export const resetMatchHistoryBatch = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const allStats = await ctx.db.query("globalStats").collect();
-    for (const doc of allStats) {
-      await ctx.db.delete(doc._id);
-    }
-    const allCounters = await ctx.db.query("globalCounters").collect();
-    for (const doc of allCounters) {
-      await ctx.db.delete(doc._id);
+    if (await clearMatchHistoryBatch(ctx)) {
+      await ctx.scheduler.runAfter(0, internal.stats.resetMatchHistoryBatch, {});
     }
   },
 });
