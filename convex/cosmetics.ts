@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { isV3CharacterId, kstDate, levelForExperience } from "./v3Constants";
+import { isV3CharacterId, kstDate } from "./v3Constants";
 import { ensureSeasonReset } from "./season";
 
 type Rarity = "common" | "rare" | "epic" | "legendary" | "unique";
@@ -119,11 +119,21 @@ export const getCharacterLoadouts = query({
   handler: async (ctx) => await ctx.db.query("characterCosmeticLoadouts").take(50),
 });
 
+export const getExperiencePointBalance = query({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    const balance = await ctx.db
+      .query("anonymousExperiencePointBalances")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .unique();
+    return { balance: balance?.balance ?? 0 };
+  },
+});
+
 export const draw = mutation({
-  args: { clientId: v.string(), targetCharacterId: v.string() },
+  args: { clientId: v.string() },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) throw new Error("Client ID is required");
-    assertCharacterId(args.targetCharacterId);
 
     const now = Date.now();
     const today = kstDate(now);
@@ -162,17 +172,22 @@ export const draw = mutation({
         unlockedByClientId: args.clientId,
       });
     } else {
-      const progress = await ctx.db
-        .query("characterProgress")
-        .withIndex("by_characterId", (q) => q.eq("characterId", args.targetCharacterId))
+      const pointBalance = await ctx.db
+        .query("anonymousExperiencePointBalances")
+        .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
         .unique();
-      if (!progress) throw new Error("Character progress has not been initialized");
-      const experience = progress.experience + experienceGranted;
-      await ctx.db.patch(progress._id, {
-        experience,
-        level: levelForExperience(experience),
-        updatedAt: now,
-      });
+      if (pointBalance) {
+        await ctx.db.patch(pointBalance._id, {
+          balance: pointBalance.balance + experienceGranted,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("anonymousExperiencePointBalances", {
+          clientId: args.clientId,
+          balance: experienceGranted,
+          updatedAt: now,
+        });
+      }
     }
 
     if (gachaState) {
@@ -196,7 +211,6 @@ export const draw = mutation({
 
     await ctx.db.insert("gachaDrawHistory", {
       clientId: args.clientId,
-      targetCharacterId: args.targetCharacterId,
       cosmeticId: cosmetic.cosmeticId,
       result: unlock ? "duplicateExperience" : "unlocked",
       experienceGranted,
