@@ -591,6 +591,20 @@ export class GameLounge {
       }
     });
 
+    // 장착 스킨의 이동 흔적은 가벼운 파티클로만 처리해 전투 성능에 영향을 주지 않는다.
+    this.characters.forEach((char) => {
+      const trail = char.cosmeticStyle?.trail;
+      if (!char.isDead && trail !== undefined && trail !== "none" && Math.random() < (trail === "spark" ? 0.18 : 0.1)) {
+        this.createParticle(
+          char.x - char.vx * 2,
+          char.y - char.vy * 2,
+          char.cosmeticStyle?.glowColor ?? char.color,
+          trail === "spark" ? 3 : Math.max(3, char.radius * 0.18),
+          trail === "spark" ? 18 : 25,
+        );
+      }
+    });
+
     // 캐릭터마다 랜덤 초기 방향 결정 (3초 대기 후 이 각도로 날아감)
     this.initialAngles.clear();
     this.characters.forEach((char) => {
@@ -1776,7 +1790,8 @@ export class GameLounge {
       this.ctx.arc(char.x, char.y, currentRadius, 0, Math.PI * 2);
       this.ctx.closePath();
 
-      this.ctx.fillStyle = "#121225";
+      const skin = char.cosmeticStyle;
+      this.ctx.fillStyle = skin?.fillColor ?? "#121225";
       this.ctx.fill();
 
       // 원형 내부 이미지 또는 텍스트 렌더링
@@ -1792,7 +1807,7 @@ export class GameLounge {
         );
       } else {
         // 이미지가 없으므로 centered name text fallback 드로잉
-        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fillStyle = skin?.textColor ?? "#ffffff";
         this.ctx.font = `bold ${Math.max(10, currentRadius * 0.45)}px "Orbit", sans-serif`;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
@@ -1803,17 +1818,36 @@ export class GameLounge {
       // 캐릭터 테두리 빛 효과 선 (팀전/보스전일 경우 전용 테두리 링 및 글로우 적용)
       this.ctx.save();
 
-      let strokeColor = char.color;
+      let strokeColor = skin?.borderColor ?? char.color;
       let strokeWidth = 3;
-      let shadowB = char.skillActive ? 25 : 10;
-      let shadowC = char.skillActive ? char.color : "rgba(0,0,0,0.5)";
+      let shadowB = char.skillActive ? 25 : skin ? 16 : 10;
+      let shadowC = char.skillActive ? char.color : skin?.glowColor ?? "rgba(0,0,0,0.5)";
+
+      if (skin?.borderAnimation === "pulse") {
+        shadowB = 14 + Math.sin(Date.now() / 180) * 7;
+        strokeWidth = 3.5 + (Math.sin(Date.now() / 180) + 1) * 0.5;
+      } else if (skin?.borderAnimation === "aurora") {
+        shadowB = 24;
+        shadowC = Math.sin(Date.now() / 360) > 0 ? skin.glowColor : skin.borderColor;
+        strokeWidth = 4;
+      } else if (skin?.borderAnimation === "flame") {
+        shadowB = 24 + Math.sin(Date.now() / 110) * 5;
+        strokeWidth = 4;
+      } else if (skin?.borderAnimation === "frost") {
+        shadowB = 18;
+        strokeWidth = 4;
+      } else if (skin?.borderAnimation === "glitch") {
+        strokeColor = Math.sin(Date.now() / 75) > 0 ? skin.borderColor : skin.glowColor;
+        shadowB = 20;
+        strokeWidth = 3.5;
+      }
 
       if (char.isBoss) {
         strokeColor = "#ffd700"; // 보스는 눈부신 골드색
         strokeWidth = 6;
         shadowB = 25;
         shadowC = "#ffd700";
-      } else if (char.teamId !== undefined) {
+      } else if (!skin && char.teamId !== undefined) {
         strokeColor = char.teamId === 1 ? "#ff3b30" : "#007aff"; // 1: 레드팀(도전자), 2: 블루팀
         strokeWidth = 4.5;
         shadowB = 15;

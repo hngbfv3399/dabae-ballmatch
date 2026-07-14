@@ -1,337 +1,144 @@
-import { internalMutation, query, mutation } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { V3_CHARACTER_IDS, isV3CharacterId } from "./v3Constants";
+import { currentSeasonWindow, ensureSeasonReset } from "./season";
 
-const CHARACTER_IDS = new Set([
-  "doyun", "jiho", "su", "chanik", "chanhwi", "nayuta", "unhee", "dongjun", "seyeon", "puman",
-  "eunsu", "myeongseok", "juju", "juyeon", "sungjae", "mongshil", "seojun", "jiwoo", "junseok", "es", "juju_singularity_boss",
-]);
-const MODES = new Set(["all", "solo", "2", "3", "4", "5", "6", "team", "team:deathmatch", "team:control", "team:relic", "boss"]);
-const MAX_PARTICIPANTS = 6;
+const INITIAL_SCORE = 1000;
 
-function assertCharacterId(characterId: string): void {
-  if (!CHARACTER_IDS.has(characterId)) throw new Error("Unknown character ID");
+type RankingMode = "solo" | "team" | "tournament";
+
+function rankingModeForLegacyMode(mode: string): RankingMode {
+  if (mode === "tournament") return "tournament";
+  if (mode.startsWith("team")) return "team";
+  return "solo";
 }
 
-function assertMode(mode: string): void {
-  if (!MODES.has(mode)) throw new Error("Unknown game mode");
+function assertParticipants(participantIds: string[]) {
+  if (participantIds.length < 2 || participantIds.length > 16) throw new Error("A ranked match needs 2 to 16 characters");
+  if (new Set(participantIds).size !== participantIds.length) throw new Error("Ranked participants must be unique");
+  participantIds.forEach((characterId) => {
+    if (!isV3CharacterId(characterId)) throw new Error("Unknown ranked character");
+  });
 }
 
-function aggregateModes(mode: string): string[] {
-  if (mode.startsWith("team:")) return ["all", "team", mode];
-  if (/^[2-6]$/.test(mode)) return ["all", "solo", mode];
-  return ["all", mode];
+async function ensureSeason(ctx: MutationCtx, now: number) {
+  const window = currentSeasonWindow(now);
+  const existing = await ctx.db
+    .query("pvpSeasons")
+    .withIndex("by_seasonId", (q) => q.eq("seasonId", window.seasonId))
+    .unique();
+  if (existing) return existing;
+
+  const activeSeasons = await ctx.db.query("pvpSeasons").withIndex("by_status", (q) => q.eq("status", "active")).take(10);
+  for (const season of activeSeasons) await ctx.db.patch(season._id, { status: "ended" });
+  const id = await ctx.db.insert("pvpSeasons", { ...window, status: "active" });
+  return await ctx.db.get(id);
 }
 
-// 1. Get all character stats for a specific mode
-export const getStats = query({
-  args: { mode: v.string() },
+function scoreDelta(mode: RankingMode, result: "win" | "loss" | "draw") {
+  if (result === "draw") return 5;
+  if (mode === "tournament") return result === "win" ? 35 : -15;
+  return result === "win" ? 25 : -10;
+}
+
+export const getRankingOverview = query({
+  args: { mode: v.union(v.literal("solo"), v.literal("team"), v.literal("tournament")) },
   handler: async (ctx, args) => {
-    assertMode(args.mode);
-    return await ctx.db
-      .query("globalStats")
-      .withIndex("by_mode_and_char", (q) => q.eq("mode", args.mode))
-      .collect();
+    const window = currentSeasonWindow(Date.now());
+    const season = await ctx.db.query("pvpSeasons").withIndex("by_seasonId", (q) => q.eq("seasonId", window.seasonId)).unique();
+    const rankings = await ctx.db
+      .query("pvpCharacterRankings")
+      .withIndex("by_seasonId_and_mode_and_score", (q) => q.eq("seasonId", window.seasonId).eq("mode", args.mode))
+      .order("desc")
+      .take(V3_CHARACTER_IDS.length);
+    return {
+      season: season ?? { ...window, status: "active" as const },
+      rankings: rankings.map((entry) => ({
+        characterId: entry.characterId,
+        score: entry.score,
+        wins: entry.wins,
+        games: entry.games,
+        draws: entry.draws,
+        winRate: entry.games > 0 ? Math.round((entry.wins / entry.games) * 1000) / 10 : 0,
+      })),
+    };
   },
 });
 
-// 2. Get all counter stats for a specific mode
-export const getCounters = query({
-  args: { mode: v.string() },
-  handler: async (ctx, args) => {
-    assertMode(args.mode);
-    return await ctx.db
-      .query("globalCounters")
-      .withIndex("by_mode_victim_and_killer", (q) => q.eq("mode", args.mode))
-      .collect();
-  },
-});
+// 호환용 시작 이벤트다. 전적은 종료 시점에 한 번만 기록해 중복 판수를 막는다.
+export const recordGameStart = mutation({ args: { participantIds: v.array(v.string()), mode: v.string() }, handler: async () => null });
 
-// 3. Record game start for participantIds (increment games by 1)
-export const recordGameStart = mutation({
-  args: {
-    participantIds: v.array(v.string()),
-    mode: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (args.participantIds.length === 0 || args.participantIds.length > MAX_PARTICIPANTS) {
-      throw new Error(`participantIds must contain between 1 and ${MAX_PARTICIPANTS} characters`);
-    }
-    if (new Set(args.participantIds).size !== args.participantIds.length) {
-      throw new Error("participantIds must not contain duplicates");
-    }
-    args.participantIds.forEach(assertCharacterId);
-    assertMode(args.mode);
-    const modes = aggregateModes(args.mode);
-    for (const mode of modes) {
-      for (const charId of args.participantIds) {
-        const existing = await ctx.db
-          .query("globalStats")
-          .withIndex("by_mode_and_char", (q) =>
-            q.eq("mode", mode).eq("characterId", charId)
-          )
-          .unique();
-
-        if (existing) {
-          await ctx.db.patch(existing._id, {
-            games: existing.games + 1,
-          });
-        } else {
-          await ctx.db.insert("globalStats", {
-            characterId: charId,
-            mode,
-            wins: 0,
-            games: 1,
-            damageDealt: 0,
-            damageTaken: 0,
-            rankSum: 0,
-            mvpCount: 0,
-          });
-        }
-      }
-    }
-  },
-});
-
-// 4. Record game end (increment wins for winner, add damageDealt and damageTaken for all chars)
 export const recordGameEnd = mutation({
   args: {
     winnerId: v.string(),
     mode: v.string(),
-    allChars: v.array(
-      v.object({
-        characterId: v.string(),
-        damageDealt: v.number(),
-        damageTaken: v.number(),
-        rank: v.number(),
-        isMvp: v.boolean(),
-      })
-    ),
+    allChars: v.array(v.object({
+      characterId: v.string(), damageDealt: v.number(), damageTaken: v.number(), rank: v.number(), isMvp: v.boolean(), teamId: v.optional(v.number()),
+    })),
   },
   handler: async (ctx, args) => {
-    if (args.allChars.length === 0 || args.allChars.length > MAX_PARTICIPANTS) {
-      throw new Error(`allChars must contain between 1 and ${MAX_PARTICIPANTS} characters`);
-    }
-    if (new Set(args.allChars.map((char) => char.characterId)).size !== args.allChars.length) {
-      throw new Error("allChars must not contain duplicate characters");
-    }
-    if (args.winnerId !== "draw") assertCharacterId(args.winnerId);
-    assertMode(args.mode);
-    args.allChars.forEach((char) => assertCharacterId(char.characterId));
-    const modes = aggregateModes(args.mode);
-    for (const mode of modes) {
-      // Increment win for winner (if valid character)
-      const hasWinner = args.winnerId && args.winnerId !== "draw";
-      if (hasWinner) {
-        const winnerStats = await ctx.db
-          .query("globalStats")
-          .withIndex("by_mode_and_char", (q) =>
-            q.eq("mode", mode).eq("characterId", args.winnerId)
-          )
-          .unique();
+    const participantIds = args.allChars.map((entry) => entry.characterId);
+    assertParticipants(participantIds);
+    const mode = rankingModeForLegacyMode(args.mode);
+    const now = Date.now();
+    await ensureSeasonReset(ctx, now);
+    const season = await ensureSeason(ctx, now);
+    const isDraw = args.winnerId === "draw";
+    if (!isDraw && !isV3CharacterId(args.winnerId)) throw new Error("Unknown winner");
+    const winner = args.allChars.find((entry) => entry.characterId === args.winnerId);
+    const winningIds = isDraw
+      ? new Set<string>()
+      : mode === "team" && winner?.teamId !== undefined
+        ? new Set(args.allChars.filter((entry) => entry.teamId === winner.teamId).map((entry) => entry.characterId))
+        : new Set([args.winnerId]);
 
-        if (winnerStats) {
-          await ctx.db.patch(winnerStats._id, {
-            wins: winnerStats.wins + 1,
-          });
-        } else {
-          await ctx.db.insert("globalStats", {
-            characterId: args.winnerId,
-            mode,
-            wins: 1,
-            games: 1,
-            damageDealt: 0,
-            damageTaken: 0,
-            rankSum: 0,
-            mvpCount: 0,
-          });
-        }
-      }
-
-      // Add damages, rank, and MVP count for all participants
-      for (const char of args.allChars) {
-        const charStats = await ctx.db
-          .query("globalStats")
-          .withIndex("by_mode_and_char", (q) =>
-            q.eq("mode", mode).eq("characterId", char.characterId)
-          )
-          .unique();
-
-        const addedRankSum = char.rank;
-        const addedMvpCount = char.isMvp ? 1 : 0;
-
-        if (charStats) {
-          await ctx.db.patch(charStats._id, {
-            damageDealt: charStats.damageDealt + char.damageDealt,
-            damageTaken: charStats.damageTaken + char.damageTaken,
-            rankSum: (charStats.rankSum ?? 0) + addedRankSum,
-            mvpCount: (charStats.mvpCount ?? 0) + addedMvpCount,
-          });
-        } else {
-          await ctx.db.insert("globalStats", {
-            characterId: char.characterId,
-            mode,
-            wins: 0,
-            games: 1,
-            damageDealt: char.damageDealt,
-            damageTaken: char.damageTaken,
-            rankSum: addedRankSum,
-            mvpCount: addedMvpCount,
-          });
-        }
-      }
-    }
-  },
-});
-
-// 5. Record character death (increment counter victim -> killer)
-export const recordCharacterDeath = mutation({
-  args: {
-    victimId: v.string(),
-    killerId: v.string(),
-    mode: v.string(),
-  },
-  handler: async (ctx, args) => {
-    assertCharacterId(args.victimId);
-    assertCharacterId(args.killerId);
-    assertMode(args.mode);
-    const modes = aggregateModes(args.mode);
-    for (const mode of modes) {
+    for (const characterId of participantIds) {
+      const result = isDraw ? "draw" : winningIds.has(characterId) ? "win" : "loss";
       const existing = await ctx.db
-        .query("globalCounters")
-        .withIndex("by_mode_victim_and_killer", (q) =>
-          q.eq("mode", mode).eq("victimId", args.victimId).eq("killerId", args.killerId)
-        )
+        .query("pvpCharacterRankings")
+        .withIndex("by_seasonId_and_mode_and_characterId", (q) => q.eq("seasonId", season!.seasonId).eq("mode", mode).eq("characterId", characterId))
         .unique();
-
+      const delta = scoreDelta(mode, result);
       if (existing) {
-        await ctx.db.patch(existing._id, {
-          count: existing.count + 1,
-        });
+        await ctx.db.patch(existing._id, { score: Math.max(0, existing.score + delta), wins: existing.wins + (result === "win" ? 1 : 0), games: existing.games + 1, draws: existing.draws + (result === "draw" ? 1 : 0), updatedAt: now });
       } else {
-        await ctx.db.insert("globalCounters", {
-          victimId: args.victimId,
-          killerId: args.killerId,
-          mode,
-          count: 1,
-        });
+        await ctx.db.insert("pvpCharacterRankings", { seasonId: season!.seasonId, mode, characterId, score: Math.max(0, INITIAL_SCORE + delta), wins: result === "win" ? 1 : 0, games: 1, draws: result === "draw" ? 1 : 0, updatedAt: now });
       }
     }
+    return { seasonId: season!.seasonId, mode, recorded: participantIds.length };
   },
 });
 
-const RESET_BATCH_SIZE = 100;
+// 기존 상세 통계 화면이 새 시즌 전적을 읽도록 하는 읽기 전용 호환 API다.
+export const getStats = query({
+  args: { mode: v.string() },
+  handler: async (ctx, args) => {
+    const mode = rankingModeForLegacyMode(args.mode);
+    const seasonId = currentSeasonWindow(Date.now()).seasonId;
+    const rankings = await ctx.db.query("pvpCharacterRankings").withIndex("by_seasonId_and_mode_and_score", (q) => q.eq("seasonId", seasonId).eq("mode", mode)).order("desc").take(V3_CHARACTER_IDS.length);
+    return rankings.map((entry) => ({ characterId: entry.characterId, wins: entry.wins, games: entry.games, damageDealt: entry.score, damageTaken: 0, rankSum: 0, mvpCount: 0, score: entry.score }));
+  },
+});
 
-async function clearMatchHistoryBatch(ctx: MutationCtx) {
-  const stats = await ctx.db.query("globalStats").take(RESET_BATCH_SIZE);
-  const counters = await ctx.db.query("globalCounters").take(RESET_BATCH_SIZE);
-  const tiers = await ctx.db.query("oneOnOneTiers").take(RESET_BATCH_SIZE);
-  const bosses = await ctx.db.query("bossStats").take(RESET_BATCH_SIZE);
+export const getCounters = query({ args: { mode: v.string() }, handler: async () => [] });
+export const getDamageRanking = query({ args: { mode: v.string() }, handler: async () => [] });
+export const recordCharacterDeath = mutation({ args: { victimId: v.string(), killerId: v.string(), mode: v.string() }, handler: async () => null });
+export const recordBossResult = mutation({ args: { bossId: v.string(), cleared: v.boolean() }, handler: async () => null });
+export const getBossDifficulty = query({ args: {}, handler: async () => [] });
 
-  for (const doc of [...stats, ...counters, ...tiers, ...bosses]) {
-    await ctx.db.delete(doc._id);
-  }
-
-  return stats.length === RESET_BATCH_SIZE || counters.length === RESET_BATCH_SIZE || tiers.length === RESET_BATCH_SIZE || bosses.length === RESET_BATCH_SIZE;
-}
-
-// 전적 초기화는 실수 방지를 위한 확인 문자열을 요구하며, 대용량 DB는 여러 작업으로 나누어 비운다.
+// 개발용 즉시 초기화는 현재 시즌의 PvP 랭킹만 비운다. 레벨과 스킨은 건드리지 않는다.
 export const resetMatchHistory = mutation({
   args: { confirmation: v.literal("RESET_MATCH_HISTORY") },
   handler: async (ctx) => {
-    const scheduled = await clearMatchHistoryBatch(ctx);
-    if (scheduled) {
-      await ctx.scheduler.runAfter(0, internal.stats.resetMatchHistoryBatch, {});
+    const seasonId = currentSeasonWindow(Date.now()).seasonId;
+    for (const mode of ["solo", "team", "tournament"] as const) {
+      const rows = await ctx.db
+        .query("pvpCharacterRankings")
+        .withIndex("by_seasonId_and_mode_and_score", (q) => q.eq("seasonId", seasonId).eq("mode", mode))
+        .take(V3_CHARACTER_IDS.length);
+      for (const row of rows) await ctx.db.delete(row._id);
     }
-    return { scheduled };
-  },
-});
-
-export const resetMatchHistoryBatch = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    if (await clearMatchHistoryBatch(ctx)) {
-      await ctx.scheduler.runAfter(0, internal.stats.resetMatchHistoryBatch, {});
-    }
-  },
-});
-
-export const recordBossResult = mutation({
-  args: { bossId: v.string(), cleared: v.boolean() },
-  handler: async (ctx, args) => {
-    assertCharacterId(args.bossId);
-    const existing = await ctx.db.query("bossStats").withIndex("by_boss", (q) => q.eq("bossId", args.bossId)).unique();
-    if (existing) {
-      await ctx.db.patch(existing._id, { games: existing.games + 1, clears: existing.clears + (args.cleared ? 1 : 0) });
-    } else {
-      await ctx.db.insert("bossStats", { bossId: args.bossId, games: 1, clears: args.cleared ? 1 : 0 });
-    }
-  },
-});
-
-export const getBossDifficulty = query({
-  args: {},
-  handler: async (ctx) => {
-    const bosses = await ctx.db.query("bossStats").take(50);
-    return bosses.map((boss) => ({ ...boss, clearRate: boss.games > 0 ? (boss.clears / boss.games) * 100 : 0 })).sort((left, right) => right.clearRate - left.clearRate);
-  },
-});
-
-// 7. Get sorted average damage ranking for a specific mode
-export const getDamageRanking = query({
-  args: { mode: v.string() },
-  handler: async (ctx, args) => {
-    assertMode(args.mode);
-    const stats = await ctx.db
-      .query("globalStats")
-      .withIndex("by_mode_and_char", (q) => q.eq("mode", args.mode))
-      .collect();
-
-    const ranking = stats.map((item) => ({
-      characterId: item.characterId,
-      games: item.games,
-      avgDamageDealt: item.games > 0 ? item.damageDealt / item.games : 0,
-    }));
-
-    // Sort by avgDamageDealt descending
-    ranking.sort((a, b) => b.avgDamageDealt - a.avgDamageDealt);
-    return ranking;
-  },
-});
-
-// 8. Get all 1v1 tier test results
-export const getOneOnOneTiers = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("oneOnOneTiers").collect();
-  },
-});
-
-// 9. Update 1v1 tier test result for a character
-export const updateOneOnOneTier = mutation({
-  args: {
-    characterId: v.string(),
-    tier: v.string(),
-  },
-  handler: async (ctx, args) => {
-    assertCharacterId(args.characterId);
-    const existing = await ctx.db
-      .query("oneOnOneTiers")
-      .withIndex("by_char", (q) => q.eq("characterId", args.characterId))
-      .unique();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        tier: args.tier,
-        updatedAt: Date.now(),
-      });
-    } else {
-      await ctx.db.insert("oneOnOneTiers", {
-        characterId: args.characterId,
-        tier: args.tier,
-        updatedAt: Date.now(),
-      });
-    }
+    return { scheduled: false };
   },
 });

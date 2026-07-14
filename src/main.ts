@@ -4,7 +4,7 @@ import {
   availableCharacters,
   createCharacterState,
 } from "./characterManager";
-import type { CharacterState } from "./characters/character.interface";
+import type { CharacterCosmeticStyle, CharacterState } from "./characters/character.interface";
 import {
   defaultArena,
   getArenaForMatch,
@@ -15,6 +15,7 @@ import { GameLounge } from "./maingame/gameLounge";
 import { getCharacterStatusEffects } from "./maingame/statusEffects";
 import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
+import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
 
 // DOM Elements
 const lobbyView = document.getElementById("lobby-view") as HTMLElement;
@@ -28,6 +29,41 @@ const backToLobbyBtn = document.getElementById(
 ) as HTMLButtonElement;
 const focusModeBtn = document.getElementById("focus-mode-btn") as HTMLButtonElement;
 const gameCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
+const pveCommandPanel = document.getElementById("pve-command-panel") as HTMLElement;
+const pvpSetupPanel = document.getElementById("pvp-setup-panel") as HTMLElement;
+const pveCharacterSelectBtn = document.getElementById("pve-character-select-btn") as HTMLButtonElement;
+const pveCharacterSelectAvatar = document.getElementById("pve-character-select-avatar") as HTMLElement;
+const pveCharacterSelectName = document.getElementById("pve-character-select-name") as HTMLElement;
+const pveCharacterSelectStats = document.getElementById("pve-character-select-stats") as HTMLElement;
+const pveStartBtn = document.getElementById("pve-start-btn") as HTMLButtonElement;
+const pveCharacterModal = document.getElementById("pve-character-modal") as HTMLElement;
+const pveCharacterModalClose = document.getElementById("pve-character-modal-close") as HTMLButtonElement;
+const pveCharacterList = document.getElementById("pve-character-list") as HTMLElement;
+const pveStageSelect = document.getElementById("pve-stage-select") as HTMLSelectElement;
+const modeSettingsRow = document.getElementById("mode-settings-row") as HTMLElement;
+const matchSelectionSlots = document.getElementById("match-selection-slots") as HTMLElement;
+const matchCharacterPickerModal = document.getElementById("match-character-picker-modal") as HTMLElement;
+const matchCharacterPickerClose = document.getElementById("match-character-picker-close") as HTMLButtonElement;
+const matchCharacterPickerList = document.getElementById("match-character-picker-list") as HTMLElement;
+const matchCharacterPickerDetail = document.getElementById("match-character-picker-detail") as HTMLElement;
+const gameplayDeck = document.querySelector(".mode-command-deck") as HTMLElement;
+const rankingHubPanel = document.getElementById("ranking-hub-panel") as HTMLElement;
+const rankingSeasonLabel = document.getElementById("ranking-season-label") as HTMLElement;
+const rankingList = document.getElementById("ranking-list") as HTMLElement;
+const collectionHubPanel = document.getElementById("collection-hub-panel") as HTMLElement;
+const collectionList = document.getElementById("collection-list") as HTMLElement;
+const collectionDetail = document.getElementById("collection-detail") as HTMLElement;
+const openGameModeBtn = document.getElementById("open-game-mode-btn") as HTMLButtonElement;
+const gameModeModal = document.getElementById("game-mode-modal") as HTMLElement;
+const gameModeModalClose = document.getElementById("game-mode-modal-close") as HTMLButtonElement;
+const gameModeSetupHost = document.getElementById("game-mode-setup-host") as HTMLElement;
+const gachaModal = document.getElementById("gacha-modal") as HTMLElement;
+const gachaTargetCharacter = document.getElementById("gacha-target-character") as HTMLSelectElement;
+const gachaDrawBtn = document.getElementById("gacha-draw-btn") as HTMLButtonElement;
+const gachaDrawStatus = document.getElementById("gacha-draw-status") as HTMLElement;
+const gachaResult = document.getElementById("gacha-result") as HTMLElement;
+const gachaCatalog = document.getElementById("gacha-catalog") as HTMLElement;
+const gachaPreview = document.getElementById("gacha-preview") as HTMLElement;
 
 function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
   gameCanvas.width = arena.width;
@@ -148,16 +184,176 @@ let gameLounge: GameLounge | null = null;
 let isPracticeMode = false;
 
 // 게임 모드 상태 변수
-type GameMode = "solo" | "team" | "boss" | "tournament";
+type GameMode = "pve" | "solo" | "team" | "boss" | "tournament";
 type TournamentMatch = { players: [string | null, string | null]; winnerId?: string };
 type TournamentState = { rounds: TournamentMatch[][]; currentRound: number; championId?: string; awaitingNext: boolean };
 
-let currentMode: GameMode = "solo";
+let currentMode: GameMode = "pve";
 let teamGameType: TeamGameType = "deathmatch";
 let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
+type PveProgress = { level: number; experience: number; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
+type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number };
+let pveRun: PveRun | null = null;
+let selectedPveCharacterId: string | null = null;
+let pveProgressByCharacter = new Map<string, PveProgress>();
+let pveProgressUnsubscribe: (() => void) | null = null;
+type Cosmetic = { cosmeticId: string; name: string; rarity: "common" | "rare" | "epic" | "legendary" | "unique"; isUnlocked: boolean; style: CharacterCosmeticStyle };
+let cosmeticCatalog: Cosmetic[] = [];
+let cosmeticLoadouts = new Map<string, string>();
+let gachaProgress = { dailyDrawsRemaining: 0, completedDungeonClears: 0, bonusDrawsAvailable: 0 };
+let cosmeticCatalogUnsubscribe: (() => void) | null = null;
+let cosmeticLoadoutUnsubscribe: (() => void) | null = null;
+let gachaProgressUnsubscribe: (() => void) | null = null;
+let managedCharacterId: string | null = null;
+let activeMatchSlot = -1;
+let matchSlotIds: Array<string | null> = [];
+let previewGachaCosmeticId: string | null = null;
+let previewMatchCharacterId: string | null = null;
+let isPickingPveCharacter = false;
+type RankingEntry = { characterId: string; score: number; wins: number; games: number; draws: number; winRate: number };
+type RankingSeason = { seasonId: string; startedAt: number; endsAt: number; status: string };
+let activeRankingMode: "solo" | "team" | "tournament" = "solo";
+let currentRankingEntries: RankingEntry[] = [];
+let currentRankingSeason: RankingSeason | null = null;
+let rankingUnsubscribe: (() => void) | null = null;
+
+function getAnonymousClientId(): string {
+  const storageKey = "dambae-ballgame-anonymous-client-id";
+  const existing = localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const clientId = crypto.randomUUID();
+  localStorage.setItem(storageKey, clientId);
+  return clientId;
+}
+
+const anonymousClientId = getAnonymousClientId();
+
+function applyEquippedCosmetic(state: CharacterState) {
+  const cosmeticId = cosmeticLoadouts.get(state.id);
+  const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticId && entry.isUnlocked);
+  if (cosmetic) state.cosmeticStyle = cosmetic.style;
+  return state;
+}
+
+// 레벨 성장으로 계산되는 실제 전투 스탯은 항상 정수로 확정한다.
+// 공격력이 0인 특수 캐릭터도 있으므로 고정 +1이 아닌, 양수 기본 스탯의 올림 보정을 사용한다.
+function getLeveledHp(baseHp: number, progress: PveProgress): number {
+  return Math.ceil(baseHp * progress.healthMultiplier);
+}
+
+function getLeveledAttack(baseAttack: number, progress: PveProgress): number {
+  return Math.ceil(baseAttack * progress.attackMultiplier);
+}
+
+function applyCharacterLevel(state: CharacterState) {
+  const progress = getPveProgress(state.id);
+  state.maxHp = getLeveledHp(state.maxHp, progress);
+  state.hp = state.maxHp;
+  state.attackPower = getLeveledAttack(state.attackPower, progress);
+  return state;
+}
+
+function renderGachaCatalog() {
+  if (!gachaCatalog) return;
+  gachaCatalog.innerHTML = "";
+  cosmeticCatalog.forEach((cosmetic) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `gacha-skin-icon ${cosmetic.isUnlocked ? "unlocked" : "locked"} ${previewGachaCosmeticId === cosmetic.cosmeticId ? "active" : ""}`;
+    card.style.setProperty("--skin-border", cosmetic.style.borderColor);
+    card.style.setProperty("--skin-fill", cosmetic.style.fillColor);
+    card.style.setProperty("--skin-text", cosmetic.style.textColor);
+    card.style.setProperty("--skin-glow", cosmetic.style.glowColor);
+    card.innerHTML = `<span class="cosmetic-preview">${cosmetic.isUnlocked ? "SKIN" : "?"}</span><small class="rarity-${cosmetic.rarity}">${cosmetic.name}</small>`;
+    card.addEventListener("click", () => { previewGachaCosmeticId = cosmetic.cosmeticId; renderGachaCatalog(); });
+    gachaCatalog.appendChild(card);
+  });
+  renderGachaPreview();
+}
+
+function renderGachaPreview() {
+  const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === previewGachaCosmeticId) ?? cosmeticCatalog[0];
+  if (!cosmetic) { gachaPreview.textContent = "스킨을 불러오는 중입니다."; return; }
+  const effect = `${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`;
+  gachaPreview.innerHTML = `<div class="skin-preview-stage anim-${cosmetic.style.borderAnimation} trail-${cosmetic.style.trail}" style="--skin-border:${cosmetic.style.borderColor};--skin-fill:${cosmetic.style.fillColor};--skin-text:${cosmetic.style.textColor};--skin-glow:${cosmetic.style.glowColor}"><i></i><i></i><i></i><span class="gacha-preview-orb">SKIN</span></div><span class="eyebrow">${cosmetic.isUnlocked ? "획득함" : "미획득"} · ${cosmetic.rarity.toUpperCase()}</span><h3>${cosmetic.name}</h3><p>공통 스킨</p><div class="skill-slot"><b>외형 효과 미리보기</b><br>${effect}</div><p class="gacha-preview-note">위 오브에서 테두리 애니메이션과 이동 흔적을 미리 볼 수 있습니다. 가챠 탭에서는 장착할 수 없으며, 장착은 캐릭터 관리에서만 가능합니다.</p>`;
+}
+
+function updateGachaUI() {
+  const dungeonClearProgress = gachaProgress.completedDungeonClears % 3;
+  gachaDrawStatus.textContent = `오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 현재 공통 스킨 풀에서 뽑습니다. 캐릭터 스킨은 같은 뽑기 풀에 추가될 예정입니다.`;
+  gachaDrawBtn.disabled = cosmeticCatalog.length === 0 || (gachaProgress.dailyDrawsRemaining + gachaProgress.bonusDrawsAvailable <= 0);
+  gachaDrawBtn.textContent = "뽑기";
+  renderGachaCatalog();
+}
+
+function formatSeasonDate(timestamp: number): string {
+  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(timestamp);
+}
+
+function renderSeasonRanking() {
+  if (!currentRankingSeason) {
+    rankingSeasonLabel.textContent = "시즌 정보를 불러오는 중입니다.";
+    rankingList.textContent = "랭킹을 불러오는 중입니다.";
+    return;
+  }
+  rankingSeasonLabel.textContent = `${currentRankingSeason.seasonId.toUpperCase()} · ${formatSeasonDate(currentRankingSeason.startedAt)} ~ ${formatSeasonDate(currentRankingSeason.endsAt)}`;
+  if (currentRankingEntries.length === 0) {
+    rankingList.innerHTML = `<div class="ranking-empty">아직 기록된 ${activeRankingMode === "solo" ? "개인전" : activeRankingMode === "team" ? "팀전" : "토너먼트"}이 없습니다.<br><small>첫 전투를 완료하면 캐릭터별 시즌 점수가 기록됩니다.</small></div>`;
+    return;
+  }
+  rankingList.innerHTML = currentRankingEntries.map((entry, index) => {
+    const character = availableCharacters.find((candidate) => candidate.id === entry.characterId);
+    if (!character) return "";
+    return `<article class="ranking-row"><b class="ranking-place">${index + 1}</b>${getAvatarHTML(character.name, character.image, "ranking-avatar")}<div class="ranking-identity"><strong style="color:${character.color}">${character.name}</strong><small>${entry.wins}승 ${entry.games - entry.wins - entry.draws}패 ${entry.draws}무 · 승률 ${entry.winRate.toFixed(1)}%</small></div><strong class="ranking-score">${entry.score.toLocaleString()}<small>RP</small></strong></article>`;
+  }).join("");
+}
+
+function subscribeSeasonRanking() {
+  rankingUnsubscribe?.();
+  rankingUnsubscribe = convexClient.onUpdate(api.stats.getRankingOverview, { mode: activeRankingMode }, (overview) => {
+    currentRankingSeason = overview.season;
+    currentRankingEntries = overview.rankings;
+    renderSeasonRanking();
+  });
+}
+
+async function equipCosmetic(characterId: string, cosmeticId: string) {
+  try {
+    await convexClient.mutation(api.cosmetics.equipForCharacter, { clientId: anonymousClientId, characterId, cosmeticId });
+    gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}에게 스킨을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
+  } catch {
+    gachaResult.textContent = "스킨 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
+  }
+}
+
+async function drawGacha() {
+  const targetCharacterId = gachaTargetCharacter.value;
+  if (!targetCharacterId) return;
+  gachaDrawBtn.disabled = true;
+  try {
+    await convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
+    const result = await convexClient.mutation(api.cosmetics.draw, { clientId: anonymousClientId, targetCharacterId });
+    gachaResult.textContent = result.result === "unlocked"
+      ? `획득! ${result.cosmetic.name} (${result.cosmetic.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
+      : `중복! ${result.cosmetic.name} · ${availableCharacters.find((character) => character.id === targetCharacterId)?.name ?? "선택 캐릭터"}에게 ${result.experienceGranted} XP를 지급했습니다.`;
+  } catch (error) {
+    gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
+  }
+}
+
+function initCosmetics() {
+  gachaTargetCharacter.innerHTML = availableCharacters.map((character) => `<option value="${character.id}">${character.name} · 중복 XP 대상</option>`).join("");
+  void convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
+  cosmeticCatalogUnsubscribe?.();
+  cosmeticLoadoutUnsubscribe?.();
+  gachaProgressUnsubscribe?.();
+  cosmeticCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listCatalog, {}, (catalog) => { cosmeticCatalog = catalog as Cosmetic[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
+  cosmeticLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getCharacterLoadouts, {}, (loadouts) => { cosmeticLoadouts = new Map(loadouts.map((loadout) => [loadout.characterId, loadout.cosmeticId])); updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
+  gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = progress; updateGachaUI(); });
+}
 
 function getCharacterFamilyId(character: { id: string; characterFamilyId?: string }) {
   return character.characterFamilyId ?? character.id;
@@ -225,7 +421,8 @@ function launchNextTournamentMatch() {
 }
 
 function updateTeamGameTypeVisibility() {
-  teamGameTypeSetting.classList.toggle("hidden", currentMode !== "team");
+  // 팀전 규칙은 공통 게임 방식 버튼에서만 선택한다.
+  teamGameTypeSetting.classList.add("hidden");
 }
 
 // 아바타 HTML 렌더러 (이모지 대체)
@@ -439,7 +636,7 @@ async function recordGameEnd(
   allChars: CharacterState[],
   mode: string,
 ) {
-  if (isPracticeMode) return;
+  if (isPracticeMode || currentMode === "pve") return;
   const finalWinnerId = winnerId.includes("clone") ? "eunsu" : winnerId;
   const realChars = allChars.filter((char) => !char.id.includes("clone"));
 
@@ -453,6 +650,7 @@ async function recordGameEnd(
         damageTaken: char.totalDamageTaken || 0,
         rank: char.rank || 1,
         isMvp: char.isMvp,
+        teamId: char.teamId,
       })),
     });
   } catch (err) {}
@@ -481,7 +679,7 @@ async function recordCharacterDeath(
   killerId: string,
   playerCount: number,
 ) {
-  if (isPracticeMode) return;
+  if (isPracticeMode || currentMode === "pve") return;
   if (victimId.includes("clone") || killerId.includes("clone")) return;
   try {
     await convexClient.mutation(api.stats.recordCharacterDeath, {
@@ -664,6 +862,22 @@ function initLobby(preserveSelections = false) {
       emptyRoleNotice.classList.add("hidden");
       emptyRoleNotice.style.display = "none";
     }
+  }
+
+  if (currentMode === "solo" || currentMode === "team" || currentMode === "tournament") {
+    const randomCard = document.createElement("button");
+    randomCard.type = "button";
+    randomCard.className = "character-row random-character-row";
+    randomCard.innerHTML = `<div class="row-identity"><div class="avatar-text">?</div><div><div class="char-name">무작위 캐릭터</div><div class="row-skill-name">클릭하면 비어 있는 편성 칸을 무작위로 채웁니다.</div></div></div><div class="row-winrate"><strong class="text-neon-yellow">RANDOM</strong></div>`;
+    randomCard.addEventListener("click", () => {
+      const candidates = availableCharacters.filter((character) => !selectedIds.has(character.id));
+      const random = candidates[Math.floor(Math.random() * candidates.length)];
+      if (!random) return;
+      selectedIds.add(random.id);
+      if (currentMode === "team") (selectedRedIds.size < 3 ? selectedRedIds : selectedBlueIds).add(random.id);
+      initLobby(true);
+    });
+    characterListContainer.appendChild(randomCard);
   }
 
   filteredChars.forEach((char) => {
@@ -998,6 +1212,11 @@ function updateStartButtonState() {
 
 // Start Simulator
 function startGame() {
+  gameModeModal.classList.add("hidden");
+  if (currentMode === "pve") {
+    startPveDungeon();
+    return;
+  }
   if (currentMode === "tournament" && !tournamentState) {
     startTournament();
     return;
@@ -1049,6 +1268,8 @@ function startGame() {
       gameCanvas.height,
     );
     if (isLargeSoloMatch) state.radius = LARGE_SOLO_CHARACTER_RADIUS;
+    applyCharacterLevel(state);
+    applyEquippedCosmetic(state);
 
     // 모드별 스탯 및 팀 세팅
     if (currentMode === "boss") {
@@ -1165,13 +1386,13 @@ function startPracticeGame() {
   const allConfigs = [...selectedConfigs, dummyConfig];
   const total = allConfigs.length;
   const initialStates = allConfigs.map((config, index) =>
-    createCharacterState(
+    applyEquippedCosmetic(applyCharacterLevel(createCharacterState(
       config,
       index,
       total,
       gameCanvas.width,
       gameCanvas.height,
-    ),
+    ))),
   );
 
   totalCountEl.textContent = total.toString();
@@ -1371,13 +1592,58 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = "게임 종료";
   const winnerTitle = winnerModal.querySelector(".winner-title") as HTMLElement | null;
 
+  if (currentMode === "pve" && pveRun) {
+    const run = pveRun;
+    const player = allChars.find((character) => character.id === run.characterId);
+    const clearedStage = winner?.teamId === 1 && player && !player.isDead;
+    if (!clearedStage || !player) {
+      pveRun = null;
+      if (winnerTitle) winnerTitle.textContent = "DUNGEON FAILED";
+      winnerInfo.innerHTML = `<div class="winner-trophy">💀</div><div class="win-name" style="color:#ff5e5e">던전 실패</div><div class="win-desc">슬라임 소굴을 끝까지 돌파하지 못했습니다. 실패 시 경험치는 지급되지 않습니다.</div>`;
+      modalCloseBtn.textContent = "던전 선택으로";
+      winnerModal.classList.remove("hidden");
+      return;
+    }
+
+    run.currentHp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
+    if (run.stage < SLIME_MEADOW_STAGE_COUNT) {
+      run.stage += 1;
+      gameStatusText.textContent = `스테이지 ${run.stage - 1} 클리어 · HP 25% 회복`;
+      window.setTimeout(() => {
+        if (pveRun === run) startPveStage();
+      }, 900);
+      return;
+    }
+
+    pveRun = null;
+    const clearTimeMs = Date.now() - run.startedAt;
+    gameStatusText.textContent = "던전 클리어";
+    void convexClient.mutation(api.progression.recordDungeonClear, {
+      clientId: anonymousClientId,
+      characterId: run.characterId,
+      dungeonId: SLIME_MEADOW_DUNGEON_ID,
+      clearTimeMs,
+    }).then((result) => {
+      if (winnerTitle) winnerTitle.textContent = "DUNGEON CLEARED";
+      winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · 슬라임 소굴 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 5까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>`;
+      modalCloseBtn.textContent = "던전 선택으로";
+      winnerModal.classList.remove("hidden");
+    }).catch(() => {
+      if (winnerTitle) winnerTitle.textContent = "CLEAR SAVING FAILED";
+      winnerInfo.innerHTML = `<div class="winner-trophy">⚠️</div><div class="win-name">클리어 기록 저장에 실패했습니다</div><div class="win-desc">네트워크를 확인한 뒤 다시 시도해 주세요.</div>`;
+      modalCloseBtn.textContent = "던전 선택으로";
+      winnerModal.classList.remove("hidden");
+    });
+    return;
+  }
+
   if (currentMode === "tournament" && tournamentState) {
     const finalists = allChars.filter((char) => !char.id.includes("clone") && char.id !== "dummy");
     const resolvedWinner = winner ?? [...finalists].sort((a, b) => (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0))[0] ?? null;
     const next = findNextTournamentMatch();
     if (!next || !resolvedWinner) return;
     next.match.winnerId = resolvedWinner.id;
-    recordGameEnd(resolvedWinner.id, allChars, "2");
+    recordGameEnd(resolvedWinner.id, allChars, "tournament");
 
     if (next.roundIndex === tournamentState.rounds.length - 1) {
       tournamentState.championId = resolvedWinner.id;
@@ -1615,6 +1881,7 @@ function closeWinnerModal() {
 function goBackToLobby() {
   if (gameView.classList.contains("is-focus-mode")) void setFocusMode(false);
   isPracticeMode = false;
+  pveRun = null;
   tournamentState = null;
   if (tournamentHeader) tournamentHeader.classList.add("hidden");
   if (gameLounge) {
@@ -2050,49 +2317,265 @@ function openCharacterDetail(charId: string) {
   charDetailModal.classList.remove("hidden");
 }
 
-// Initialize Game Mode Tab Selection
-function initModeSelection() {
-  const modeTabs = document.querySelectorAll(".mode-tab");
-  const modeDesc = document.getElementById("mode-desc");
+function getPveProgress(characterId: string): PveProgress {
+  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, healthMultiplier: 1, attackMultiplier: 1, totalDungeonClears: 0 };
+}
 
+function updatePveSelectionUI() {
+  const selected = availableCharacters.find((character) => character.id === selectedPveCharacterId);
+  if (!selected) {
+    pveCharacterSelectAvatar.textContent = "?";
+    pveCharacterSelectName.textContent = "캐릭터 선택";
+    pveCharacterSelectStats.textContent = "선택 후 레벨과 능력치를 확인합니다.";
+    pveStartBtn.disabled = true;
+    return;
+  }
+  const progress = getPveProgress(selected.id);
+  pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
+  pveCharacterSelectAvatar.style.color = selected.color;
+  pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
+  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · ${progress.totalDungeonClears}회 클리어`;
+  pveStartBtn.disabled = false;
+}
+
+function renderPveCharacterList() {
+  pveCharacterList.innerHTML = "";
+  const randomButton = document.createElement("button");
+  randomButton.type = "button";
+  randomButton.className = "character-row";
+  randomButton.innerHTML = `<div class="row-identity"><div class="avatar-text">?</div><div><div class="char-name">무작위 캐릭터</div><div class="row-skill-name">입장할 때 무작위로 선택합니다.</div></div></div><div class="row-winrate"><strong class="text-neon-yellow">RANDOM</strong><small>던전 도전</small></div>`;
+  randomButton.addEventListener("click", () => {
+    const random = availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
+    if (!random) return;
+    selectedPveCharacterId = random.id;
+    pveCharacterModal.classList.add("hidden");
+    updatePveSelectionUI();
+  });
+  pveCharacterList.appendChild(randomButton);
+  availableCharacters.forEach((character) => {
+    const progress = getPveProgress(character.id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">누적 경험치 <strong class="text-neon-yellow">${progress.experience} XP</strong><small>${progress.totalDungeonClears}회 클리어</small></div>`;
+    button.addEventListener("click", () => {
+      selectedPveCharacterId = character.id;
+      pveCharacterModal.classList.add("hidden");
+      updatePveSelectionUI();
+    });
+    pveCharacterList.appendChild(button);
+  });
+}
+
+function initPveProgressSubscription() {
+  void convexClient.mutation(api.progression.ensureInitialState, {});
+  pveProgressUnsubscribe?.();
+  pveProgressUnsubscribe = convexClient.onUpdate(api.progression.getOverview, {}, (overview) => {
+    pveProgressByCharacter = new Map(overview.characters.map((progress) => [progress.characterId, progress]));
+    updatePveSelectionUI();
+    if (!pveCharacterModal.classList.contains("hidden")) renderPveCharacterList();
+    if (!collectionHubPanel.classList.contains("hidden")) renderCollection();
+  });
+}
+
+function openPveCharacterModal() {
+  isPickingPveCharacter = true;
+  previewMatchCharacterId = selectedPveCharacterId;
+  renderMatchCharacterPicker();
+  matchCharacterPickerModal.classList.remove("hidden");
+}
+
+function startPveDungeon() {
+  if (!selectedPveCharacterId) return;
+  const character = availableCharacters.find((entry) => entry.id === selectedPveCharacterId);
+  if (!character) return;
+  const progress = getPveProgress(character.id);
+  pveCharacterModal.classList.add("hidden");
+  gameModeModal.classList.add("hidden");
+  pveRun = { characterId: character.id, stage: Number(pveStageSelect.value), startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress) };
+  startPveStage();
+}
+
+function startPveStage() {
+  if (!pveRun) return;
+  const character = availableCharacters.find((entry) => entry.id === pveRun?.characterId);
+  if (!character) return;
+  const progress = getPveProgress(character.id);
+  const enemies = createSlimeMeadowStage(pveRun.stage);
+  applyArenaToCanvas(getArenaForMatch("team", 2, "deathmatch"));
+  lobbyView.classList.add("hidden");
+  gameView.classList.remove("hidden");
+  gameView.dataset.mode = "pve";
+  setHudCollapsed(true);
+  document.getElementById("boss-battle-header")?.classList.add("hidden");
+  document.getElementById("team-battle-header")?.classList.add("hidden");
+  const player = createCharacterState(character, 0, enemies.length + 1, gameCanvas.width, gameCanvas.height);
+  applyEquippedCosmetic(player);
+  player.maxHp = getLeveledHp(character.maxHp, progress);
+  player.hp = Math.min(player.maxHp, pveRun.currentHp);
+  player.attackPower = getLeveledAttack(character.attackPower, progress);
+  player.teamId = 1;
+  player.x = player.radius * 2.5;
+  player.y = gameCanvas.height / 2;
+  const enemyStates = enemies.map((enemy, index) => {
+    const state = createCharacterState(enemy, index + 1, enemies.length + 1, gameCanvas.width, gameCanvas.height);
+    state.teamId = 2;
+    state.x = gameCanvas.width - state.radius * 2.5 - (index % 2) * 85;
+    state.y = ((index + 1) / (enemies.length + 1)) * gameCanvas.height;
+    return state;
+  });
+  totalCountEl.textContent = String(enemyStates.length + 1);
+  aliveCountEl.textContent = String(enemyStates.length + 1);
+  gameStatusText.textContent = `슬라임 소굴 · ${pveRun.stage}/${SLIME_MEADOW_STAGE_COUNT} 스테이지`;
+  if (!gameLounge) gameLounge = new GameLounge(gameCanvas, updateHUD, showWinner, updateCountdown, recordCharacterDeath);
+  gameLounge.init([player, ...enemyStates], gameSpeedMultiplier, "deathmatch");
+}
+
+// Initialize Game Mode Tab Selection
+function selectGameplayMode(selectedMode: Exclude<GameMode, "boss">) {
+  const modeDesc = document.getElementById("mode-desc");
   const modeDescriptions: Record<string, string> = {
+    pve: "🧪 PvE 던전: 캐릭터 하나를 골라 초원의 슬라임 소굴 5스테이지에 도전합니다.",
     solo: "⚔️ 개인전: 최후의 1인이 승리하는 배틀로얄 방식입니다. (최소 2명 선택 필요)",
     team: "🔴🔵 팀전: 레드팀과 블루팀으로 나뉘어 전면전을 펼칩니다. 아군 킬(Friendly Fire)은 면역입니다.",
     boss: "👑 보스전: 전용 보스 캐릭터(1명) vs 도전자들의 비대칭 대결입니다. 보스의 능력치와 스킬은 전용 파일에서 정의됩니다.",
     tournament: "🏆 토너먼트: 정확히 16명을 선택하세요. 무작위 16강 대진부터 결승까지 모두 1대1로 진행합니다.",
   };
+  currentMode = selectedMode;
+  const isPve = selectedMode === "pve";
+  pveCommandPanel.classList.toggle("hidden", !isPve);
+  pvpSetupPanel.classList.toggle("hidden", isPve);
+  gameModeSetupHost.replaceChildren(modeSettingsRow, isPve ? pveCommandPanel : pvpSetupPanel);
+  updateTeamGameTypeVisibility();
+  updateStatsModeControls(selectedMode);
+  if (modeDesc) modeDesc.textContent = modeDescriptions[selectedMode];
+  const heading = document.getElementById("gameplay-heading");
+  if (heading) heading.textContent = "게임플레이";
+  selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear(); bossCharacterId = null;
+  matchSlotIds = Array.from({ length: selectedMode === "team" ? 6 : selectedMode === "tournament" ? 16 : 2 }, () => null);
+  renderMatchSlots();
+  initLobby(true);
+}
 
-  modeTabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      // 액티브 탭 클래스 토글
-      modeTabs.forEach((t) => {
-        t.classList.remove("active");
-        (t as HTMLElement).style.background = "transparent";
-        (t as HTMLElement).style.color = "#888";
-      });
-      tab.classList.add("active");
-      (tab as HTMLElement).style.background = "rgba(255, 255, 255, 0.1)";
-      (tab as HTMLElement).style.color = "#fff";
-
-      const selectedMode = tab.getAttribute("data-mode") as GameMode;
-      currentMode = selectedMode;
-      updateTeamGameTypeVisibility();
-      updateStatsModeControls(selectedMode);
-
-      if (modeDesc) {
-        modeDesc.textContent = modeDescriptions[selectedMode] || "";
-      }
-
-      // 모드 변경 시 선택 정보 초기화
-      selectedIds.clear();
-      selectedRedIds.clear();
-      selectedBlueIds.clear();
-      bossCharacterId = null;
-
-      // 로비 재렌더링하여 모드별 특화 UI 동기화
-      initLobby(false);
-    });
+function renderMatchSlots() {
+  if (currentMode === "pve") return;
+  matchSelectionSlots.innerHTML = "";
+  matchSlotIds.forEach((id, index) => {
+    const character = availableCharacters.find((entry) => entry.id === id);
+    const slot = document.createElement("button"); slot.type = "button";
+    slot.className = `match-character-slot ${character ? "filled" : ""} ${currentMode === "team" ? index < 3 ? "red" : "blue" : ""}`;
+    slot.innerHTML = character ? `<strong style="color:${character.color}">${character.name}</strong><small>${currentMode === "team" ? index < 3 ? "RED" : "BLUE" : "선택됨"}</small>` : `<b>?</b><small>${currentMode === "team" ? index < 3 ? "RED 슬롯" : "BLUE 슬롯" : `참가자 ${index + 1}`}</small>`;
+    slot.addEventListener("click", () => { isPickingPveCharacter = false; activeMatchSlot = index; renderMatchCharacterPicker(); matchCharacterPickerModal.classList.remove("hidden"); });
+    matchSelectionSlots.appendChild(slot);
   });
+}
+
+function renderMatchCharacterPicker() {
+  matchCharacterPickerList.innerHTML = "";
+  const candidates = isPickingPveCharacter
+    ? availableCharacters
+    : availableCharacters.filter((character) => !matchSlotIds.includes(character.id) || matchSlotIds[activeMatchSlot] === character.id);
+  if (!previewMatchCharacterId || !candidates.some((character) => character.id === previewMatchCharacterId)) previewMatchCharacterId = candidates[0]?.id ?? null;
+  const randomButton = document.createElement("button");
+  randomButton.type = "button";
+  randomButton.className = "picker-character picker-random";
+  randomButton.innerHTML = `<span class="picker-icon-frame"><b>?</b></span><strong>무작위</strong><small>중복 없이 자동 선택</small>`;
+  randomButton.addEventListener("click", () => {
+    const usedByOtherSlots = isPickingPveCharacter ? new Set<string>() : new Set(matchSlotIds.filter((id, index) => index !== activeMatchSlot && id));
+    const eligible = availableCharacters.filter((character) => !usedByOtherSlots.has(character.id));
+    const picked = eligible[Math.floor(Math.random() * eligible.length)];
+    if (picked) chooseMatchCharacter(picked.id);
+  });
+  matchCharacterPickerList.appendChild(randomButton);
+  candidates.forEach((character) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = `picker-character ${previewMatchCharacterId === character.id ? "active" : ""}`;
+    const progress = getPveProgress(character.id);
+    button.innerHTML = `<span class="picker-icon-frame" style="--picker-color:${character.color}">${getAvatarHTML(character.name, character.image, "picker-avatar")}</span><strong>${character.name}</strong><small>Lv.${progress.level} · ${character.role}</small>`;
+    button.addEventListener("click", () => { previewMatchCharacterId = character.id; renderMatchCharacterPicker(); }); matchCharacterPickerList.appendChild(button);
+  });
+  renderMatchCharacterPreview();
+}
+
+function renderMatchCharacterPreview() {
+  const character = availableCharacters.find((entry) => entry.id === previewMatchCharacterId);
+  if (!character) { matchCharacterPickerDetail.textContent = "선택 가능한 캐릭터가 없습니다."; return; }
+  const progress = getPveProgress(character.id); const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id));
+  const skinEffect = cosmetic
+    ? `${cosmetic.rarity.toUpperCase()} · ${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`
+    : "기본 외형 · 캐릭터 고유 색상과 테두리를 사용합니다.";
+  matchCharacterPickerDetail.innerHTML = `<div class="picker-detail-head"><div class="picker-preview-avatar">${getAvatarHTML(character.name, character.image, "picker-preview-image")}</div><div><span class="eyebrow">${character.role}</span><h3 style="color:${character.color}">${character.name} <small>Lv.${progress.level}</small></h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><section class="picker-info-block"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><p>캐릭터 고유 전투 로직이 현재 전투에 유지됩니다.</p></section><section class="picker-info-block"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><p>${character.skillDescription}</p></section><section class="picker-info-block skin-info"><em>SKIN · 현재 착용</em><strong>${cosmetic?.name ?? "기본 외형"}</strong><p>${skinEffect}</p></section><button id="confirm-match-character-btn" class="btn btn-primary" type="button">${character.name} 선택하기</button>`;
+  document.getElementById("confirm-match-character-btn")?.addEventListener("click", () => chooseMatchCharacter(character.id));
+}
+
+function chooseMatchCharacter(characterId: string) {
+  if (isPickingPveCharacter) {
+    selectedPveCharacterId = characterId;
+    updatePveSelectionUI();
+    matchCharacterPickerModal.classList.add("hidden");
+    isPickingPveCharacter = false;
+    return;
+  }
+  matchSlotIds[activeMatchSlot] = characterId; selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear();
+  matchSlotIds.forEach((id, index) => { if (!id) return; selectedIds.add(id); if (currentMode === "team") (index < 3 ? selectedRedIds : selectedBlueIds).add(id); });
+  matchCharacterPickerModal.classList.add("hidden"); renderMatchSlots(); updateStartButtonState();
+}
+
+function renderCollection() {
+  collectionList.innerHTML = "";
+  availableCharacters.forEach((character) => {
+    const progress = getPveProgress(character.id);
+    const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id));
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `collection-card ${managedCharacterId === character.id ? "active" : ""}`;
+    card.innerHTML = `<span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><strong style="color:${character.color}">${character.name}</strong><small>Lv.${progress.level} · ${cosmetic?.name ?? "기본 외형"}</small>`;
+    card.addEventListener("click", () => { managedCharacterId = character.id; renderCollection(); });
+    collectionList.appendChild(card);
+  });
+  renderManagedCharacter();
+}
+
+function renderManagedCharacter() {
+  const character = availableCharacters.find((entry) => entry.id === managedCharacterId);
+  if (!character) { collectionDetail.textContent = "왼쪽에서 관리할 캐릭터를 선택하세요."; return; }
+  const progress = getPveProgress(character.id);
+  const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
+  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
+  skins.forEach((skin) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "management-skin";
+    button.style.setProperty("--skin-border", skin.style.borderColor); button.style.setProperty("--skin-fill", skin.style.fillColor); button.style.setProperty("--skin-text", skin.style.textColor);
+    button.textContent = cosmeticLoadouts.get(character.id) === skin.cosmeticId ? `${skin.name} ✓` : skin.name;
+    button.addEventListener("click", () => void equipCosmetic(character.id, skin.cosmeticId));
+    skinGrid.appendChild(button);
+  });
+}
+
+function setHubTab(hub: "gameplay" | "gacha" | "ranking" | "collection") {
+  document.querySelectorAll<HTMLButtonElement>(".hub-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.hub === hub));
+  const isGameplay = hub === "gameplay";
+  gameplayDeck.classList.toggle("hidden", !isGameplay);
+  // 전투 편성 UI는 게임 시작 모달 내부에서만 표시한다.
+  rankingHubPanel.classList.toggle("hidden", hub !== "ranking");
+  collectionHubPanel.classList.toggle("hidden", hub !== "collection");
+  gachaModal.classList.toggle("hidden", hub !== "gacha");
+  if (hub === "gacha") { gachaResult.textContent = ""; updateGachaUI(); }
+  if (hub === "collection") renderCollection();
+  if (hub === "ranking") { subscribeSeasonRanking(); renderSeasonRanking(); }
+}
+
+function initHubNavigation() {
+  document.querySelectorAll<HTMLButtonElement>(".hub-tab").forEach((tab) => tab.addEventListener("click", () => setHubTab(tab.dataset.hub as "gameplay" | "gacha" | "ranking" | "collection")));
+  openGameModeBtn.addEventListener("click", () => { selectGameplayMode(currentMode as Exclude<GameMode, "boss">); gameModeModal.classList.remove("hidden"); });
+  gameModeModalClose.addEventListener("click", () => gameModeModal.classList.add("hidden"));
+  document.querySelectorAll<HTMLButtonElement>("[data-game-mode]").forEach((button) => button.addEventListener("click", () => { selectGameplayMode(button.dataset.gameMode as Exclude<GameMode, "boss">); document.querySelectorAll<HTMLButtonElement>(".game-mode-tab").forEach((tab) => tab.classList.toggle("active", tab === button)); }));
+  document.querySelectorAll<HTMLButtonElement>("[data-ranking-mode]").forEach((button) => button.addEventListener("click", () => {
+    activeRankingMode = button.dataset.rankingMode as "solo" | "team" | "tournament";
+    document.querySelectorAll<HTMLButtonElement>("[data-ranking-mode]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+    subscribeSeasonRanking();
+  }));
 }
 
 function initCombatSettings() {
@@ -2112,6 +2595,12 @@ function initCombatSettings() {
   statsButtons.forEach((button) => {
     button.addEventListener("click", () => {
       selectedStatsMode = button.dataset.statsMode ?? "solo";
+      if (currentMode === "solo" && /^[2-6]$/.test(selectedStatsMode)) {
+        matchSlotIds = Array.from({ length: Number(selectedStatsMode) }, () => null);
+        selectedIds.clear();
+        renderMatchSlots();
+        updateStartButtonState();
+      }
       if (currentMode === "team" && selectedStatsMode.startsWith("team:")) {
         teamGameType = selectedStatsMode.replace("team:", "") as TeamGameType;
         teamGameTypeSelect.value = teamGameType;
@@ -2132,15 +2621,16 @@ function updateStatsModeControls(mode: GameMode) {
   const statsContextLabel = document.getElementById("stats-context-label");
   const statsButtons = document.getElementById("stats-mode-buttons");
   const context: Record<GameMode, { label: string; statsMode: string; buttonContext: string | null }> = {
-    solo: { label: "개인전 전적", statsMode: ["solo", "2", "3", "4", "5", "6"].includes(selectedStatsMode) ? selectedStatsMode : "solo", buttonContext: "solo" },
-    team: { label: "팀전 전적", statsMode: "team", buttonContext: "team" },
+    pve: { label: "PvE 성장", statsMode: "solo", buttonContext: null },
+    solo: { label: "개인전 인원", statsMode: ["2", "3", "4", "5", "6"].includes(selectedStatsMode) ? selectedStatsMode : "2", buttonContext: "solo" },
+    team: { label: "팀전 규칙", statsMode: `team:${teamGameType}`, buttonContext: "team" },
     boss: { label: "보스 난이도", statsMode: "boss", buttonContext: null },
     tournament: { label: "토너먼트 전적", statsMode: "2", buttonContext: null },
   };
   const next = context[mode];
   selectedStatsMode = next.statsMode;
   if (statsContextLabel) statsContextLabel.textContent = next.label;
-  if (statsButtons) statsButtons.setAttribute("aria-label", `${next.label} 기준`);
+  if (statsButtons) statsButtons.setAttribute("aria-label", next.label);
   document.querySelectorAll<HTMLButtonElement>("[data-stats-mode]").forEach((button) => {
     button.classList.toggle("hidden", button.dataset.statsContext !== next.buttonContext);
     const isSelected = button.dataset.statsMode === selectedStatsMode;
@@ -2163,6 +2653,7 @@ function updateRandomMatchButtonLabel() {
     relic: "보석 쟁탈전",
   };
   const labels: Record<Exclude<GameMode, "solo">, string> = {
+    pve: "🧪 슬라임 던전 시작",
     team: `🎲 ${teamRuleLabels[teamGameType]} 랜덤 팀전 시작`,
     boss: "🎲 보스 1 vs 도전자 4 랜덤전 시작",
     tournament: "🎲 토너먼트 랜덤전 시작",
@@ -2177,10 +2668,20 @@ teamGameTypeSelect.addEventListener("change", () => {
 });
 
 // Start APP
-initModeSelection();
+initHubNavigation();
 initCombatSettings();
 updateStatsModeControls(currentMode);
 updateTeamGameTypeVisibility();
-initLobby();
-subscribeToGlobalData();
-initPatchNotesSubscription();
+  initLobby();
+  subscribeToGlobalData();
+  initPatchNotesSubscription();
+  initPveProgressSubscription();
+  updatePveSelectionUI();
+  pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);
+  pveCharacterModalClose.addEventListener("click", () => pveCharacterModal.classList.add("hidden"));
+  pveStartBtn.addEventListener("click", startPveDungeon);
+  initCosmetics();
+  gachaTargetCharacter.addEventListener("change", renderGachaCatalog);
+  gachaDrawBtn.addEventListener("click", () => void drawGacha());
+  matchCharacterPickerClose.addEventListener("click", () => matchCharacterPickerModal.classList.add("hidden"));
+  selectGameplayMode("pve");

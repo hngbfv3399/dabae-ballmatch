@@ -8,8 +8,12 @@
  * @module
  */
 
+import type * as cosmetics from "../cosmetics.js";
 import type * as patchNotes from "../patchNotes.js";
+import type * as progression from "../progression.js";
+import type * as season from "../season.js";
 import type * as stats from "../stats.js";
+import type * as v3Constants from "../v3Constants.js";
 
 import type {
   ApiFromModules,
@@ -18,8 +22,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  cosmetics: typeof cosmetics;
   patchNotes: typeof patchNotes;
+  progression: typeof progression;
+  season: typeof season;
   stats: typeof stats;
+  v3Constants: typeof v3Constants;
 }>;
 
 /**

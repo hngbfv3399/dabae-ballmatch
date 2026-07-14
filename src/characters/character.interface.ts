@@ -8,6 +8,15 @@ export interface CharacterStatusEffect {
   color: string;
 }
 
+export interface CharacterCosmeticStyle {
+  textColor: string;
+  borderColor: string;
+  fillColor: string;
+  glowColor: string;
+  borderAnimation: 'none' | 'pulse' | 'aurora' | 'flame' | 'frost' | 'glitch';
+  trail: 'none' | 'fade' | 'spark';
+}
+
 export interface BossDropDefinition {
   x: number;
   y: number;
@@ -181,4 +190,6 @@ export interface CharacterState extends CharacterConfig {
   mvpScore: number;
   deathAnimationTime: number;
   lastGaugeLogTime?: number;
+  // 전역 장착 스킨의 시각 효과. 전투 판정 색상(char.color)과 분리한다.
+  cosmeticStyle?: CharacterCosmeticStyle;
 }
