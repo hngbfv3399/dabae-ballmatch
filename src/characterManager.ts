@@ -18,6 +18,7 @@ import { mongshilConfig } from './characters/mongshil/normal';
 import { seojunConfig } from './characters/seojun/normal';
 import { jiwooConfig } from './characters/jiwoo/normal';
 import { junseokConfig } from './characters/junseok/normal';
+import { esConfig } from './characters/es/normal';
 import { jujuSingularityBossConfig } from './characters/juju/boss';
 
 // 이용 가능한 캐릭터 목록
@@ -40,7 +41,8 @@ export const availableCharacters: CharacterConfig[] = [
   mongshilConfig,
   seojunConfig,
   jiwooConfig,
-  junseokConfig
+  junseokConfig,
+  esConfig
 ];
 
 /**
