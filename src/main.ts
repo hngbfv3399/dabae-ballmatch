@@ -692,7 +692,7 @@ function initLobby(preserveSelections = false) {
       : "없음";
 
     const card = document.createElement("div");
-    card.className = "character-card card";
+    card.className = "character-row";
 
     // 모드별 카드 테두리 및 선택 스타일 적용
     if (currentMode === "solo" || currentMode === "tournament") {
@@ -718,23 +718,18 @@ function initLobby(preserveSelections = false) {
     }
     card.dataset.id = char.id;
 
-    let crownHTML = "";
-    if (currentMode === "boss" && bossCharacterId === char.id) {
-      crownHTML = `<div class="boss-crown-badge" style="background: #ffd700; color: #000; border-color: #ffd700;" title="현재 보스">👑</div>`;
-    }
-
     let modeBadgeHTML = "";
     if (currentMode === "team") {
       if (selectedRedIds.has(char.id)) {
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ff3b30; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔴 RED</div>`;
+        modeBadgeHTML = `<span class="mode-row-badge red">RED</span>`;
       } else if (selectedBlueIds.has(char.id)) {
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: #007aff; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🔵 BLUE</div>`;
+        modeBadgeHTML = `<span class="mode-row-badge blue">BLUE</span>`;
       }
     } else if (currentMode === "boss") {
       if (bossCharacterId === char.id) {
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ffd700; color: #000; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">👑 보스</div>`;
+        modeBadgeHTML = `<span class="mode-row-badge boss">BOSS</span>`;
       } else if (selectedRedIds.has(char.id)) {
-        modeBadgeHTML = `<div class="mode-card-badge" style="background: #ff3b30; color: #fff; font-weight: bold; font-family: 'Orbit', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 8px; position: absolute; top: 12px; right: 12px; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3);">👤 플레이어</div>`;
+        modeBadgeHTML = `<span class="mode-row-badge red">도전자</span>`;
       }
     }
 
@@ -744,7 +739,7 @@ function initLobby(preserveSelections = false) {
       const isRed = selectedRedIds.has(char.id);
       const isBlue = selectedBlueIds.has(char.id);
       teamSelectorHTML = `
-        <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
+        <div class="row-team-selector">
           <button class="red-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isRed ? "#ff3b30" : "rgba(255,255,255,0.1)"}; background: ${isRed ? "#ff3b30" : "rgba(0,0,0,0.2)"}; color: ${isRed ? "#fff" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔴 RED</button>
           <button class="blue-team-btn" style="flex: 1; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBlue ? "#007aff" : "rgba(255,255,255,0.1)"}; background: ${isBlue ? "#007aff" : "rgba(0,0,0,0.2)"}; color: ${isBlue ? "#fff" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">🔵 BLUE</button>
         </div>
@@ -753,7 +748,7 @@ function initLobby(preserveSelections = false) {
       const isBoss = isBossCharacter && bossCharacterId === char.id;
       const isChallenger = selectedRedIds.has(char.id);
       teamSelectorHTML = `
-        <div class="card-team-selector" style="display: flex; gap: 6px; margin-top: 1rem; width: 100%; box-sizing: border-box;">
+        <div class="row-team-selector">
           ${
             isBossCharacter
               ? `<button class="boss-team-btn" style="width: 100%; padding: 5px 0; font-size: 0.72rem; border-radius: 6px; border: 1px solid ${isBoss ? "#ffd700" : "rgba(255,255,255,0.1)"}; background: ${isBoss ? "#ffd700" : "rgba(0,0,0,0.2)"}; color: ${isBoss ? "#000" : "#888"}; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: 'Orbit', sans-serif;">👑 보스 버전</button>`
@@ -765,48 +760,14 @@ function initLobby(preserveSelections = false) {
 
     const currentTier = char.tier || "C";
     card.innerHTML = `
-      ${crownHTML}
       ${modeBadgeHTML}
-      <div class="tier-card-badge tier-badge-${currentTier.toLowerCase()}">${currentTier}</div>
-      <button class="char-detail-trigger-btn" data-id="${char.id}" title="상세 설명 보기" style="position: absolute; top: 12px; left: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(6px); color: rgba(255, 255, 255, 0.85); font-size: 0.72rem; padding: 3px 8px; border-radius: 12px; cursor: pointer; z-index: 10; font-family: 'Orbit', sans-serif; transition: all 0.2s;">ℹ️ 정보</button>
-      ${getAvatarHTML(char.name, char.image)}
-      <div class="char-name">${char.name}</div>
-      <div class="char-stats">
-        <div class="stat-row">
-          <span>체력 (HP)</span>
-          <span class="stat-val">${char.maxHp}</span>
-        </div>
-        <div class="stat-row">
-          <span>이동 속도</span>
-          <span class="stat-val">${char.speed.toFixed(1)}x</span>
-        </div>
-        <div class="stat-row">
-          <span>기본 공격력</span>
-          <span class="stat-val">${char.attackPower}</span>
-        </div>
-      </div>
+      <span class="tier-card-badge tier-badge-${currentTier.toLowerCase()}">${currentTier}</span>
+      <div class="row-identity">${getAvatarHTML(char.name, char.image)}<div><div class="char-name">${char.name}</div><div class="row-skill-name">${char.skillName}</div></div></div>
+      <div class="char-stats row-stats"><span>HP <b>${char.maxHp}</b></span><span>SPD <b>${char.speed.toFixed(1)}x</b></span><span>ATK <b>${char.attackPower}</b></span></div>
+      <div class="row-winrate">승률 <strong class="text-neon-yellow">${winRateStr}</strong><small>${wins}승/${games}판</small></div>
+      <button class="char-detail-trigger-btn" data-id="${char.id}" title="상세 설명 보기">정보</button>
       <div class="char-history">
-        <div class="history-title">📊 전적 기록 (${mode === "all" ? "전체" : `${mode}인전`})</div>
-        <div class="stat-row">
-          <span>승률</span>
-          <span class="stat-val text-neon-yellow">${winRateStr} (${wins}승/${games}판)</span>
-        </div>
-        <div class="stat-row">
-          <span>평균 등수 / MVP 횟수</span>
-          <span class="stat-val"><span class="text-neon-cyan avg-rank-val">${avgRank}위</span> / <span class="text-neon-yellow mvp-count-val">${mvpCount}회</span></span>
-        </div>
-        <div class="stat-row">
-          <span>준 피해 / 받은 피해</span>
-          <span class="stat-val"><span class="text-neon-green">${dmgDealt}</span> / <span class="text-neon-red">${dmgTaken}</span></span>
-        </div>
-        <div class="stat-row" style="margin-top: 0.3rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.3rem;">
-          <span>🎯 천적 (약함)</span>
-          <span class="stat-val text-neon-red" style="font-weight: 700;">${worstKillerStr}</span>
-        </div>
-        <div class="stat-row">
-          <span>⚔️ 먹잇감 (강함)</span>
-          <span class="stat-val text-neon-green" style="font-weight: 700;">${bestVictimStr}</span>
-        </div>
+        <span class="avg-rank-val">${avgRank}위</span><span class="mvp-count-val">${mvpCount}회</span><span class="text-neon-green">${dmgDealt}</span><span class="text-neon-red">${dmgTaken}</span><span class="text-neon-red">${worstKillerStr}</span><span class="text-neon-green">${bestVictimStr}</span>
       </div>
       ${teamSelectorHTML}
     `;
@@ -968,6 +929,19 @@ function updateStartButtonState() {
     startBtnText = `게임 시작 (개인전 ${selectedIds.size}명 선택됨)`;
   }
   startBtn.textContent = startBtnText;
+
+  const selectionSummary = document.getElementById("selection-summary");
+  if (selectionSummary) {
+    if (currentMode === "team") {
+      selectionSummary.textContent = `레드 ${selectedRedIds.size}/3 · 블루 ${selectedBlueIds.size}/3 편성`;
+    } else if (currentMode === "boss") {
+      selectionSummary.textContent = `보스 ${bossCharacterId ? 1 : 0}/1 · 도전자 ${selectedRedIds.size}/${BOSS_CHALLENGER_COUNT} 편성`;
+    } else if (currentMode === "tournament") {
+      selectionSummary.textContent = `16강 참가자 ${selectedIds.size}/16명 선택`;
+    } else {
+      selectionSummary.textContent = `개인전 참가자 ${selectedIds.size}명 · 최소 2명 필요`;
+    }
+  }
 
   // 연습모드 버튼 활성화 (최소 1개 이상 선택 필요, 연습은 모드 무관)
   const practiceStartBtn = document.getElementById(
