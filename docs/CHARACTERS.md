@@ -255,14 +255,14 @@ This document maps character-specific file paths and `#region` maps to allow AI 
 - **File**: `src/characters/es/normal.ts`
 - **Role**: Nuker | **Tier**: A
 - **Region Map**:
-  - `TYPES`: Per-target fuse marks and temporary detonation-speed state.
-  - `CONSTANTS`: Fuse duration/stacks, detonation damage, splash, and visual limits.
-  - `HELPERS`: Team-safe enemy check and character-local fuse-state initialization.
+  - `TYPES`: Sticky-grenade projectile and one-time Bomb Devil passive state.
+  - `CONSTANTS`: Grenade fuse/damage/radius and Bomb Devil HP threshold/explosion tuning.
+  - `HELPERS`: Team-safe target selection, sticky-grenade state, status synchronization, and explosion resolution.
   - `CONFIG`: Character stats and skill copy.
-  - `SKILL_TRIGGER`: Detonate every active fuse mark and grant a short speed burst.
-  - `UPDATE`: Expire fuse/contact timers and render capped fuse particles.
+  - `SKILL_TRIGGER`: Throw a sticky grenade toward the nearest enemy.
+  - `UPDATE`: Trigger Bomb Devil at low HP, resolve grenade flight/attachment/wall stick/explosion, and sync status UI.
   - `BASIC_ATTACK`: Reserved no-op hook.
-  - `COLLISION`: Apply or refresh a team-safe fuse mark on contact.
+  - `COLLISION`: Reserved no-op hook.
   - `DAMAGE`: Standard incoming damage hook.
-  - `DEATH`: Remove active fuses and restore any temporary speed bonus.
-  - `RENDER`: Draw the active-fuse ring and status indicator.
+  - `DEATH`: Remove active grenades and their target status.
+  - `RENDER`: Draw sticky grenades and their fuse timers.
