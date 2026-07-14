@@ -48,21 +48,28 @@
                 <option value="relic">보석 쟁탈전 · 보석 10개 확보</option>
               </select>
             </div>
-            <div class="compact-setting">
-              <label for="game-speed">시뮬레이션 속도</label>
-              <select id="game-speed">
-                <option value="1">1.0x · 보통</option>
-                <option value="1.5">1.5x · 빠름</option>
-                <option value="2">2.0x · 매우 빠름</option>
-              </select>
-            </div>
-            <div class="compact-setting">
-              <label for="stats-mode-select">전적 기준</label>
-              <select id="stats-mode-select">
-                <option value="all" selected>전체 매치</option>
-                <option value="2">2인전</option><option value="3">3인전</option><option value="4">4인전</option><option value="5">5인전</option><option value="6">6인전</option>
-                <option value="team">팀전 (3v3)</option><option value="boss">보스전 (1v4)</option>
-              </select>
+            <div class="combat-settings-panel" aria-label="전투 및 전적 설정">
+              <div class="combat-setting-block">
+                <span>전투 속도</span>
+                <div class="combat-setting-buttons" role="group" aria-label="시뮬레이션 속도">
+                  <button type="button" class="combat-setting-button active" data-game-speed="1" aria-pressed="true">1.0x <small>보통</small></button>
+                  <button type="button" class="combat-setting-button" data-game-speed="1.5" aria-pressed="false">1.5x <small>빠름</small></button>
+                  <button type="button" class="combat-setting-button" data-game-speed="2" aria-pressed="false">2.0x <small>매우 빠름</small></button>
+                </div>
+              </div>
+              <div class="combat-setting-block">
+                <span>전적 보기</span>
+                <div class="combat-setting-buttons stats-mode-buttons" role="group" aria-label="전적 기준">
+                  <button type="button" class="combat-setting-button active" data-stats-mode="all" aria-pressed="true">전체</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="2" aria-pressed="false">2인</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="3" aria-pressed="false">3인</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="4" aria-pressed="false">4인</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="5" aria-pressed="false">5인</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="6" aria-pressed="false">6인</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="team" aria-pressed="false">팀전</button>
+                  <button type="button" class="combat-setting-button" data-stats-mode="boss" aria-pressed="false">보스전</button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -111,36 +118,6 @@
                 <span>게임 시작하기</span>
               </button>
             </div>
-
-            <section id="random-match-console" class="random-match-console" data-mode="solo" aria-label="랜덤 매치">
-              <div class="quick-match-heading"><div><span class="eyebrow">QUICK MATCH · CURRENT MODE</span><h3>랜덤 매치</h3></div><span>현재 모드 연동</span></div>
-              <div class="random-mode-preview">
-                <span id="random-mode-meta">2–6명 · 자유 난투</span>
-                <strong id="random-mode-title">개인전 빠른 매치</strong>
-                <p id="random-mode-description">인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.</p>
-              </div>
-              <div id="random-count-setting-item" class="random-option-row">
-                <span class="random-option-label">참가 인원</span>
-                <div class="random-choice-group" role="group" aria-label="개인전 랜덤 참가 인원">
-                  <button type="button" class="random-choice-button active" data-random-count="2" aria-pressed="true">2명</button>
-                  <button type="button" class="random-choice-button" data-random-count="3" aria-pressed="false">3명</button>
-                  <button type="button" class="random-choice-button" data-random-count="4" aria-pressed="false">4명</button>
-                  <button type="button" class="random-choice-button" data-random-count="5" aria-pressed="false">5명</button>
-                  <button type="button" class="random-choice-button" data-random-count="6" aria-pressed="false">6명</button>
-                </div>
-              </div>
-              <div id="random-team-game-type-setting" class="random-option-row hidden">
-                <span class="random-option-label">팀전 규칙</span>
-                <div class="random-choice-group random-team-rule-group" role="group" aria-label="랜덤 팀전 규칙">
-                  <button type="button" class="random-choice-button active" data-random-team-rule="deathmatch" aria-pressed="true">데스매치</button>
-                  <button type="button" class="random-choice-button" data-random-team-rule="control" aria-pressed="false">점령전</button>
-                  <button type="button" class="random-choice-button" data-random-team-rule="relic" aria-pressed="false">보석 쟁탈전</button>
-                </div>
-              </div>
-              <button id="random-start-btn" class="btn btn-secondary random-start-btn">
-                <span id="random-start-label">개인전 랜덤 매치 시작</span>
-              </button>
-            </section>
 
             <details class="practice-tools">
               <summary>🏋️ 연습 도구 열기</summary>

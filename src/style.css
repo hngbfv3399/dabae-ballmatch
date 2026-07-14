@@ -1993,6 +1993,14 @@ body {
 .mode-settings-row { gap: 0.6rem; flex-wrap: wrap; }
 .compact-setting { display: flex; align-items: center; gap: 0.55rem; min-height: 34px; color: #a8adcb; font-size: 0.78rem; }
 .compact-setting select { border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; background: rgba(0,0,0,0.3); color: #fff; padding: 0.35rem 0.45rem; }
+.combat-settings-panel { display: flex; flex: 1; flex-wrap: wrap; gap: 0.7rem 1rem; align-items: center; padding: 0.65rem 0.8rem; border: 1px solid rgba(89, 211, 255, 0.18); border-radius: 8px; background: linear-gradient(90deg, rgba(0, 198, 255, 0.055), rgba(127, 0, 255, 0.045)); }
+.combat-setting-block { display: flex; align-items: center; gap: 0.55rem; }
+.combat-setting-block > span { color: #aeb7d6; font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
+.combat-setting-buttons { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.combat-setting-button { min-height: 30px; padding: 0.3rem 0.48rem; border: 1px solid rgba(255,255,255,0.13); border-radius: 5px; background: rgba(0,0,0,0.24); color: #aeb4d1; cursor: pointer; font-size: 0.68rem; font-weight: 800; transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease; }
+.combat-setting-button small { margin-left: 0.12rem; color: inherit; font-size: 0.58rem; font-weight: 600; }
+.combat-setting-button:hover { border-color: rgba(89,211,255,0.65); color: #fff; }
+.combat-setting-button.active { border-color: #00e5ff; background: linear-gradient(135deg, rgba(0, 159, 190, 0.72), rgba(65, 20, 164, 0.58)); color: #fff; box-shadow: 0 0 9px rgba(0, 229, 255, 0.22); }
 
 .lobby-main { grid-template-columns: minmax(0, 1fr) 290px; align-items: start; gap: 1.25rem; }
 .roster-panel { min-width: 0; padding: 1.25rem; border-top: 1px solid rgba(255,255,255,0.14); background: rgba(6, 8, 20, 0.38); }
@@ -2053,6 +2061,8 @@ body {
   .mode-command-tabs .mode-tab small { font-size: 0.58rem; }
   .compact-setting { width: 100%; justify-content: space-between; }
   .compact-setting select { max-width: 68%; }
+  .combat-settings-panel { width: 100%; }
+  .combat-setting-block { align-items: flex-start; flex-direction: column; }
   .roster-panel { padding: 0.85rem 0.55rem; }
   .character-row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 0.45rem; min-height: 58px; padding: 0.45rem; }
   .character-row .tier-card-badge { width: 22px; height: 22px; font-size: 0.62rem; }
@@ -2063,29 +2073,6 @@ body {
   .row-team-selector button { flex: 1; }
 }
 
-/* 랜덤 매치는 연습 도구와 분리해 모드별 자동 편성 정보를 전면에 둔다. */
-.random-match-console { margin-top: 0.75rem; padding: 1rem; border: 1px solid rgba(127, 0, 255, 0.38); background: linear-gradient(145deg, rgba(127,0,255,0.13), rgba(255,0,127,0.07)); }
-.quick-match-heading { display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.8rem; }
-.quick-match-heading h3 { margin-top: 0.2rem; font-family: 'Orbit', sans-serif; font-size: 1rem; }
-.quick-match-heading > span { padding: 0.26rem 0.4rem; border: 1px solid rgba(255,255,255,0.14); color: #c9b5ff; font-size: 0.63rem; }
-.random-mode-preview { min-height: 104px; margin: 0.25rem 0 0.75rem; padding: 0.75rem; border-left: 3px solid #bf8cff; background: rgba(0,0,0,0.22); }
-.random-mode-preview > span { color: #d4a6ff; font-family: 'Orbit', sans-serif; font-size: 0.62rem; }
-.random-mode-preview strong { display: block; margin-top: 0.28rem; font-size: 0.9rem; }
-.random-mode-preview p { margin-top: 0.35rem; color: #b6b9d0; font-size: 0.72rem; line-height: 1.45; }
-.random-option-row { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.55rem; color: #aeb4d1; font-size: 0.76rem; }
-.random-option-label { flex: 0 0 auto; font-weight: 700; }
-.random-choice-group { display: flex; flex: 1; justify-content: flex-end; flex-wrap: wrap; gap: 0.32rem; }
-.random-choice-button { min-height: 29px; padding: 0.32rem 0.48rem; border: 1px solid rgba(255,255,255,0.16); border-radius: 5px; background: rgba(0,0,0,0.22); color: #c8cce0; cursor: pointer; font-size: 0.67rem; font-weight: 700; transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease; }
-.random-choice-button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.42); color: #fff; }
-.random-choice-button.active { border-color: #d5aeff; background: linear-gradient(135deg, rgba(127,0,255,0.72), rgba(255,0,127,0.52)); color: #fff; box-shadow: 0 0 9px rgba(174,81,255,0.3); }
-.random-match-console[data-mode="team"] .random-choice-button.active { border-color: #83e9ff; background: linear-gradient(135deg, rgba(0,122,255,0.7), rgba(0,198,255,0.5)); box-shadow: 0 0 9px rgba(0,198,255,0.25); }
-.random-start-btn { width: 100%; min-height: 42px; margin-top: 0.25rem; border: 0; background: linear-gradient(135deg, #7f00ff, #ff007f); color: #fff; box-shadow: 0 0 12px rgba(127,0,255,0.32); font-size: 0.82rem; font-weight: 800; }
-.random-match-console[data-mode="team"] { border-color: rgba(0,153,255,0.48); background: linear-gradient(145deg, rgba(0,122,255,0.13), rgba(0,242,254,0.07)); }
-.random-match-console[data-mode="team"] .random-mode-preview { border-left-color: #00c6ff; }.random-match-console[data-mode="team"] .quick-match-heading > span { color: #7dd3fc; }
-.random-match-console[data-mode="boss"] { border-color: rgba(255,215,0,0.48); background: linear-gradient(145deg, rgba(126,80,0,0.22), rgba(255,80,0,0.07)); }
-.random-match-console[data-mode="boss"] .random-mode-preview { border-left-color: #ffd700; }.random-match-console[data-mode="boss"] .quick-match-heading > span { color: #ffe08a; }
-.random-match-console[data-mode="tournament"] { border-color: rgba(255,167,38,0.5); background: linear-gradient(145deg, rgba(115,58,0,0.2), rgba(255,167,38,0.08)); }
-.random-match-console[data-mode="tournament"] .random-mode-preview { border-left-color: #ffab40; }
 .practice-tools { margin-top: 0.55rem; padding: 0.7rem 0.8rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.018); color: var(--text-secondary); }
 .practice-tools summary { cursor: pointer; color: #d8dbea; font-size: 0.76rem; font-weight: 700; }
 .practice-tools[open] summary { margin-bottom: 0.6rem; }
@@ -2095,4 +2082,4 @@ body {
 .stats-reset-btn { flex: 0 0 auto; border: 1px solid rgba(255, 111, 130, 0.7); background: rgba(145, 18, 45, 0.62); color: #fff; font-size: 0.72rem; font-weight: 800; }
 .stats-reset-btn:hover:not(:disabled) { background: rgba(197, 27, 61, 0.85); }
 .stats-reset-btn:disabled { cursor: wait; opacity: 0.68; }
-@media (max-width: 620px) { .random-option-row { align-items: flex-start; flex-direction: column; } .random-choice-group { justify-content: flex-start; } .stats-reset-zone { align-items: stretch; flex-direction: column; } .stats-reset-btn { width: 100%; } }
+@media (max-width: 620px) { .stats-reset-zone { align-items: stretch; flex-direction: column; } .stats-reset-btn { width: 100%; } }

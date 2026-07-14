@@ -22,9 +22,6 @@ const characterListContainer = document.getElementById(
   "character-list",
 ) as HTMLElement;
 const startBtn = document.getElementById("start-btn") as HTMLButtonElement;
-const gameSpeedSelect = document.getElementById(
-  "game-speed",
-) as HTMLSelectElement;
 const backToLobbyBtn = document.getElementById(
   "back-to-lobby-btn",
 ) as HTMLButtonElement;
@@ -50,15 +47,6 @@ const totalCountEl = document.getElementById("total-count") as HTMLElement;
 const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
 const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
-const randomStartBtn = document.getElementById(
-  "random-start-btn",
-) as HTMLButtonElement;
-const randomTeamGameTypeSetting = document.getElementById(
-  "random-team-game-type-setting",
-) as HTMLElement;
-const statsModeSelect = document.getElementById(
-  "stats-mode-select",
-) as HTMLSelectElement;
 const tierListNotice = document.getElementById(
   "tier-list-notice",
 ) as HTMLElement;
@@ -138,8 +126,8 @@ const emptyRoleNotice = document.getElementById(
 ) as HTMLElement;
 let lobbyTotalGames = 0;
 let currentRoleFilter = "all";
-let randomPlayerCount = 2;
-let randomTeamGameType: TeamGameType = "deathmatch";
+let gameSpeedMultiplier = 1;
+let selectedStatsMode = "all";
 
 // Winner Modal Elements
 const winnerModal = document.getElementById("winner-modal") as HTMLElement;
@@ -306,7 +294,7 @@ let currentGlobalDamageRanking: DamageRankingEntry[] = [];
 
 function getStoredStats(): Record<string, Record<string, CharacterStats>> {
   const record: Record<string, Record<string, CharacterStats>> = {};
-  const mode = statsModeSelect ? statsModeSelect.value : "all";
+  const mode = selectedStatsMode;
   record[mode] = {};
 
   currentGlobalStats.forEach((item) => {
@@ -324,7 +312,7 @@ function getStoredStats(): Record<string, Record<string, CharacterStats>> {
 
 function calculateDynamicTiers() {
   const statsAll = getStoredStats();
-  const mode = statsModeSelect ? statsModeSelect.value : "all";
+  const mode = selectedStatsMode;
   const stats = statsAll[mode] || {};
 
   const totalGames = Object.values(stats)
@@ -456,7 +444,7 @@ function getStoredCounters(): Record<
   Record<string, Record<string, number>>
 > {
   const record: Record<string, Record<string, Record<string, number>>> = {};
-  const mode = statsModeSelect ? statsModeSelect.value : "all";
+  const mode = selectedStatsMode;
   record[mode] = {};
 
   currentGlobalCounters.forEach((item) => {
@@ -486,7 +474,7 @@ async function recordCharacterDeath(
 
 function renderTierList() {
   const statsAll = getStoredStats();
-  const mode = statsModeSelect ? statsModeSelect.value : "all";
+  const mode = selectedStatsMode;
   const stats = statsAll[mode] || {};
 
   const tiers = ["s", "a", "b", "c", "d", "e", "f"] as const;
@@ -632,7 +620,7 @@ function initLobby(preserveSelections = false) {
       (boss) => boss.id === char.id,
     );
     const statsAll = getStoredStats();
-    const mode = statsModeSelect ? statsModeSelect.value : "all";
+    const mode = selectedStatsMode;
     const stats = statsAll[mode] || {};
     const s = stats[char.id] || {
       wins: 0,
@@ -1067,7 +1055,7 @@ function startGame() {
     gameModeStr,
   );
 
-  const speedMultiplier = parseFloat(gameSpeedSelect.value);
+  const speedMultiplier = gameSpeedMultiplier;
 
   if (!gameLounge) {
     gameLounge = new GameLounge(
@@ -1143,7 +1131,7 @@ function startPracticeGame() {
   totalCountEl.textContent = total.toString();
   aliveCountEl.textContent = total.toString();
 
-  const speedMultiplier = parseFloat(gameSpeedSelect.value);
+  const speedMultiplier = gameSpeedMultiplier;
 
   if (!gameLounge) {
     gameLounge = new GameLounge(
@@ -1579,89 +1567,15 @@ function goBackToLobby() {
   initLobby();
 }
 
-function startRandomGame() {
-  const randMode = currentMode;
-
-  // 피셔-예이츠 셔플 알고리즘을 사용해 완전한 무작위 보장
-  const shuffled = [...availableCharacters];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  selectedIds.clear();
-  selectedRedIds.clear();
-  selectedBlueIds.clear();
-  bossCharacterId = null;
-
-  if (randMode === "team") {
-    teamGameType = randomTeamGameType;
-    teamGameTypeSelect.value = teamGameType;
-    // 팀전 랜덤 (무조건 6명)
-    const selected = shuffled.slice(0, 6);
-    selected.forEach((c, index) => {
-      selectedIds.add(c.id);
-      if (index < 3) {
-        selectedRedIds.add(c.id); // 3명 RED
-      } else {
-        selectedBlueIds.add(c.id); // 3명 BLUE
-      }
-    });
-  } else if (randMode === "boss") {
-    if (availableBossCharacters.length === 0) {
-      alert(
-        "👑 등록된 보스 캐릭터가 없습니다. characters/<name>/boss.ts를 추가한 뒤 등록해 주세요.",
-      );
-      return;
-    }
-    const boss =
-      availableBossCharacters[
-        Math.floor(Math.random() * availableBossCharacters.length)
-      ];
-    bossCharacterId = boss.id;
-    selectedIds.add(boss.id);
-
-    const challengers = shuffled.filter(
-      (character) => getCharacterFamilyId(character) !== getCharacterFamilyId(boss),
-    );
-    if (challengers.length < BOSS_CHALLENGER_COUNT) {
-      alert(`보스와 겹치지 않는 플레이어 캐릭터가 ${BOSS_CHALLENGER_COUNT}명 이상 필요합니다.`);
-      return;
-    }
-    challengers.slice(0, BOSS_CHALLENGER_COUNT).forEach((c) => {
-      selectedIds.add(c.id);
-      selectedRedIds.add(c.id); // 4명 도전자 (RED)
-    });
-  } else if (randMode === "tournament") {
-    shuffled.slice(0, 16).forEach((character) => selectedIds.add(character.id));
-  } else {
-    // 개인전 랜덤 (지정 인원)
-    const count = randomPlayerCount;
-    const selected = shuffled.slice(0, count);
-    selected.forEach((c) => selectedIds.add(c.id));
-  }
-
-  // 로비 카드 및 시작 버튼 갱신 후 플레이 개시
-  initLobby(true);
-  updateStartButtonState();
-  if (randMode === "tournament") startTournament();
-  else startGame();
-}
-
 // Listeners
 startBtn.addEventListener("click", startGame);
 backToLobbyBtn.addEventListener("click", goBackToLobby);
 modalCloseBtn.addEventListener("click", closeWinnerModal);
-randomStartBtn.addEventListener("click", startRandomGame);
 
 const practiceStartBtn = document.getElementById("practice-start-btn");
 if (practiceStartBtn) {
   practiceStartBtn.addEventListener("click", startPracticeGame);
 }
-
-statsModeSelect.addEventListener("change", () => {
-  subscribeToGlobalData();
-});
 
 if (openStatsBtn && statsCenterModal) {
   openStatsBtn.addEventListener("click", () => {
@@ -1711,7 +1625,7 @@ function subscribeToGlobalData() {
   if (countersUnsubscribe) countersUnsubscribe();
   if (damageRankingUnsubscribe) damageRankingUnsubscribe();
 
-  const mode = statsModeSelect ? statsModeSelect.value : "all";
+  const mode = selectedStatsMode;
 
   statsUnsubscribe = convexClient.onUpdate(
     api.stats.getStats,
@@ -1812,7 +1726,7 @@ function updateLobbyUI() {
     }
 
     const statsRecord = getStoredStats();
-    const mode = statsModeSelect ? statsModeSelect.value : "all";
+    const mode = selectedStatsMode;
     const stats = statsRecord[mode] || {};
     const s = stats[char.id] || {
       wins: 0,
@@ -2042,7 +1956,6 @@ function initModeSelection() {
       const selectedMode = tab.getAttribute("data-mode") as GameMode;
       currentMode = selectedMode;
       updateTeamGameTypeVisibility();
-      updateRandomMatchPanel(selectedMode);
 
       if (modeDesc) {
         modeDesc.textContent = modeDescriptions[selectedMode] || "";
@@ -2060,36 +1973,12 @@ function initModeSelection() {
   });
 }
 
-function updateRandomMatchPanel(mode: GameMode) {
-  const countSettingItem = document.getElementById("random-count-setting-item");
-  const randomConsole = document.getElementById("random-match-console");
-  const randomModeMeta = document.getElementById("random-mode-meta");
-  const randomModeTitle = document.getElementById("random-mode-title");
-  const randomModeDescription = document.getElementById("random-mode-description");
-  const randomStartLabel = document.getElementById("random-start-label");
-
-  const content: Record<GameMode, { meta: string; title: string; description: string; button: string }> = {
-    solo: { meta: "2–6명 · 자유 난투", title: "개인전 빠른 매치", description: "인원만 선택하면 무작위 캐릭터를 골라 바로 전투를 시작합니다.", button: "개인전 랜덤 매치 시작" },
-    team: { meta: "3 vs 3 · 균등 편성", title: "팀전 빠른 매치", description: "6명의 캐릭터를 무작위로 뽑아 RED와 BLUE 팀에 3명씩 자동 배정합니다.", button: "팀전 랜덤 매치 시작" },
-    boss: { meta: "BOSS 1명 vs 도전자 4명", title: "보스 레이드 빠른 매치", description: "등록된 보스 1명과 같은 계열을 제외한 무작위 도전자 4명을 자동 편성합니다.", button: "보스 레이드 시작" },
-    tournament: { meta: "16명 · 단일 엘리미네이션", title: "16강 토너먼트 빠른 매치", description: "일반 캐릭터 16명을 무작위로 선발해 16강부터 결승까지 연속 진행합니다.", button: "랜덤 토너먼트 시작" },
-  };
-  const current = content[mode];
-  randomConsole?.setAttribute("data-mode", mode);
-  if (randomModeMeta) randomModeMeta.textContent = current.meta;
-  if (randomModeTitle) randomModeTitle.textContent = current.title;
-  if (randomModeDescription) randomModeDescription.textContent = current.description;
-  if (randomStartLabel) randomStartLabel.textContent = current.button;
-  if (countSettingItem) countSettingItem.style.display = mode === "solo" ? "flex" : "none";
-  randomTeamGameTypeSetting.classList.toggle("hidden", mode !== "team");
-}
-
-function initRandomMatchControls() {
-  const countButtons = document.querySelectorAll<HTMLButtonElement>("[data-random-count]");
-  countButtons.forEach((button) => {
+function initCombatSettings() {
+  const speedButtons = document.querySelectorAll<HTMLButtonElement>("[data-game-speed]");
+  speedButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      randomPlayerCount = Number(button.dataset.randomCount);
-      countButtons.forEach((candidate) => {
+      gameSpeedMultiplier = Number(button.dataset.gameSpeed);
+      speedButtons.forEach((candidate) => {
         const isSelected = candidate === button;
         candidate.classList.toggle("active", isSelected);
         candidate.setAttribute("aria-pressed", String(isSelected));
@@ -2097,15 +1986,16 @@ function initRandomMatchControls() {
     });
   });
 
-  const ruleButtons = document.querySelectorAll<HTMLButtonElement>("[data-random-team-rule]");
-  ruleButtons.forEach((button) => {
+  const statsButtons = document.querySelectorAll<HTMLButtonElement>("[data-stats-mode]");
+  statsButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      randomTeamGameType = button.dataset.randomTeamRule as TeamGameType;
-      ruleButtons.forEach((candidate) => {
+      selectedStatsMode = button.dataset.statsMode ?? "all";
+      statsButtons.forEach((candidate) => {
         const isSelected = candidate === button;
         candidate.classList.toggle("active", isSelected);
         candidate.setAttribute("aria-pressed", String(isSelected));
       });
+      subscribeToGlobalData();
     });
   });
 }
@@ -2117,8 +2007,7 @@ teamGameTypeSelect.addEventListener("change", () => {
 
 // Start APP
 initModeSelection();
-initRandomMatchControls();
-updateRandomMatchPanel(currentMode);
+initCombatSettings();
 updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
