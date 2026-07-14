@@ -196,8 +196,8 @@ let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
-type PveProgress = { level: number; experience: number; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
-type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number };
+type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
+type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number; rewardEligible: boolean };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -250,6 +250,19 @@ function getLeveledHp(baseHp: number, progress: PveProgress): number {
 
 function getLeveledAttack(baseAttack: number, progress: PveProgress): number {
   return Math.ceil(baseAttack * progress.attackMultiplier);
+}
+
+function getExperienceLabel(progress: PveProgress): string {
+  return progress.isMaxLevel ? "MAX" : `${progress.experienceInCurrentLevel} / ${progress.experienceToNextLevel} XP`;
+}
+
+function getExperiencePercent(progress: PveProgress): number {
+  return progress.isMaxLevel ? 100 : Math.min(100, (progress.experienceInCurrentLevel / progress.experienceToNextLevel) * 100);
+}
+
+function getExperiencePanelMarkup(progress: PveProgress): string {
+  const progressLabel = progress.isMaxLevel ? "최대 레벨 달성" : `다음 레벨까지 ${getExperienceLabel(progress)}`;
+  return `<section class="experience-panel"><div class="experience-head"><span>성장 경험치</span><strong>${progressLabel}</strong></div><div class="experience-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${getExperiencePercent(progress)}"><i style="width:${getExperiencePercent(progress)}%"></i></div><small>누적 ${progress.experience} XP · 던전 ${progress.totalDungeonClears}회 클리어</small></section>`;
 }
 
 function applyCharacterLevel(state: CharacterState) {
@@ -1668,7 +1681,10 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       pveAdvancePending = true;
       gameStatusText.textContent = `던전 1-${clearedStageNumber} 클리어 · 다음 스테이지 대기 중`;
       if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
-      winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 1-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>획득 예정 경험치</span><strong class="text-neon-yellow">+${dungeonExperience} XP</strong></div><div class="stat-row"><span>다음 전투</span><strong>던전 1-${run.stage}</strong></div></div><p class="win-desc" style="margin-top:0.9rem">경험치는 던전 1-5까지 모두 클리어하면 지급됩니다.</p>`;
+      const rewardInfo = run.rewardEligible
+        ? `<div class="stat-row"><span>던전 완료 보상</span><strong class="text-neon-yellow">+${dungeonExperience} XP</strong></div><p class="win-desc" style="margin-top:0.9rem">경험치와 가챠 진행도는 던전 1-1부터 1-5까지 모두 클리어할 때만 지급됩니다.</p>`
+        : `<div class="stat-row"><span>현재 도전</span><strong>스테이지 연습</strong></div><p class="win-desc" style="margin-top:0.9rem">스테이지 선택 연습은 경험치와 가챠 진행도가 지급되지 않습니다.</p>`;
+      winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 1-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem">${rewardInfo}<div class="stat-row"><span>다음 전투</span><strong>던전 1-${run.stage}</strong></div></div>`;
       modalCloseBtn.textContent = "다음 스테이지";
       winnerModal.classList.remove("hidden");
       return;
@@ -1678,6 +1694,13 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     pveAdvancePending = false;
     const clearTimeMs = Date.now() - run.startedAt;
     gameStatusText.textContent = "던전 클리어";
+    if (!run.rewardEligible) {
+      if (winnerTitle) winnerTitle.textContent = "STAGE PRACTICE CLEARED";
+      winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">스테이지 연습 완료</div><div class="win-desc">던전 1-1부터 시작한 완주가 아니므로 경험치와 가챠 진행도는 지급되지 않습니다.</div>`;
+      modalCloseBtn.textContent = "던전 선택으로";
+      winnerModal.classList.remove("hidden");
+      return;
+    }
     void convexClient.mutation(api.progression.recordDungeonClear, {
       clientId: anonymousClientId,
       characterId: run.characterId,
@@ -1685,7 +1708,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       clearTimeMs,
     }).then((result) => {
       if (winnerTitle) winnerTitle.textContent = "DUNGEON CLEARED";
-      winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · 슬라임 소굴 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 5까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>`;
+      winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · 던전 1 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 1-1부터 1-5까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>가챠 진행도</span><strong>${result.completedDungeonClears % 3} / 3 던전 클리어</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>`;
       modalCloseBtn.textContent = "던전 선택으로";
       winnerModal.classList.remove("hidden");
     }).catch(() => {
@@ -2384,7 +2407,7 @@ function openCharacterDetail(charId: string) {
 }
 
 function getPveProgress(characterId: string): PveProgress {
-  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, healthMultiplier: 1, attackMultiplier: 1, totalDungeonClears: 0 };
+  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, experienceInCurrentLevel: 0, experienceToNextLevel: 100, isMaxLevel: false, healthMultiplier: 1, attackMultiplier: 1, totalDungeonClears: 0 };
 }
 
 function updatePveSelectionUI() {
@@ -2400,7 +2423,7 @@ function updatePveSelectionUI() {
   pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
   pveCharacterSelectAvatar.style.color = selected.color;
   pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
-  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · ${progress.totalDungeonClears}회 클리어`;
+  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
   pveStartBtn.disabled = false;
 }
 
@@ -2423,7 +2446,7 @@ function renderPveCharacterList() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
-    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">누적 경험치 <strong class="text-neon-yellow">${progress.experience} XP</strong><small>${progress.totalDungeonClears}회 클리어</small></div>`;
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>던전 ${progress.totalDungeonClears}회 클리어 · 누적 ${progress.experience} XP</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
       pveCharacterModal.classList.add("hidden");
@@ -2459,7 +2482,8 @@ function startPveDungeon() {
   const progress = getPveProgress(character.id);
   pveCharacterModal.classList.add("hidden");
   gameModeModal.classList.add("hidden");
-  pveRun = { characterId: character.id, stage: Number(pveStageSelect.value), startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress) };
+  const stage = Number(pveStageSelect.value);
+  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), rewardEligible: stage === 1 };
   startPveStage();
 }
 
@@ -2607,7 +2631,7 @@ function renderManagedCharacter() {
   if (!character) { collectionDetail.textContent = "왼쪽에서 관리할 캐릭터를 선택하세요."; return; }
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
-  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
   const basicSkin = document.createElement("button");
   basicSkin.type = "button";

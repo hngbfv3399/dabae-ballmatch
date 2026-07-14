@@ -24,18 +24,28 @@ function assertFirstDungeon(dungeonId: string): void {
   if (dungeonId !== FIRST_DUNGEON_ID) throw new Error("Unknown or locked dungeon");
 }
 
+function experienceAtLevelStart(level: number): number {
+  let total = 0;
+  for (let currentLevel = 1; currentLevel < level; currentLevel += 1) {
+    total += experienceRequiredForLevel(currentLevel);
+  }
+  return total;
+}
+
 export function growthSummary(experience: number) {
   const level = levelForExperience(experience);
+  const isMaxLevel = level === MAX_CHARACTER_LEVEL;
   const healthMultiplier = 1 + 0.02 * (level - 1);
   const attackMultiplier = 1 + 0.0125 * (level - 1);
   const experienceToNextLevel =
-    level === MAX_CHARACTER_LEVEL ? 0 : experienceRequiredForLevel(level);
+    isMaxLevel ? 0 : experienceRequiredForLevel(level);
 
   return {
     level,
     experience,
+    experienceInCurrentLevel: isMaxLevel ? 0 : experience - experienceAtLevelStart(level),
     experienceToNextLevel,
-    isMaxLevel: level === MAX_CHARACTER_LEVEL,
+    isMaxLevel,
     healthMultiplier,
     attackMultiplier,
   };
@@ -242,6 +252,7 @@ export const recordDungeonClear = mutation({
       experienceGranted,
       ...growthSummary(experience),
       totalDungeonClears: characterProgress.totalDungeonClears + 1,
+      completedDungeonClears: nextCompletedPlayCount,
       bonusDrawsAvailable: Math.floor(nextCompletedPlayCount / 3) - (gachaState?.bonusDrawsUsed ?? 0),
     };
   },
