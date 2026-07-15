@@ -581,6 +581,7 @@ export class GameLounge {
 
         // Restore new lifecycle hooks
         char.onTakeDamage = orig.onTakeDamage;
+        char.onDamageApplied = orig.onDamageApplied;
         char.onDealDamage = orig.onDealDamage;
         char.onReceiveCrowdControl = orig.onReceiveCrowdControl;
         char.onDeath = orig.onDeath;
@@ -1422,6 +1423,7 @@ export class GameLounge {
     if (this.isCombatHit(attacker, target, statDamage, customText)) this.noCombatHitTimer = 0;
 
     target.hp -= finalDamage;
+    target.onDamageApplied?.(target, attacker, finalDamage, context);
 
     // 상세 전투 로그 콘솔 출력
     if (customText) {

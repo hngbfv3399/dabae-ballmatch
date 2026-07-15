@@ -436,9 +436,11 @@ export const sungjaeConfig: CharacterConfig = {
   // #endregion BASIC_ATTACK
 
   // ═══════════════════════════════════════════
-  // #region DAMAGE — double HP protection and ejection blast trigger
+  // #region DAMAGE — double HP state sync and ejection blast trigger
   // ═══════════════════════════════════════════
-  onTakeDamage(target: CharacterState, attacker: CharacterState, damage: number, ctx) {
+  // 공통 DEF/런 보호막이 먼저 피해를 흡수한 뒤 호출한다.
+  // 메카·파일럿 이중 체력만 동기화하므로 성재도 다른 캐릭터와 동일하게 보호막을 거친다.
+  onDamageApplied(target: CharacterState, attacker: CharacterState, damage: number, ctx) {
     const ss = target as SungjaeState;
     if (ss.mechaHp === undefined) ss.mechaHp = SKILL_CONSTANTS.MECHA_MAX_HP;
     if (ss.pilotHp === undefined) ss.pilotHp = SKILL_CONSTANTS.PILOT_MAX_HP;
@@ -490,7 +492,7 @@ export const sungjaeConfig: CharacterConfig = {
         target.immuneTimeLeft = 1.0;
       }
 
-      return { finalDamage: 0, blocked: true }; // MechaHP took it already
+      return;
     } else {
       // 2. Pilot damage absorption
       ss.pilotHp -= damage;
@@ -503,7 +505,7 @@ export const sungjaeConfig: CharacterConfig = {
       target.vx += Math.cos(kAngle) * 4;
       target.vy += Math.sin(kAngle) * 4;
 
-      return { finalDamage: damage, blocked: false };
+      return;
     }
   },
   // #endregion DAMAGE

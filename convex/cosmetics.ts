@@ -21,10 +21,11 @@ type CosmeticDefinition = {
   };
 };
 
-type VictoryCeremonyAnimation = "wave" | "jump" | "clap" | "dance" | "trophy" | "fireworks";
+type VictoryCeremonyAnimation = "wave" | "jump" | "clap" | "dance" | "trophy" | "fireworks" | "sniper";
 type VictoryActionDefinition = {
   actionId: string;
   name: string;
+  characterId?: string;
   rarity: Rarity;
   animation: VictoryCeremonyAnimation;
 };
@@ -32,6 +33,7 @@ type VictoryActionDefinition = {
 type VictoryBackgroundDefinition = {
   backgroundId: string;
   name: string;
+  characterId?: string;
   rarity: Rarity;
   animation: VictoryCeremonyAnimation;
 };
@@ -70,6 +72,7 @@ const INITIAL_VICTORY_ACTIONS: readonly VictoryActionDefinition[] = [
   { actionId: "action-rhythm-dance", name: "리듬 댄스", rarity: "epic", animation: "dance" },
   { actionId: "action-trophy-lift", name: "승리 상승", rarity: "legendary", animation: "trophy" },
   { actionId: "action-fireworks-finale", name: "반짝임", rarity: "unique", animation: "fireworks" },
+  { actionId: "action-su-one-shot", name: "원 샷", characterId: "su", rarity: "unique", animation: "sniper" },
 ];
 
 const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
@@ -79,6 +82,7 @@ const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
   { backgroundId: "background-neon-rhythm", name: "네온 리듬", rarity: "epic", animation: "dance" },
   { backgroundId: "background-champion-gold", name: "챔피언 골드", rarity: "legendary", animation: "trophy" },
   { backgroundId: "background-fireworks-festival", name: "불꽃 축제", rarity: "unique", animation: "fireworks" },
+  { backgroundId: "background-su-crosshair", name: "검은 조준선", characterId: "su", rarity: "unique", animation: "sniper" },
 ];
 
 const LEGACY_CEREMONY_PART_IDS: Record<string, { actionId: string; backgroundId: string }> = {

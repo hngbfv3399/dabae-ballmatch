@@ -170,8 +170,9 @@ export default defineSchema({
   victoryActions: defineTable({
     actionId: v.string(),
     name: v.string(),
+    characterId: v.optional(v.string()),
     rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
-    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks")),
+    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks"), v.literal("sniper")),
     isActive: v.boolean(),
     createdAt: v.number(),
   }).index("by_actionId", ["actionId"]),
@@ -185,8 +186,9 @@ export default defineSchema({
   victoryBackgrounds: defineTable({
     backgroundId: v.string(),
     name: v.string(),
+    characterId: v.optional(v.string()),
     rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
-    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks")),
+    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks"), v.literal("sniper")),
     isActive: v.boolean(),
     createdAt: v.number(),
   }).index("by_backgroundId", ["backgroundId"]),

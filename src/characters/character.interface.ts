@@ -102,6 +102,9 @@ export interface CharacterConfig {
   // === Damage Hooks (called from dealDamage) ===
   // Return modified damage. If blocked=true, damage is fully negated.
   onTakeDamage?: (target: CharacterState, attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) => { finalDamage: number; blocked: boolean };
+  // Called after permanent/temporary shields absorb damage and HP is deducted.
+  // Use this for character-specific HP state that must never bypass the common shield flow.
+  onDamageApplied?: (target: CharacterState, attacker: CharacterState, damage: number, ctx: CharacterBehaviorContext) => void;
   // Return modified outgoing damage amount.
   onDealDamage?: (attacker: CharacterState, target: CharacterState, damage: number, ctx: CharacterBehaviorContext) => number;
   // Return true to cancel the original CC application.
