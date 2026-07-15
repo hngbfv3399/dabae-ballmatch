@@ -397,15 +397,14 @@ function renderGachaPreview() {
 function updateGachaUI() {
   const dungeonClearProgress = gachaProgress.completedDungeonClears % 3;
   const isCeremony = activeGachaType === "ceremony";
-  const catalogReady = isCeremony ? victoryCeremonyCatalog.length > 0 : cosmeticCatalog.length > 0;
-  const targetLabel = isCeremony ? "승리 세레모니" : "공통 스킨";
-  gachaTitle.textContent = `${targetLabel} 뽑기`;
+  const catalogReady = cosmeticCatalog.length + victoryCeremonyCatalog.length > 0;
+  gachaTitle.textContent = "통합 가챠";
   gachaTypeHelp.innerHTML = isCeremony
-    ? `중복 승리 세레모니를 획득하면 등급별 경험치 포인트 아이템이 적립됩니다. 획득한 세레모니는 여기서 장착하며, 게임 종료 시 <b>1위 캐릭터</b>가 행동으로 보여줍니다.`
-    : `중복 스킨을 획득하면 등급별 경험치 포인트가 적립됩니다. 적립한 포인트는 <b>도감 탭</b>에서 원하는 캐릭터에게 나누어 사용하세요. 스킨 장착 여부와는 관계없습니다.`;
-  gachaDrawStatus.textContent = `보유 경험치 포인트 아이템 ${experiencePointItems.length}개 · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 현재 ${targetLabel} 풀에서 뽑습니다.`;
+    ? `현재 탭은 세레모니 도감 필터입니다. 뽑기는 스킨과 세레모니 <b>전체 풀</b>에서 진행됩니다. 중복 세레모니는 경험치 포인트 아이템으로 바뀌며, 획득한 세레모니는 여기서 장착합니다.`
+    : `현재 탭은 스킨 도감 필터입니다. 뽑기는 스킨과 세레모니 <b>전체 풀</b>에서 진행됩니다. 중복 획득 시 경험치 포인트가 적립되며, 도감 탭에서 원하는 캐릭터에게 나누어 사용할 수 있습니다.`;
+  gachaDrawStatus.textContent = `보유 경험치 포인트 아이템 ${experiencePointItems.length}개 · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 스킨·승리 세레모니 전체 풀에서 뽑습니다.`;
   gachaDrawBtn.disabled = !catalogReady || (gachaProgress.dailyDrawsRemaining + gachaProgress.bonusDrawsAvailable <= 0);
-  gachaDrawBtn.textContent = "뽑기";
+  gachaDrawBtn.textContent = "통합 뽑기";
   renderGachaCatalog();
 }
 
@@ -418,8 +417,7 @@ function closeGachaReveal() {
 }
 
 function showGachaRevealRolling() {
-  const isCeremony = activeGachaType === "ceremony";
-  gachaRevealContent.innerHTML = `<div class="gacha-reveal rolling"><span class="eyebrow">${isCeremony ? "CEREMONY SIGNAL DETECTED" : "SKIN SIGNAL DETECTED"}</span><div class="gacha-reveal-orb"><i></i><i></i><i></i><b>?</b></div><h2>${isCeremony ? "승리 세레모니를 준비하는 중…" : "스킨을 해석하는 중…"}</h2><p>${isCeremony ? "우승자의 다음 동작을 확인하세요." : "빛의 색이 결과를 알려줍니다."}</p></div>`;
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal rolling"><span class="eyebrow">UNIFIED GACHA SIGNAL</span><div class="gacha-reveal-orb"><i></i><i></i><i></i><b>?</b></div><h2>보상을 해석하는 중…</h2><p>스킨과 승리 세레모니 전체 풀에서 결과를 불러옵니다.</p></div>`;
   gachaRevealModal.classList.remove("hidden");
 }
 
@@ -506,23 +504,21 @@ async function drawGacha() {
   gachaDrawBtn.disabled = true;
   showGachaRevealRolling();
   try {
-    if (activeGachaType === "ceremony") {
-      await convexClient.mutation(api.cosmetics.ensureInitialVictoryCeremonyCatalog, {});
-      const result = await convexClient.mutation(api.cosmetics.drawVictoryCeremony, { clientId: anonymousClientId });
-      await delay(900);
-      showVictoryCeremonyRevealResult(result as VictoryCeremonyDrawResult);
+    await convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
+    await convexClient.mutation(api.cosmetics.ensureInitialVictoryCeremonyCatalog, {});
+    const result = await convexClient.mutation(api.cosmetics.drawUnified, { clientId: anonymousClientId }) as UnifiedGachaDrawResult;
+    await delay(900);
+    if (result.itemType === "ceremony") {
+      showVictoryCeremonyRevealResult(result);
       gachaResult.textContent = result.result === "unlocked"
         ? `획득! ${result.ceremony.name} (${result.ceremony.rarity.toUpperCase()}) — 장착하면 게임 결과 1위가 이 세레모니를 보여줍니다.`
         : `중복! ${result.ceremony.name} · 경험치 포인트 ${result.experienceGranted}P를 적립했습니다. 원하는 캐릭터에게 나누어 사용하세요.`;
-      return;
+    } else {
+      showGachaRevealResult(result);
+      gachaResult.textContent = result.result === "unlocked"
+        ? `획득! ${result.cosmetic.name} (${result.cosmetic.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
+        : `중복! ${result.cosmetic.name} · 경험치 포인트 ${result.experienceGranted}P를 적립했습니다. 원하는 캐릭터에게 나누어 사용하세요.`;
     }
-    await convexClient.mutation(api.cosmetics.ensureInitialCatalog, {});
-    const result = await convexClient.mutation(api.cosmetics.draw, { clientId: anonymousClientId });
-    await delay(900);
-    showGachaRevealResult(result);
-    gachaResult.textContent = result.result === "unlocked"
-      ? `획득! ${result.cosmetic.name} (${result.cosmetic.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
-      : `중복! ${result.cosmetic.name} · 경험치 포인트 ${result.experienceGranted}P를 적립했습니다. 원하는 캐릭터에게 나누어 사용하세요.`;
   } catch (error) {
     closeGachaReveal();
     gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
@@ -530,6 +526,9 @@ async function drawGacha() {
 }
 
 type VictoryCeremonyDrawResult = { result: string; ceremony: Omit<VictoryCeremony, "isUnlocked">; experienceGranted: number };
+type UnifiedGachaDrawResult =
+  | ({ itemType: "skin"; cosmetic: GachaRevealCosmetic } & Pick<VictoryCeremonyDrawResult, "result" | "experienceGranted">)
+  | ({ itemType: "ceremony"; ceremony: VictoryCeremonyDrawResult["ceremony"] } & Pick<VictoryCeremonyDrawResult, "result" | "experienceGranted">);
 
 async function equipVictoryCeremony(ceremony: VictoryCeremony) {
   try {

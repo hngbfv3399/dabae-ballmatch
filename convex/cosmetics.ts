@@ -350,6 +350,84 @@ export const drawVictoryCeremony = mutation({
   },
 });
 
+// 가챠 탭 분류와 무관하게 스킨·승리 세레모니 전체 풀에서 하나를 뽑는다.
+export const drawUnified = mutation({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+
+    const now = Date.now();
+    const today = kstDate(now);
+    const gachaState = await ctx.db
+      .query("anonymousGachaStates")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .unique();
+    const dailyDrawsUsed = gachaState?.dailyResetDate === today ? gachaState.dailyDrawsUsed : 0;
+    const completedPlayCount = gachaState?.completedPlayCount ?? 0;
+    const bonusDrawsUsed = gachaState?.bonusDrawsUsed ?? 0;
+    const hasDailyDraw = dailyDrawsUsed < 5;
+    const hasBonusDraw = Math.floor(completedPlayCount / 3) > bonusDrawsUsed;
+    if (!hasDailyDraw && !hasBonusDraw) throw new Error("No gacha draws available");
+
+    const activeCosmetics = (await ctx.db.query("cosmetics").take(100)).filter(
+      (cosmetic) => cosmetic.isActive && cosmetic.scope === "global",
+    );
+    const activeCeremonies = (await ctx.db.query("victoryCeremonies").take(50)).filter((ceremony) => ceremony.isActive);
+    if (activeCosmetics.length + activeCeremonies.length === 0) throw new Error("Gacha catalog has not been initialized");
+
+    const rarity = rollRarity();
+    const rarityCosmetics = activeCosmetics.filter((cosmetic) => cosmetic.rarity === rarity);
+    const rarityCeremonies = activeCeremonies.filter((ceremony) => ceremony.rarity === rarity);
+    const candidates = [
+      ...(rarityCosmetics.length + rarityCeremonies.length > 0 ? rarityCosmetics : activeCosmetics).map((cosmetic) => ({ itemType: "skin" as const, item: cosmetic })),
+      ...(rarityCosmetics.length + rarityCeremonies.length > 0 ? rarityCeremonies : activeCeremonies).map((ceremony) => ({ itemType: "ceremony" as const, item: ceremony })),
+    ];
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!selected) throw new Error("Gacha draw failed");
+
+    let result: "unlocked" | "duplicateExperience" = "unlocked";
+    let experienceGranted = 0;
+    if (selected.itemType === "skin") {
+      const unlock = await ctx.db
+        .query("cosmeticUnlocks")
+        .withIndex("by_cosmeticId", (q) => q.eq("cosmeticId", selected.item.cosmeticId))
+        .unique();
+      result = unlock ? "duplicateExperience" : "unlocked";
+      experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
+      if (!unlock) await ctx.db.insert("cosmeticUnlocks", { cosmeticId: selected.item.cosmeticId, unlockedAt: now, unlockedByClientId: args.clientId });
+      await ctx.db.insert("gachaDrawHistory", { clientId: args.clientId, cosmeticId: selected.item.cosmeticId, result, experienceGranted, createdAt: now });
+    } else {
+      const unlock = await ctx.db
+        .query("victoryCeremonyUnlocks")
+        .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", selected.item.ceremonyId))
+        .unique();
+      result = unlock ? "duplicateExperience" : "unlocked";
+      experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
+      if (!unlock) await ctx.db.insert("victoryCeremonyUnlocks", { ceremonyId: selected.item.ceremonyId, unlockedAt: now, unlockedByClientId: args.clientId });
+      await ctx.db.insert("victoryCeremonyDrawHistory", { clientId: args.clientId, ceremonyId: selected.item.ceremonyId, result, experienceGranted, createdAt: now });
+    }
+    if (experienceGranted > 0) {
+      await ctx.db.insert("experiencePointItems", { clientId: args.clientId, amount: experienceGranted, rarity: selected.item.rarity, createdAt: now });
+    }
+
+    if (gachaState) {
+      await ctx.db.patch(gachaState._id, {
+        dailyResetDate: today,
+        dailyDrawsUsed: dailyDrawsUsed + (hasDailyDraw ? 1 : 0),
+        completedPlayCount,
+        bonusDrawsUsed: bonusDrawsUsed + (hasDailyDraw ? 0 : 1),
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("anonymousGachaStates", { clientId: args.clientId, dailyResetDate: today, dailyDrawsUsed: 1, completedPlayCount: 0, bonusDrawsUsed: 0, experiencePoints: 0, updatedAt: now });
+    }
+
+    return selected.itemType === "skin"
+      ? { itemType: "skin" as const, cosmetic: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" }
+      : { itemType: "ceremony" as const, ceremony: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+  },
+});
+
 export const equipVictoryCeremony = mutation({
   args: { clientId: v.string(), ceremonyId: v.string() },
   handler: async (ctx, args) => {
