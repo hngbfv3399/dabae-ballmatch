@@ -14,6 +14,9 @@ export interface RunModifier {
   acquiredAtStage: number;
   effects?: RunModifierEffects;
   requirements?: PveAugmentRequirements;
+  minStage?: number;
+  dungeonIds?: readonly string[];
+  weight?: number;
 }
 
 export interface RunModifierEffects {
@@ -33,6 +36,8 @@ export interface PveAugmentRequirements {
 export interface PveAugmentContext {
   characterId: string;
   equippedSkillNames: readonly string[];
+  dungeonId?: string;
+  stage?: number;
 }
 
 type AugmentDefinition = Omit<RunModifier, "kind" | "stacks" | "acquiredAtStage">;
@@ -105,6 +110,12 @@ function shuffle<T>(entries: readonly T[]): T[] {
 }
 
 function matchesAugmentContext(augment: AugmentDefinition, context: PveAugmentContext): boolean {
+  if (augment.minStage !== undefined && context.stage !== undefined && context.stage < augment.minStage) {
+    return false;
+  }
+  if (augment.dungeonIds && context.dungeonId && !augment.dungeonIds.includes(context.dungeonId)) {
+    return false;
+  }
   const requirements = augment.requirements;
   if (!requirements) return true;
   return (!requirements.characterId || requirements.characterId === context.characterId)

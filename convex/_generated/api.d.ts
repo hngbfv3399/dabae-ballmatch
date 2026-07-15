@@ -10,6 +10,7 @@
 
 import type * as cosmetics from "../cosmetics.js";
 import type * as patchNotes from "../patchNotes.js";
+import type * as persistentItems from "../persistentItems.js";
 import type * as progression from "../progression.js";
 import type * as season from "../season.js";
 import type * as stats from "../stats.js";
@@ -24,6 +25,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   cosmetics: typeof cosmetics;
   patchNotes: typeof patchNotes;
+  persistentItems: typeof persistentItems;
   progression: typeof progression;
   season: typeof season;
   stats: typeof stats;

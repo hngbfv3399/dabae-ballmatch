@@ -2270,3 +2270,194 @@ body {
 .stats-reset-btn:disabled { cursor: wait; opacity: 0.68; }
 @media (max-width: 620px) { .stats-reset-zone { align-items: stretch; flex-direction: column; } .stats-reset-btn { width: 100%; } }
 .ranking-hub-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }.ranking-hub-head h2 { margin:.2rem 0 .5rem; }.ranking-season-label { color:#facc15; font:700 .72rem 'Orbit',sans-serif; text-align:right; }.ranking-rule-note { margin:.2rem 0 .9rem; color:#aeb8d8; font-size:.75rem; }.ranking-mode-tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:.45rem; margin-bottom:.75rem; }.ranking-mode-tab { padding:.65rem; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.025); color:#b9c1dc; cursor:pointer; font-weight:800; }.ranking-mode-tab.active { border-color:#facc15; background:rgba(250,204,21,.12); color:#fff; }.ranking-list { display:grid; gap:.45rem; }.ranking-row { display:grid; grid-template-columns:28px 38px minmax(0,1fr) auto; align-items:center; gap:.65rem; padding:.6rem .7rem; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.025); }.ranking-place { color:#facc15; text-align:center; }.ranking-avatar { width:34px; height:34px; font-size:.56rem; }.ranking-identity { min-width:0; display:grid; gap:.1rem; }.ranking-identity small,.ranking-score small { color:#aeb8d8; font-size:.66rem; }.ranking-score { color:#facc15; text-align:right; }.ranking-score small { display:block; }.ranking-empty { padding:1.8rem; border:1px dashed rgba(250,204,21,.28); color:#b9c1dc; text-align:center; font-size:.84rem; }.ranking-empty small { color:#8792b4; }
+
+/* Permanent Player Items UI */
+.persistent-items-section {
+  margin: 1.5rem 0;
+  padding: 1.2rem;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+.draw-ticket-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 242, 254, 0.05);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  border-radius: 10px;
+  margin: 1rem 0;
+}
+.draw-ticket-info {
+  display: flex;
+  flex-direction: column;
+}
+.draw-ticket-info strong {
+  font-size: 1.1rem;
+  color: var(--neon-cyan);
+}
+.draw-ticket-info small {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+.item-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.item-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  padding: 0.8rem;
+  border-radius: 10px;
+  transition: var(--transition);
+  text-align: center;
+  cursor: pointer;
+}
+.item-slot.empty {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.01);
+  color: var(--text-secondary);
+}
+.item-slot.empty:hover {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.04);
+  color: #fff;
+}
+.item-slot.empty.active-equip {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+  animation: pulse-border 1.5s infinite alternate;
+}
+.item-slot.equipped {
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  background: rgba(0, 242, 254, 0.05);
+  color: #fff;
+  cursor: default;
+}
+.item-slot.equipped strong {
+  font-size: 0.85rem;
+  color: var(--neon-cyan);
+}
+.item-slot.equipped p {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+.item-slot.locked {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.25);
+  cursor: not-allowed;
+}
+.item-slot-unequip-btn {
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  background: rgba(255, 51, 102, 0.1);
+  color: #ff3366;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.item-slot-unequip-btn:hover {
+  background: #ff3366;
+  color: #000;
+}
+.item-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+.item-catalog-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: left;
+}
+.item-catalog-card.locked {
+  opacity: 0.5;
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+.item-catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+.item-catalog-header strong {
+  font-size: 0.85rem;
+  color: #fff;
+}
+.item-catalog-card.unlocked .item-catalog-header strong {
+  color: var(--neon-cyan);
+}
+.item-catalog-rarity-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+.item-catalog-desc {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+}
+.item-catalog-btn-group {
+  margin-top: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+.item-catalog-action-btn {
+  width: 100%;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.08);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+.item-catalog-action-btn:hover:not(:disabled) {
+  background: var(--neon-cyan);
+  color: #000;
+}
+.item-catalog-action-btn:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+}
+.item-action-result {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--neon-yellow);
+}
+
+@keyframes pulse-border {
+  from { border-color: rgba(0, 242, 254, 0.2); }
+  to { border-color: rgba(0, 242, 254, 1); }
+}
+
+@media (max-width: 620px) {
+  .item-slots-grid { grid-template-columns: 1fr; }
+  .item-catalog-grid { grid-template-columns: 1fr; }
+}
+

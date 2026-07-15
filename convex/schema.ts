@@ -268,4 +268,73 @@ export default defineSchema({
     experienceGranted: v.number(),
     createdAt: v.number(),
   }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
+
+  // 영구 플레이어 아이템 도감 정의
+  persistentItemCatalog: defineTable({
+    itemId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    rarity: v.union(
+      v.literal("common"),
+      v.literal("rare"),
+      v.literal("epic"),
+      v.literal("legendary"),
+      v.literal("unique")
+    ),
+    characterId: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    effects: v.object({
+      maxHpMultiplier: v.optional(v.number()),
+      speedMultiplier: v.optional(v.number()),
+      baseAttackRangeBonus: v.optional(v.number()),
+      defenseShieldBonus: v.optional(v.number()),
+    }),
+  }).index("by_itemId", ["itemId"]),
+
+  // 플레이어가 해금한 아이템 목록
+  persistentItemUnlocks: defineTable({
+    clientId: v.string(),
+    itemId: v.string(),
+    unlockedAt: v.number(),
+  })
+    .index("by_clientId_and_itemId", ["clientId", "itemId"])
+    .index("by_clientId", ["clientId"]),
+
+  // 캐릭터별 영구 아이템 장착 정보
+  characterItemLoadouts: defineTable({
+    clientId: v.string(),
+    characterId: v.string(),
+    slot1ItemId: v.optional(v.string()),
+    slot2ItemId: v.optional(v.string()),
+    slot3ItemId: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_clientId_and_characterId", ["clientId", "characterId"]),
+
+  // 뽑기권 잔액
+  itemTicketBalances: defineTable({
+    clientId: v.string(),
+    availableTickets: v.number(),
+    updatedAt: v.number(),
+  }).index("by_clientId", ["clientId"]),
+
+  // 마일스톤 레벨 보상 티켓 수령 여부
+  itemTicketClaims: defineTable({
+    clientId: v.string(),
+    characterId: v.string(),
+    milestoneLevel: v.number(),
+    claimedAt: v.number(),
+  })
+    .index("by_clientId_and_characterId_and_milestoneLevel", ["clientId", "characterId", "milestoneLevel"])
+    .index("by_clientId_and_characterId", ["clientId", "characterId"]),
+
+  // 뽑기 이력
+  itemDrawHistory: defineTable({
+    clientId: v.string(),
+    itemId: v.string(),
+    result: v.literal("unlocked"),
+    ticketConsumed: v.number(),
+    createdAt: v.number(),
+  }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
 });
+

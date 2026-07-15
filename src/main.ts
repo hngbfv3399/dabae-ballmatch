@@ -18,6 +18,14 @@ import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
 import { createCollapsedLaboratoryStage, LABORATORY_DUNGEON_ID, LABORATORY_STAGE_COUNT } from "./pve/labDungeon";
+import {
+  type CatalogItem,
+  type CharacterItemLoadout,
+  getEquippedPersistentItemIds,
+  resolvePersistentItemEffects,
+  applyPersistentItemStats
+} from "./maingame/persistentItemEffects";
+
 
 // DOM Elements
 const lobbyView = document.getElementById("lobby-view") as HTMLElement;
@@ -278,6 +286,14 @@ let victorySpecialEventCatalogUnsubscribe: (() => void) | null = null;
 let victorySpecialEventLoadoutUnsubscribe: (() => void) | null = null;
 let gachaProgressUnsubscribe: (() => void) | null = null;
 let experiencePointItemsUnsubscribe: (() => void) | null = null;
+
+// 영구 플레이어 아이템 관련 전역 상태
+let persistentItemCatalog: CatalogItem[] = [];
+let persistentItemLoadouts = new Map<string, CharacterItemLoadout>(); // characterId -> loadout
+let persistentItemTickets = 0;
+let persistentItemTicketClaimPending = false;
+let persistentItemSummaryUnsubscribe: (() => void) | null = null;
+
 let managedCharacterId: string | null = null;
 let activeMatchSlot = -1;
 let matchSlotIds: Array<string | null> = [];
@@ -728,6 +744,115 @@ function initCosmetics() {
   gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = { ...progress, experiencePoints: progress.experiencePoints ?? 0 }; updateGachaUI(); });
   experiencePointItemsUnsubscribe = convexClient.onUpdate(api.progression.listExperiencePointItems, { clientId: anonymousClientId }, (items) => { experiencePointItems = items as ExperiencePointItem[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
 }
+
+function initPersistentItems() {
+  void convexClient.mutation(api.persistentItems.ensureInitialPersistentItemCatalog, {});
+  persistentItemSummaryUnsubscribe?.();
+  persistentItemSummaryUnsubscribe = convexClient.onUpdate(
+    api.persistentItems.getPersistentItemSummary,
+    { clientId: anonymousClientId },
+    (summary: any) => {
+      persistentItemCatalog = summary.catalog as CatalogItem[];
+      persistentItemLoadouts = new Map(
+        summary.loadouts.map((loadout: any) => [loadout.characterId, loadout as CharacterItemLoadout])
+      );
+      persistentItemTickets = summary.ticketBalance;
+      if (!collectionHubPanel.classList.contains("hidden")) {
+        renderCollection();
+      }
+    }
+  );
+}
+
+let activeEquipSlot: 1 | 2 | 3 | null = null;
+
+async function autoClaimTickets(characterId: string) {
+  if (persistentItemTicketClaimPending) return;
+  persistentItemTicketClaimPending = true;
+  try {
+    const result = await convexClient.mutation(api.persistentItems.claimAvailableItemTickets, {
+      clientId: anonymousClientId,
+      characterId,
+    });
+    if (result.claimedCount > 0) {
+      console.log(`Auto-claimed ${result.claimedCount} milestone tickets.`);
+      const statusText = document.getElementById("milestone-claim-status-text");
+      if (statusText) statusText.textContent = `새 마일스톤 뽑기권 ${result.claimedCount}장이 지급되었습니다!`;
+    }
+  } catch (err) {
+    console.error("Auto claim tickets failed:", err);
+  } finally {
+    persistentItemTicketClaimPending = false;
+  }
+}
+
+async function drawPersistentItemUI() {
+  const drawBtn = document.getElementById("persistent-item-draw-btn") as HTMLButtonElement;
+  if (drawBtn) drawBtn.disabled = true;
+
+  gachaRevealModal.classList.remove("hidden");
+  gachaRevealContent.innerHTML = `
+    <div class="gacha-reveal rolling">
+      <span class="eyebrow">PLAYER ITEM DRAW</span>
+      <div class="gacha-reveal-orb">
+        <i></i><i></i><i></i><b>?</b>
+      </div>
+      <h2>아이템 상자를 개봉하는 중…</h2>
+      <p>보관 중인 영구 전투 아이템 카탈로그에서 해석하고 있습니다.</p>
+    </div>
+  `;
+
+  try {
+    const result = (await convexClient.mutation(api.persistentItems.drawPersistentItem, {
+      clientId: anonymousClientId,
+    })) as { catalogComplete: boolean; item: CatalogItem | null };
+
+    if (result.catalogComplete) {
+      gachaRevealContent.innerHTML = `
+        <div class="gacha-reveal revealed" style="--skin-border:var(--neon-yellow);--skin-fill:#121225;--skin-text:#fff;--skin-glow:var(--neon-yellow)">
+          <span class="eyebrow rarity-unique">CATALOG COMPLETE</span>
+          <h2>현재 아이템 도감 완성</h2>
+          <p>모든 영구 아이템을 이미 보유하고 있습니다. 티켓은 소모되지 않았습니다. 신규 아이템 업데이트를 기다려주세요!</p>
+          <button id="gacha-reveal-close" class="btn btn-primary" type="button" style="margin-top:1.5rem;">확인</button>
+        </div>
+      `;
+    } else if (result.item) {
+      const item = result.item;
+      gachaRevealContent.innerHTML = `
+        <div class="gacha-reveal revealed" style="--skin-border:var(--neon-cyan);--skin-fill:#121225;--skin-text:#fff;--skin-glow:var(--neon-cyan)">
+          <span class="eyebrow rarity-epic">PLAYER ITEM DRAW</span>
+          <div style="font-size:3rem; margin:1rem 0;">🎁</div>
+          <h2 style="color:var(--neon-cyan);">${item.name}</h2>
+          <p>새 영구 전투 아이템을 획득했습니다!</p>
+          <div class="gacha-reveal-effect" style="margin: 1rem 0; padding: 0.8rem; background: rgba(0,242,254,0.05); border: 1px solid rgba(0,242,254,0.1); border-radius:8px; font-size:0.85rem;">
+            <strong>효과:</strong> ${item.description}
+          </div>
+          <p style="font-size:0.75rem; color:var(--text-secondary);">남은 티켓: ${persistentItemTickets}장</p>
+          <button id="gacha-reveal-close" class="btn btn-primary" type="button" style="margin-top:1.5rem;">확인</button>
+        </div>
+      `;
+    }
+
+    document.getElementById("gacha-reveal-close")?.addEventListener("click", () => {
+      gachaRevealModal.classList.add("hidden");
+    });
+  } catch (err) {
+    gachaRevealContent.innerHTML = `
+      <div class="gacha-reveal revealed" style="--skin-border:var(--neon-red);--skin-fill:#121225;--skin-text:#fff;--skin-glow:var(--neon-red)">
+        <span class="eyebrow rarity-common">ERROR</span>
+        <h2>뽑기 실패</h2>
+        <p>${err instanceof Error ? err.message : "오류가 발생했습니다."}</p>
+        <button id="gacha-reveal-close" class="btn btn-primary" type="button" style="margin-top:1.5rem;">확인</button>
+      </div>
+    `;
+    document.getElementById("gacha-reveal-close")?.addEventListener("click", () => {
+      gachaRevealModal.classList.add("hidden");
+    });
+  } finally {
+    if (drawBtn) drawBtn.disabled = false;
+  }
+}
+
 
 async function useExperiencePointItem(characterId: string, item: ExperiencePointItem, resultElement: HTMLElement, useButton: HTMLButtonElement) {
   useButton.disabled = true;
@@ -1681,6 +1806,12 @@ function startGame() {
       state.cooldownMultiplier = 1.0;
       state.damageMultiplier = 1.0;
     }
+    
+    if (!state.isBoss) {
+      const loadout = persistentItemLoadouts.get(state.id);
+      const effects = resolvePersistentItemEffects(persistentItemCatalog, loadout, state.id);
+      applyPersistentItemStats(state, effects);
+    }
 
     return state;
   });
@@ -1771,15 +1902,21 @@ function startPracticeGame() {
 
   const allConfigs = [...selectedConfigs, dummyConfig];
   const total = allConfigs.length;
-  const initialStates = allConfigs.map((config, index) =>
-    applyEquippedCosmetic(applyCharacterLevel(createCharacterState(
+  const initialStates = allConfigs.map((config, index) => {
+    const state = applyEquippedCosmetic(applyCharacterLevel(createCharacterState(
       config,
       index,
       total,
       gameCanvas.width,
       gameCanvas.height,
-    ))),
-  );
+    )));
+    if (state.id !== "dummy") {
+      const loadout = persistentItemLoadouts.get(state.id);
+      const effects = resolvePersistentItemEffects(persistentItemCatalog, loadout, state.id);
+      applyPersistentItemStats(state, effects);
+    }
+    return state;
+  });
 
   totalCountEl.textContent = total.toString();
   aliveCountEl.textContent = total.toString();
@@ -1976,13 +2113,13 @@ function renderPveRunModifiers() {
   }
   const modifiers = getAllRunModifiers(pveRun.modifiers);
   pveRunModifiersPanel.classList.remove("hidden");
-  pveRunModifiersPanel.innerHTML = `<div class="pve-run-modifiers-head"><span>이번 런 빌드</span><strong>증강 ${pveRun.modifiers.augments.length} · 아이템 ${pveRun.modifiers.items.length}</strong></div>${modifiers.length > 0 ? `<div class="pve-run-modifier-list">${modifiers.map((modifier) => `<span class="pve-run-modifier ${modifier.kind} rarity-${modifier.rarity}" title="${modifier.description}">${modifier.icon} ${modifier.name}${modifier.stacks > 1 ? ` ×${modifier.stacks}` : ""}</span>`).join("")}</div>` : `<small>다음 단계부터 증강과 아이템 선택이 이곳에 기록됩니다.</small>`}`;
+  pveRunModifiersPanel.innerHTML = `<div class="pve-run-modifiers-head"><span>이번 런 빌드</span><strong>런 증강 ${pveRun.modifiers.augments.length} · 런 보상 아이템 ${pveRun.modifiers.items.length}</strong></div>${modifiers.length > 0 ? `<div class="pve-run-modifier-list">${modifiers.map((modifier) => `<span class="pve-run-modifier ${modifier.kind} rarity-${modifier.rarity}" title="${modifier.description}">${modifier.icon} ${modifier.name}${modifier.stacks > 1 ? ` ×${modifier.stacks}` : ""}</span>`).join("")}</div>` : `<small>다음 단계부터 런 증강과 런 보상 아이템 선택이 이곳에 기록됩니다.</small>`}`;
 }
 
 function getPveRunSummaryMarkup(run: PveRun): string {
   const modifiers = getAllRunModifiers(run.modifiers);
-  if (modifiers.length === 0) return `<p class="win-desc">이번 런에서는 아직 증강과 인게임 아이템을 선택하지 않았습니다.</p>`;
-  return `<div class="pve-run-summary"><strong>이번 런 빌드</strong>${modifiers.map((modifier) => `<span>${modifier.icon} ${modifier.name}</span>`).join("")}</div>`;
+  if (modifiers.length === 0) return `<p class="win-desc">이번 런에서는 아직 런 증강과 런 보상 아이템을 선택하지 않았습니다.</p>`;
+  return `<div class="pve-run-summary"><strong>이번 런 빌드 (런 증강 및 런 보상 아이템)</strong>${modifiers.map((modifier) => `<span>${modifier.icon} ${modifier.name}</span>`).join("")}</div>`;
 }
 
 function getPveRunMaximumHp(run: PveRun): number {
@@ -2000,6 +2137,8 @@ function getPveAugmentContext(run: PveRun) {
   return {
     characterId: run.characterId,
     equippedSkillNames: character ? [character.skillName] : [],
+    dungeonId: run.dungeonId,
+    stage: run.stage,
   };
 }
 
@@ -2137,6 +2276,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       pveAdvancePending = true;
       gameStatusText.textContent = `던전 ${dungeon.number}-${clearedStageNumber} 클리어 · 다음 스테이지 대기 중`;
       void recordPveStageExperience(run, clearedStageNumber).then((result) => {
+        void autoClaimTickets(run.characterId);
         const showStageClearResult = () => {
           if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
           winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 ${dungeon.number}-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div><div class="stat-row"><span>다음 전투</span><strong>던전 ${dungeon.number}-${run.stage}</strong></div></div><p class="win-desc" style="margin-top:0.9rem">가챠 진행도는 던전 ${dungeon.number}-1부터 ${dungeon.number}-${dungeon.stageCount}까지 완주할 때만 증가합니다.</p>`;
@@ -2162,6 +2302,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     const clearTimeMs = Date.now() - run.startedAt;
     gameStatusText.textContent = "던전 클리어";
     void recordPveStageExperience(run, run.stage).then((stageResult) => {
+      void autoClaimTickets(run.characterId);
       if (!run.rewardEligible) {
         if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
         winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">던전 ${dungeon.number}-${run.stage} 클리어!</div><div class="win-desc">스테이지 보상만 획득했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 획득 경험치</span><strong class="text-neon-yellow">+${stageResult.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${stageResult.level}</strong></div></div>`;
@@ -2175,6 +2316,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
         dungeonId: run.dungeonId,
         clearTimeMs,
       }).then((result) => {
+        void autoClaimTickets(run.characterId);
         if (winnerTitle) winnerTitle.textContent = "DUNGEON CLEARED";
         winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · ${dungeon.name} 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 ${dungeon.number}-1부터 ${dungeon.number}-${dungeon.stageCount}까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>마지막 스테이지 경험치</span><strong class="text-neon-yellow">+${stageResult.experienceGranted} XP</strong></div><div class="stat-row"><span>가챠 진행도</span><strong>${result.completedDungeonClears % 3} / 3 던전 클리어</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>${runSummary}`;
         modalCloseBtn.textContent = "던전 선택으로";
@@ -2977,7 +3119,21 @@ function startPveDungeon() {
   gameModeModal.classList.add("hidden");
   const stage = 1;
   const dungeonId = pveDungeonSelect.value;
-  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), currentDefenseShield: getLeveledDefenseShield(character, progress), currentShield: 0, rewardEligible: true, modifiers: createPveRunModifiers() };
+
+  const loadout = persistentItemLoadouts.get(character.id);
+  const effects = resolvePersistentItemEffects(persistentItemCatalog, loadout, character.id);
+  
+  let baseMaxHp = getLeveledHp(character.maxHp, progress);
+  let baseMaxDefenseShield = getLeveledDefenseShield(character, progress);
+
+  if (effects.maxHpMultiplier) {
+    baseMaxHp = Math.round(baseMaxHp * effects.maxHpMultiplier);
+  }
+  if (effects.defenseShieldBonus) {
+    baseMaxDefenseShield += effects.defenseShieldBonus;
+  }
+
+  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: baseMaxHp, currentHp: baseMaxHp, currentDefenseShield: baseMaxDefenseShield, currentShield: 0, rewardEligible: true, modifiers: createPveRunModifiers() };
   showAugmentChoice(pveRun, 0, startPveStage);
 }
 
@@ -3000,6 +3156,12 @@ function startPveStage() {
   player.maxHp = getLeveledHp(character.maxHp, progress);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
   player.maxDefenseShield = getLeveledDefenseShield(character, progress);
+
+  // Apply persistent items to player state
+  const stageLoadout = persistentItemLoadouts.get(character.id);
+  const stageEffects = resolvePersistentItemEffects(persistentItemCatalog, stageLoadout, character.id);
+  applyPersistentItemStats(player, stageEffects);
+
   applyPveRunModifierStats(player, pveRun.modifiers);
   player.hp = Math.min(player.maxHp, pveRun.currentHp);
   player.defenseShield = Math.min(player.maxDefenseShield, pveRun.currentDefenseShield);
@@ -3168,7 +3330,219 @@ function renderManagedCharacter() {
   const equippedAction = victoryActionCatalog.find((action) => action.actionId === equippedVictoryActionId);
   const equippedBackground = victoryBackgroundCatalog.find((background) => background.backgroundId === equippedVictoryBackgroundId);
   const canSpendExperiencePoints = false;
-  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="collection-victory-ceremony"><div><span class="eyebrow">VICTORY CEREMONY</span><strong>승리 세레모니 장착</strong><p>현재 장착: <b>${equippedCeremony ? getCeremonyDisplayName(equippedCeremony.animation) : "없음"}</b> · 모든 게임 결과의 1위에게 적용됩니다.</p></div><div id="collection-victory-ceremony-grid" class="collection-victory-ceremony-grid"></div><small id="collection-victory-ceremony-result" aria-live="polite">세레모니를 선택하면 즉시 장착됩니다.</small></section><section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section>${getSkillLoadoutMarkup(character, progress)}<h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  
+  // Auto-claim any eligible tickets on render
+  void autoClaimTickets(character.id);
+
+  function getNextMilestoneLabel(lvl: number): string {
+    const milestones = [5, 10, 15, 20, 25, 30];
+    const next = milestones.find((m) => lvl < m);
+    return next ? `Lv.${next}` : "모든 레벨 보상 수령 완료";
+  }
+
+  collectionDetail.innerHTML = `
+    <div class="management-head">
+      <span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span>
+      <div>
+        <span class="eyebrow">CHARACTER LOADOUT</span>
+        <h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3>
+      </div>
+    </div>
+    <div class="picker-stat-grid">
+      <span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span>
+      <span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span>
+      <span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span>
+      <span>SPD <b>${character.speed.toFixed(1)}x</b></span>
+    </div>
+    ${getExperiencePanelMarkup(progress)}
+
+    <!-- 영구 전투 아이템 장착 및 도감 섹션 -->
+    <section class="persistent-items-section">
+      <div>
+        <span class="eyebrow">PERMANENT PLAYER ITEMS</span>
+        <strong>영구 전투 아이템</strong>
+        <p>전투 보조 영구 아이템을 획득하고 장착하여 능력치 보정을 받으세요.</p>
+      </div>
+      <div class="draw-ticket-panel">
+        <div class="draw-ticket-info">
+          <strong>보유 아이템 뽑기권: ${persistentItemTickets}장</strong>
+          <small id="milestone-claim-status-text">
+            ${progress.level >= 30 ? "모든 레벨 보상 수령 완료" : `다음 티켓 지급 레벨: ${getNextMilestoneLabel(progress.level)}`}
+          </small>
+        </div>
+        <button id="persistent-item-draw-btn" class="btn btn-primary" type="button" ${persistentItemTickets > 0 ? "" : "disabled"}>아이템 뽑기</button>
+      </div>
+      
+      <div class="item-slots-grid">
+        <!-- slots rendered dynamically -->
+      </div>
+
+      <div class="item-catalog-container">
+        <h4 style="margin-top:1.2rem; font-size:0.85rem; color:var(--text-secondary);">보유 영구 아이템 도감</h4>
+        <p class="management-help" style="margin-bottom:0.5rem; font-size:0.7rem;">
+          ${activeEquipSlot !== null ? `슬롯 ${activeEquipSlot}에 장착할 아이템을 아래에서 선택하세요.` : "위의 빈 장착 슬롯을 클릭하면 해당 슬롯에 아이템을 장착할 수 있습니다."}
+        </p>
+        <div id="persistent-item-catalog-grid" class="item-catalog-grid"></div>
+      </div>
+      <div id="persistent-item-action-result" class="item-action-result" aria-live="polite"></div>
+    </section>
+
+    <!-- 기존 경험치 포인트 아이템 섹션 -->
+    <section class="experience-point-spend">
+      <div>
+        <span class="eyebrow">ITEM INVENTORY</span>
+        <strong>경험치 포인트 아이템</strong>
+        <p>아이템을 누르면 ${character.name}에게 즉시 경험치가 적용됩니다.</p>
+      </div>
+      <div id="collection-experience-point-items" class="experience-point-item-grid"></div>
+      <small id="collection-experience-point-result" aria-live="polite">중복 스킨을 획득하면 경험치 포인트 아이템이 추가됩니다.</small>
+    </section>
+    ${getSkillLoadoutMarkup(character, progress)}
+
+    <!-- 기존 스킨 장착 섹션 -->
+    <h4>스킨 장착</h4>
+    <p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p>
+    <div class="management-skin-grid" id="management-skin-grid"></div>
+
+    <!-- 기존 승리 연출 장착 섹션 -->
+    <section class="collection-victory-ceremony">
+      <div>
+        <span class="eyebrow">VICTORY LOADOUT</span>
+        <strong>승리 행동 · 배경 · 특수 이벤트 장착</strong>
+        <p>행동·배경·특수 이벤트는 따로 뽑고 따로 장착합니다. 현재: <b>${equippedAction?.name ?? "행동 없음"}</b> · <b>${equippedBackground?.name ?? "배경 없음"}</b> · <b>${victorySpecialEventCatalog.find((event) => event.specialEventId === equippedVictorySpecialEventId)?.name ?? "특수 이벤트 없음"}</b></p>
+      </div>
+      <div class="collection-ceremony-part">
+        <b>플레이어 행동</b>
+        <div id="collection-victory-action-grid" class="collection-victory-ceremony-grid"></div>
+      </div>
+      <div class="collection-ceremony-part">
+        <b>배경 효과</b>
+        <div id="collection-victory-background-grid" class="collection-victory-ceremony-grid"></div>
+      </div>
+      <div class="collection-ceremony-part">
+        <b>특수 이벤트 · 승리 모달 전체 효과</b>
+        <div id="collection-victory-special-event-grid" class="collection-victory-ceremony-grid"></div>
+      </div>
+      <small id="collection-victory-ceremony-result" aria-live="polite">각 항목을 선택하면 즉시 장착됩니다.</small>
+      <small id="collection-victory-special-event-result" aria-live="polite"></small>
+      <div style="display:none;">${equippedCeremony ? getCeremonyDisplayName(equippedCeremony.animation) : ""} ${canSpendExperiencePoints}</div>
+    </section>
+  `;
+
+  // Bind Draw Button
+  document.getElementById("persistent-item-draw-btn")?.addEventListener("click", drawPersistentItemUI);
+
+  // Render slots
+  const loadout = persistentItemLoadouts.get(character.id);
+  const slotsGrid = collectionDetail.querySelector(".item-slots-grid") as HTMLElement;
+  slotsGrid.innerHTML = "";
+
+  const renderSlot = (slotIndex: number, item: CatalogItem | null | undefined, unlocked: boolean) => {
+    const slotBtn = document.createElement("button");
+    slotBtn.type = "button";
+    
+    if (!unlocked) {
+      slotBtn.className = "item-slot locked";
+      slotBtn.innerHTML = `<strong>슬롯 ${slotIndex}</strong><p>🔒 Lv.20에 해금</p>`;
+    } else if (item) {
+      slotBtn.className = `item-slot equipped ${activeEquipSlot === slotIndex ? "active-equip" : ""}`;
+      slotBtn.innerHTML = `
+        <strong>슬롯 ${slotIndex}: ${item.name}</strong>
+        <p>${item.description}</p>
+        <button class="item-slot-unequip-btn" type="button">장착 해제</button>
+      `;
+      slotBtn.addEventListener("click", () => {
+        activeEquipSlot = activeEquipSlot === slotIndex ? null : slotIndex as 1 | 2 | 3;
+        renderManagedCharacter();
+      });
+      slotBtn.querySelector(".item-slot-unequip-btn")?.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const resultEl = document.getElementById("persistent-item-action-result") as HTMLElement;
+        try {
+          resultEl.textContent = "장착 해제 중...";
+          await convexClient.mutation(api.persistentItems.clearPersistentItemSlot, {
+            clientId: anonymousClientId,
+            characterId: character.id,
+            slot: slotIndex
+          });
+          resultEl.textContent = "장착이 해제되었습니다.";
+          activeEquipSlot = null;
+        } catch (err) {
+          resultEl.textContent = err instanceof Error ? err.message : "해제 실패";
+        }
+      });
+    } else {
+      slotBtn.className = `item-slot empty ${activeEquipSlot === slotIndex ? "active-equip" : ""}`;
+      slotBtn.innerHTML = `
+        <strong>슬롯 ${slotIndex}</strong>
+        <p>${activeEquipSlot === slotIndex ? "아이템을 선택하세요" : "비어 있음 (클릭)"}</p>
+      `;
+      slotBtn.addEventListener("click", () => {
+        activeEquipSlot = activeEquipSlot === slotIndex ? null : slotIndex as 1 | 2 | 3;
+        renderManagedCharacter();
+      });
+    }
+    slotsGrid.appendChild(slotBtn);
+  };
+
+  renderSlot(1, loadout?.slot1ItemId ? persistentItemCatalog.find(i => i.itemId === loadout.slot1ItemId) : null, true);
+  renderSlot(2, loadout?.slot2ItemId ? persistentItemCatalog.find(i => i.itemId === loadout.slot2ItemId) : null, true);
+  renderSlot(3, loadout?.slot3ItemId ? persistentItemCatalog.find(i => i.itemId === loadout.slot3ItemId) : null, progress.level >= 20);
+
+  // Render catalog
+  const catalogGrid = document.getElementById("persistent-item-catalog-grid") as HTMLElement;
+  catalogGrid.innerHTML = "";
+
+  const equippedIds = new Set(getEquippedPersistentItemIds(loadout));
+
+  persistentItemCatalog.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = `item-catalog-card ${item.isUnlocked ? "unlocked" : "locked"}`;
+    
+    let actionBtnHtml = "";
+    if (!item.isUnlocked) {
+      actionBtnHtml = `<button class="item-catalog-action-btn" disabled>미보유</button>`;
+    } else if (equippedIds.has(item.itemId)) {
+      actionBtnHtml = `<button class="item-catalog-action-btn" disabled>장착 중</button>`;
+    } else if (activeEquipSlot !== null) {
+      actionBtnHtml = `<button class="item-catalog-action-btn" id="equip-btn-${item.itemId}">슬롯 ${activeEquipSlot}에 장착</button>`;
+    } else {
+      actionBtnHtml = `<button class="item-catalog-action-btn" disabled>슬롯 선택 필요</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="item-catalog-header">
+        <strong>${item.name}</strong>
+        <span class="item-catalog-rarity-badge">${item.isUnlocked ? "보유" : "미보유"}</span>
+      </div>
+      <p class="item-catalog-desc">${item.description}</p>
+      <div class="item-catalog-btn-group">
+        ${actionBtnHtml}
+      </div>
+    `;
+
+    if (item.isUnlocked && !equippedIds.has(item.itemId) && activeEquipSlot !== null) {
+      card.querySelector(`#equip-btn-${item.itemId}`)?.addEventListener("click", async () => {
+        const resultEl = document.getElementById("persistent-item-action-result") as HTMLElement;
+        try {
+          resultEl.textContent = "아이템 장착 중...";
+          await convexClient.mutation(api.persistentItems.equipPersistentItem, {
+            clientId: anonymousClientId,
+            characterId: character.id,
+            slot: activeEquipSlot!,
+            itemId: item.itemId
+          });
+          resultEl.textContent = "아이템이 장착되었습니다.";
+          activeEquipSlot = null;
+        } catch (err) {
+          resultEl.textContent = err instanceof Error ? err.message : "장착 실패";
+        }
+      });
+    }
+
+    catalogGrid.appendChild(card);
+  });
+
   const collectionStats = collectionDetail.querySelector(".picker-stat-grid") as HTMLElement;
   collectionStats.innerHTML = `<span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span>`;
   const experienceSection = collectionDetail.querySelector(".experience-point-spend") as HTMLElement;
@@ -3399,6 +3773,7 @@ updateTeamGameTypeVisibility();
   pveDungeonSelect.addEventListener("change", updatePveDungeonUI);
   fillRandomSlotsBtn.addEventListener("click", fillMatchSlotsRandomly);
   initCosmetics();
+  initPersistentItems();
   gachaDrawBtn.addEventListener("click", () => void drawGacha());
   document.querySelectorAll<HTMLButtonElement>(".gacha-type-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
