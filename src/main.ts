@@ -3511,15 +3511,17 @@ function renderManagedCharacter() {
 
   const equippedIds = new Set(getEquippedPersistentItemIds(loadout));
 
+  let unlockedCount = 0;
   persistentItemCatalog.forEach((item) => {
     const isUnlocked = persistentItemUnlocks.has(`${character.id}:${item.itemId}`);
+    if (!isUnlocked) return;
+    unlockedCount++;
+
     const card = document.createElement("div");
-    card.className = `item-catalog-card ${isUnlocked ? "unlocked" : "locked"}`;
+    card.className = `item-catalog-card unlocked`;
     
     let actionBtnHtml = "";
-    if (!isUnlocked) {
-      actionBtnHtml = `<button class="item-catalog-action-btn" disabled>미보유</button>`;
-    } else if (equippedIds.has(item.itemId)) {
+    if (equippedIds.has(item.itemId)) {
       actionBtnHtml = `<button class="item-catalog-action-btn" disabled>장착 중</button>`;
     } else if (activeEquipSlot !== null) {
       actionBtnHtml = `<button class="item-catalog-action-btn" id="equip-btn-${item.itemId}">슬롯 ${activeEquipSlot}에 장착</button>`;
@@ -3530,7 +3532,7 @@ function renderManagedCharacter() {
     card.innerHTML = `
       <div class="item-catalog-header">
         <strong>${item.name}</strong>
-        <span class="item-catalog-rarity-badge">${isUnlocked ? "보유" : "미보유"}</span>
+        <span class="item-catalog-rarity-badge">보유</span>
       </div>
       <p class="item-catalog-desc">${item.description}</p>
       <div class="item-catalog-btn-group">
@@ -3559,6 +3561,15 @@ function renderManagedCharacter() {
 
     catalogGrid.appendChild(card);
   });
+
+  if (unlockedCount === 0) {
+    catalogGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; color: var(--text-secondary); background: rgba(255,255,255,0.01); border: 1px dashed rgba(255,255,255,0.08); border-radius: 8px; font-size: 0.9rem; line-height: 1.5;">
+        보유하고 있는 영구 전투 아이템이 없습니다.<br>
+        우측 상단의 <strong>'아이템 뽑기'</strong> 버튼을 클릭하여 아이템을 획득해 보세요!
+      </div>
+    `;
+  }
 
   const collectionStats = collectionDetail.querySelector(".picker-stat-grid") as HTMLElement;
   collectionStats.innerHTML = `<span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span>`;
