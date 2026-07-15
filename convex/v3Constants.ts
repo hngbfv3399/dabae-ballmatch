@@ -30,6 +30,26 @@ export const FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE = 200;
 export const LABORATORY_FIRST_CLEAR_EXPERIENCE = 600;
 export const LABORATORY_REPEAT_CLEAR_EXPERIENCE = 300;
 
+export type DungeonRewardConfig = {
+  firstClearExperience: number;
+  repeatClearExperience: number;
+};
+
+const DUNGEON_REWARD_CONFIGS: Record<(typeof DUNGEON_IDS)[number], DungeonRewardConfig> = {
+  [FIRST_DUNGEON_ID]: {
+    firstClearExperience: FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE,
+    repeatClearExperience: FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE,
+  },
+  [LABORATORY_DUNGEON_ID]: {
+    firstClearExperience: LABORATORY_FIRST_CLEAR_EXPERIENCE,
+    repeatClearExperience: LABORATORY_REPEAT_CLEAR_EXPERIENCE,
+  },
+};
+
+export function getDungeonRewardConfig(dungeonId: (typeof DUNGEON_IDS)[number]): DungeonRewardConfig {
+  return DUNGEON_REWARD_CONFIGS[dungeonId];
+}
+
 export function isDungeonId(dungeonId: string): dungeonId is (typeof DUNGEON_IDS)[number] {
   return (DUNGEON_IDS as readonly string[]).includes(dungeonId);
 }

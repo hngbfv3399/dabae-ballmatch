@@ -8,6 +8,7 @@ import {
   LABORATORY_FIRST_CLEAR_EXPERIENCE,
   LABORATORY_REPEAT_CLEAR_EXPERIENCE,
   DUNGEON_IDS,
+  getDungeonRewardConfig,
   MAX_CHARACTER_LEVEL,
   V3_CHARACTER_IDS,
   experienceRequiredForLevel,
@@ -163,6 +164,10 @@ export const getOverview = query({
     return {
       characters,
       laboratoryUnlockedCharacterIds,
+      dungeons: DUNGEON_IDS.map((dungeonId) => ({
+        dungeonId,
+        ...getDungeonRewardConfig(dungeonId),
+      })),
       dungeon: firstDungeon ?? {
         dungeonId: FIRST_DUNGEON_ID,
         isUnlocked: true,
