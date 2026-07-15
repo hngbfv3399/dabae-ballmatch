@@ -37,9 +37,11 @@ function experienceAtLevelStart(level: number): number {
 export function growthSummary(experience: number) {
   const level = levelForExperience(experience);
   const isMaxLevel = level === MAX_CHARACTER_LEVEL;
-  const healthMultiplier = 1 + 0.02 * (level - 1);
-  const attackMultiplier = 1 + 0.0125 * (level - 1);
-  const damageTakenMultiplier = 1 - Math.min(0.29, 0.01 * (level - 1));
+  // 5레벨 단위는 새 스킬을 해금하는 구간이므로, 스탯은 나머지 레벨에서만 상승한다.
+  const statGrowthSteps = Math.max(0, (level - 1) - Math.floor(level / 5));
+  const healthMultiplier = 1 + 0.02 * statGrowthSteps;
+  const attackMultiplier = 1 + 0.0125 * statGrowthSteps;
+  const damageTakenMultiplier = 1 - Math.min(0.29, 0.01 * statGrowthSteps);
   const experienceToNextLevel =
     isMaxLevel ? 0 : experienceRequiredForLevel(level);
 

@@ -269,12 +269,9 @@ function getLeveledDefensePercent(progress: PveProgress): number {
   return Math.round((1 - getLeveledDamageTakenMultiplier(progress)) * 100);
 }
 
-function getPermanentSkillGrowth(level: number) {
-  const durationMilestones = Math.floor(Math.min(level, 30) / 5);
-  return {
-    durationMultiplier: 1 + durationMilestones * 0.05,
-    extraCasts: level >= 15 ? 1 : 0,
-  };
+function getNextSkillUnlockLevel(level: number): number | null {
+  if (level >= 30) return null;
+  return Math.min(30, (Math.floor(level / 5) + 1) * 5);
 }
 
 function getExperienceLabel(progress: PveProgress): string {
@@ -296,9 +293,6 @@ function applyCharacterLevel(state: CharacterState) {
   state.hp = state.maxHp;
   state.attackPower = getLeveledAttack(state.attackPower, progress);
   state.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
-  const skillGrowth = getPermanentSkillGrowth(progress.level);
-  state.permanentSkillDurationMultiplier = skillGrowth.durationMultiplier;
-  state.permanentSkillEchoCount = skillGrowth.extraCasts;
   return state;
 }
 
@@ -2607,8 +2601,8 @@ function updatePveSelectionUI() {
   pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
   pveCharacterSelectAvatar.style.color = selected.color;
   pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
-  const skillGrowth = getPermanentSkillGrowth(progress.level);
-  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getLeveledDefensePercent(progress)}% · 스킬 지속 +${Math.round((skillGrowth.durationMultiplier - 1) * 100)}%${skillGrowth.extraCasts ? " · 추가 시전 +1" : ""} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
+  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getLeveledDefensePercent(progress)}% · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
   pveStartBtn.disabled = false;
 }
 
@@ -2631,8 +2625,8 @@ function renderPveCharacterList() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
-    const skillGrowth = getPermanentSkillGrowth(progress.level);
-    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getLeveledDefensePercent(progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>스킬 지속 +${Math.round((skillGrowth.durationMultiplier - 1) * 100)}%${skillGrowth.extraCasts ? " · 추가 시전 +1" : ""} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
+    const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getLeveledDefensePercent(progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
       pveCharacterModal.classList.add("hidden");
@@ -2690,9 +2684,6 @@ function startPveStage() {
   player.maxHp = getLeveledHp(character.maxHp, progress);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
   player.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
-  const skillGrowth = getPermanentSkillGrowth(progress.level);
-  player.permanentSkillDurationMultiplier = skillGrowth.durationMultiplier;
-  player.permanentSkillEchoCount = skillGrowth.extraCasts;
   applyPveRunModifierStats(player, pveRun.modifiers);
   player.hp = Math.min(player.maxHp, pveRun.currentHp);
   player.runShield = pveRun.currentShield;
