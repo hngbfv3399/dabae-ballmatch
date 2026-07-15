@@ -22,9 +22,15 @@ export const V3_CHARACTER_IDS = [
 ] as const;
 
 export const FIRST_DUNGEON_ID = "slime-meadow";
+export const LABORATORY_DUNGEON_ID = "collapsed-laboratory";
+export const DUNGEON_IDS = [FIRST_DUNGEON_ID, LABORATORY_DUNGEON_ID] as const;
 export const MAX_CHARACTER_LEVEL = 30;
 export const FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE = 450;
 export const FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE = 200;
+
+export function isDungeonId(dungeonId: string): dungeonId is (typeof DUNGEON_IDS)[number] {
+  return (DUNGEON_IDS as readonly string[]).includes(dungeonId);
+}
 
 export function isV3CharacterId(characterId: string): boolean {
   return (V3_CHARACTER_IDS as readonly string[]).includes(characterId);

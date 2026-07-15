@@ -2,7 +2,7 @@ import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { FIRST_DUNGEON_ID } from "./v3Constants";
+import { DUNGEON_IDS } from "./v3Constants";
 
 export const SEASON_DURATION_MS = 56 * 24 * 60 * 60 * 1000;
 const SEASON_EPOCH_MS = Date.parse("2026-07-13T00:00:00+09:00");
@@ -21,9 +21,11 @@ async function clearSeasonDataBatch(ctx: MutationCtx, seasonId: string) {
   const gachaHistory = await ctx.db.query("gachaDrawHistory").take(RESET_BATCH_SIZE);
   for (const entry of [...dungeonRecords, ...stageRecords, ...gachaStates, ...gachaHistory]) await ctx.db.delete(entry._id);
 
-  const firstDungeon = await ctx.db.query("dungeonProgress").withIndex("by_dungeonId", (q) => q.eq("dungeonId", FIRST_DUNGEON_ID)).unique();
-  if (firstDungeon) await ctx.db.replace(firstDungeon._id, { dungeonId: FIRST_DUNGEON_ID, isUnlocked: true, clearCount: 0 });
-  else await ctx.db.insert("dungeonProgress", { dungeonId: FIRST_DUNGEON_ID, isUnlocked: true, clearCount: 0 });
+  for (const dungeonId of DUNGEON_IDS) {
+    const dungeon = await ctx.db.query("dungeonProgress").withIndex("by_dungeonId", (q) => q.eq("dungeonId", dungeonId)).unique();
+    if (dungeon) await ctx.db.replace(dungeon._id, { dungeonId, isUnlocked: true, clearCount: 0 });
+    else await ctx.db.insert("dungeonProgress", { dungeonId, isUnlocked: true, clearCount: 0 });
+  }
 
   if (dungeonRecords.length === RESET_BATCH_SIZE || stageRecords.length === RESET_BATCH_SIZE || gachaStates.length === RESET_BATCH_SIZE || gachaHistory.length === RESET_BATCH_SIZE) {
     await ctx.scheduler.runAfter(0, internal.season.continueReset, { seasonId });

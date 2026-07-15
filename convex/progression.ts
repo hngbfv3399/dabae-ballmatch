@@ -4,10 +4,12 @@ import {
   FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE,
   FIRST_DUNGEON_ID,
   FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE,
+  DUNGEON_IDS,
   MAX_CHARACTER_LEVEL,
   V3_CHARACTER_IDS,
   experienceRequiredForLevel,
   isV3CharacterId,
+  isDungeonId,
   kstDate,
   levelForExperience,
 } from "./v3Constants";
@@ -23,8 +25,8 @@ function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) throw new Error("Unknown character ID");
 }
 
-function assertFirstDungeon(dungeonId: string): void {
-  if (dungeonId !== FIRST_DUNGEON_ID) throw new Error("Unknown or locked dungeon");
+function assertDungeon(dungeonId: string): void {
+  if (!isDungeonId(dungeonId)) throw new Error("Unknown or locked dungeon");
 }
 
 function experienceAtLevelStart(level: number): number {
@@ -87,19 +89,15 @@ export const ensureInitialState = mutation({
       }
     }
 
-    const firstDungeon = await ctx.db
-      .query("dungeonProgress")
-      .withIndex("by_dungeonId", (q) => q.eq("dungeonId", FIRST_DUNGEON_ID))
-      .unique();
-    if (!firstDungeon) {
-      await ctx.db.insert("dungeonProgress", {
-        dungeonId: FIRST_DUNGEON_ID,
-        isUnlocked: true,
-        clearCount: 0,
-      });
+    let createdDungeons = 0;
+    for (const dungeonId of DUNGEON_IDS) {
+      const dungeon = await ctx.db.query("dungeonProgress").withIndex("by_dungeonId", (q) => q.eq("dungeonId", dungeonId)).unique();
+      if (!dungeon) {
+        await ctx.db.insert("dungeonProgress", { dungeonId, isUnlocked: true, clearCount: 0 });
+        createdDungeons += 1;
+      }
     }
-
-    return { createdCharacters, dungeonCreated: !firstDungeon };
+    return { createdCharacters, createdDungeons };
   },
 });
 
@@ -223,7 +221,7 @@ export const recordDungeonStageClear = mutation({
   args: { characterId: v.string(), dungeonId: v.string(), stageNumber: v.number() },
   handler: async (ctx, args) => {
     assertCharacterId(args.characterId);
-    assertFirstDungeon(args.dungeonId);
+    assertDungeon(args.dungeonId);
     if (!Number.isInteger(args.stageNumber) || args.stageNumber < 1 || args.stageNumber > 5) {
       throw new Error("Invalid dungeon stage");
     }
@@ -276,7 +274,7 @@ export const recordDungeonClear = mutation({
   },
   handler: async (ctx, args) => {
     assertCharacterId(args.characterId);
-    assertFirstDungeon(args.dungeonId);
+    assertDungeon(args.dungeonId);
     if (!Number.isFinite(args.clearTimeMs) || args.clearTimeMs < MIN_DUNGEON_CLEAR_TIME_MS || args.clearTimeMs > MAX_DUNGEON_CLEAR_TIME_MS) {
       throw new Error("Invalid dungeon clear time");
     }

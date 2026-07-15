@@ -4,6 +4,7 @@ import type {
   BossDropDefinition,
   MapCutDefinition,
   CinematicRequest,
+  ProjectileDefinition,
 } from "../characters/character.interface";
 import { checkWallCollision, resolveCollision, limitMinSpeed } from "./physics";
 import { finalizeMatchResults } from "./matchResults";
@@ -28,6 +29,8 @@ interface FloatingText {
   color: string;
   life: number; // 0 ~ 1
 }
+
+interface Projectile extends ProjectileDefinition { sourceId: string; }
 
 interface RelicGem {
   x: number;
@@ -68,6 +71,7 @@ export class GameLounge {
   private characters: CharacterState[] = [];
   private particles: Particle[] = [];
   private floatingTexts: FloatingText[] = [];
+  private projectiles: Projectile[] = [];
   private activeCinematic: ActiveCinematic | null = null;
 
   private isRunning: boolean = false;
@@ -266,6 +270,9 @@ export class GameLounge {
       },
       startCinematic: (request) => {
         this.activeCinematic = { ...request, timeLeft: request.duration, totalDuration: request.duration };
+      },
+      spawnProjectile: (source, projectile) => {
+        this.projectiles.push({ ...projectile, sourceId: source.id });
       },
       arenaWidth: this.canvas.width,
       arenaHeight: this.canvas.height,
@@ -537,6 +544,7 @@ export class GameLounge {
     this.simulationSpeed = simulationSpeed;
     this.particles = [];
     this.floatingTexts = [];
+    this.projectiles = [];
     this.activeCinematic = null;
     this.prepTimer = 3.0;
     this.isPrepared = false;
@@ -1000,6 +1008,7 @@ export class GameLounge {
     this.updateTeamObjective(dt);
     this.updateBossDrops();
     this.updateMapCuts(dt);
+    this.updateProjectiles(dt);
 
     const context = this.getBehaviorContext();
 
@@ -1263,6 +1272,29 @@ export class GameLounge {
     }
 
     this.onUpdateHUD(this.characters);
+  }
+
+  /** 발사 후 방향을 바꾸지 않는 공용 투사체. 이동으로 피할 수 있는 PvE 공격에 사용한다. */
+  private updateProjectiles(dt: number) {
+    for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
+      const projectile = this.projectiles[index];
+      projectile.x += projectile.vx * dt;
+      projectile.y += projectile.vy * dt;
+      projectile.life -= dt;
+      const source = this.characters.find((character) => character.id === projectile.sourceId);
+      const target = source && this.characters.find((character) =>
+        !character.isDead && character.id !== source.id &&
+        (source.teamId === undefined || character.teamId === undefined || source.teamId !== character.teamId) &&
+        Math.hypot(character.x - projectile.x, character.y - projectile.y) <= character.radius + projectile.radius,
+      );
+      if (source && target) {
+        this.dealDamage(source, target, projectile.damage, projectile.label ?? "투사체");
+        this.createExplosion(projectile.x, projectile.y, projectile.color, 8);
+        this.projectiles.splice(index, 1);
+      } else if (projectile.life <= 0 || projectile.x < -projectile.radius || projectile.x > this.canvas.width + projectile.radius || projectile.y < -projectile.radius || projectile.y > this.canvas.height + projectile.radius) {
+        this.projectiles.splice(index, 1);
+      }
+    }
   }
 
   /**
@@ -1817,6 +1849,17 @@ export class GameLounge {
       this.ctx.strokeStyle = drop.color; this.ctx.lineWidth = 3; this.ctx.beginPath(); this.ctx.arc(drop.x, drop.y, 20, 0, Math.PI * 2); this.ctx.stroke();
       this.ctx.shadowBlur = 0; this.ctx.fillStyle = '#fff'; this.ctx.font = 'bold 20px Orbit'; this.ctx.textAlign = 'center'; this.ctx.fillText(drop.icon, drop.x, drop.y + 7);
       this.ctx.font = 'bold 11px Orbit'; this.ctx.fillStyle = drop.color; this.ctx.fillText(`${drop.name} · 전체 적용`, drop.x, drop.y - 31); this.ctx.restore();
+    });
+
+    this.projectiles.forEach((projectile) => {
+      this.ctx.save();
+      this.ctx.fillStyle = projectile.color;
+      this.ctx.shadowColor = projectile.color;
+      this.ctx.shadowBlur = 14;
+      this.ctx.beginPath();
+      this.ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
     });
 
     // 보스전에서는 제한시간 HUD를 표시하지 않는다.

@@ -92,11 +92,11 @@
 
         <section id="pve-command-panel" class="pve-command-panel">
           <div class="pve-command-copy">
-            <span class="eyebrow">DUNGEON · 01</span>
-            <h2>초원의 슬라임 소굴</h2>
-            <p>각 스테이지를 클리어하면 즉시 경험치를 획득합니다. 가챠 진행도는 던전 1-1부터 1-5까지 완주할 때만 증가합니다.</p>
+            <span class="eyebrow" id="pve-dungeon-number">DUNGEON · 01</span>
+            <h2 id="pve-dungeon-name">초원의 슬라임 소굴</h2>
+            <p id="pve-dungeon-description">각 스테이지를 클리어하면 즉시 경험치를 획득합니다. 가챠 진행도는 던전 1-1부터 1-5까지 완주할 때만 증가합니다.</p>
           </div>
-          <label class="compact-setting">시작 스테이지<select id="pve-stage-select"><option value="1">1 스테이지 · 슬라임 초원</option><option value="2" disabled>2 스테이지 · 잠김</option><option value="3" disabled>3 스테이지 · 잠김</option><option value="4" disabled>4 스테이지 · 잠김</option><option value="5" disabled>5 스테이지 · 잠김</option></select></label>
+          <label class="compact-setting">던전 선택<select id="pve-dungeon-select"><option value="slime-meadow">던전 01 · 초원의 슬라임 소굴</option><option value="collapsed-laboratory">던전 02 · 붕괴한 연구소</option></select></label>
           <button id="pve-character-select-btn" class="pve-character-select" type="button">
             <span id="pve-character-select-avatar">?</span>
             <span><strong id="pve-character-select-name">캐릭터 선택</strong><small id="pve-character-select-stats">선택 후 레벨과 능력치를 확인합니다.</small></span>

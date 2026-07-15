@@ -53,6 +53,18 @@ export interface CinematicRequest {
   lightDuration?: number;
 }
 
+export interface ProjectileDefinition {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  damage: number;
+  color: string;
+  life: number;
+  label?: string;
+}
+
 export interface CharacterBehaviorContext {
   characters: CharacterState[];
   createParticle: (x: number, y: number, color: string, size?: number, life?: number) => void;
@@ -66,6 +78,7 @@ export interface CharacterBehaviorContext {
   spawnBossDrop: (drop: BossDropDefinition) => void;
   spawnMapCut: (source: CharacterState, cut: MapCutDefinition) => void;
   startCinematic: (request: CinematicRequest) => void;
+  spawnProjectile: (source: CharacterState, projectile: ProjectileDefinition) => void;
   arenaWidth: number;
   arenaHeight: number;
   logMessage?: (msg: string, type: string) => void;
