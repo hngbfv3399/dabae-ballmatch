@@ -508,11 +508,11 @@ function getCeremonyBackgroundPreviewMarkup(animation: VictoryAnimation): string
   return `<div class="ceremony-background-preview ceremony-scene ceremony-scene-${animation}" aria-hidden="true"><i></i><i></i><i></i></div>`;
 }
 
-const SPECIAL_EVENT_RENDERERS: Record<VictorySpecialEvent["effect"], { modalClass: string; getOverlayMarkup: () => string; getPreviewMarkup: () => string }> = {
+const SPECIAL_EVENT_RENDERERS: Record<VictorySpecialEvent["effect"], { modalClass: string; getOverlayMarkup: (playerMarkup?: string) => string; getPreviewMarkup: () => string }> = {
   sniper: {
     modalClass: "victory-special-sniper-active",
-    getOverlayMarkup: () => `<div class="victory-special-overlay victory-special-overlay-sniper" aria-hidden="true"><i></i><i></i><i></i><b>+</b></div>`,
-    getPreviewMarkup: () => `<div class="special-event-preview special-event-preview-sniper" aria-hidden="true"><b>+</b><span>1.3s 후 격발 · 모달 전체 균열</span></div>`,
+    getOverlayMarkup: (playerMarkup = "<b>SU</b>") => `<div class="victory-special-overlay victory-special-overlay-sniper" aria-hidden="true"><span class="special-sniper-afterimage"></span><span class="special-sniper-shooter">${playerMarkup}</span><span class="special-sniper-rifle"><i></i></span><span class="special-sniper-muzzle"></span><b>+</b></div>`,
+    getPreviewMarkup: () => `<div class="special-event-preview special-event-preview-sniper" aria-hidden="true"><span class="special-preview-shooter">SU</span><span class="special-preview-rifle"></span><b>+</b><span>등장 → 조준 → 반동 → 잔상 소멸</span></div>`,
   },
 };
 
@@ -527,7 +527,7 @@ function openSuCeremonyPreview(): void {
   if (!renderer) return;
   winnerModal.classList.add(renderer.modalClass);
   if (winnerTitle) winnerTitle.textContent = "SU · ONE SHOT";
-  winnerInfo.innerHTML = `${renderer.getOverlayMarkup()}<div class="winner-ceremony-card has-ceremony ceremony-sniper" style="width:100%; border:1px solid #e2e8f940;"><div class="winner-ceremony-rank">🥇 수 전용 세레모니 테스트</div><div class="winner-ceremony-main">${getCeremonySceneMarkup(null, "sniper", "preview", getVictoryPlayerMarkup({ id: "su", name: "수" }))}<div class="winner-ceremony-identity"><strong style="color:#e2e8f0">수</strong><span>원 샷 · 검은 조준선</span></div></div></div><p class="win-desc">약 1.3초 후 조준선이 격발되고, 승리 모달 전체에 검은 균열 유리가 나타났다가 사라집니다.</p>`;
+  winnerInfo.innerHTML = `${renderer.getOverlayMarkup(getVictoryPlayerMarkup({ id: "su", name: "수" }))}<div class="winner-ceremony-card has-ceremony ceremony-sniper" style="width:100%; border:1px solid #e2e8f940;"><div class="winner-ceremony-rank">🥇 수 전용 세레모니 테스트</div><div class="winner-ceremony-main">${getCeremonySceneMarkup(null, "sniper", "preview", getVictoryPlayerMarkup({ id: "su", name: "수" }))}<div class="winner-ceremony-identity"><strong style="color:#e2e8f0">수</strong><span>원 샷 · 검은 조준선</span></div></div></div><p class="win-desc">아래에서 등장 → 총을 조준 → 발사 반동 → 총을 내리고 잔상이 사라집니다.</p>`;
   modalCloseBtn.textContent = "미리보기 닫기";
   winnerModal.classList.remove("hidden");
 }
@@ -2303,7 +2303,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   ].filter(Boolean).map((item) => `<div class="battle-highlight">${item}</div>`).join('');
 
   let html = `
-    ${specialEventRenderer?.getOverlayMarkup() ?? ""}
+    ${specialEventRenderer?.getOverlayMarkup(getVictoryPlayerMarkup(firstPlace)) ?? ""}
     ${modeWinnerBanner}
     <!-- First-place result / equipped victory background -->
     <div class="winner-ceremony-card ${hasVictoryCeremony ? `has-ceremony ceremony-${ceremonyAnimation}` : "no-ceremony"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
