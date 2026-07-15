@@ -2163,14 +2163,15 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   let html = `
     ${modeWinnerBanner}
     <!-- First-place victory ceremony -->
-    <div class="mvp-spotlight-card winner-ceremony-card ceremony-${equippedCeremony?.animation ?? "wave"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
-      <div class="mvp-badge" style="background: ${firstPlace.color}; color: #000; box-shadow: 0 0 10px ${firstPlace.color}80;">🥇 1ST PLACE</div>
-      <div class="winner-ceremony-effects" aria-hidden="true"><span>${getCeremonyEmoji(equippedCeremony?.animation ?? "wave")}</span><i></i><i></i><i></i></div>
-      <div class="mvp-avatar-container winner-ceremony-avatar">
-        ${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}
+    <div class="winner-ceremony-card ceremony-${equippedCeremony?.animation ?? "wave"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
+      <div class="winner-ceremony-rank">🥇 1위 · VICTORY CEREMONY</div>
+      <div class="winner-ceremony-main">
+        <div class="winner-ceremony-avatar">
+          ${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}
+        </div>
+        <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong><span>${equippedCeremony?.name ?? "챔피언 인사"}</span></div>
+        <div class="winner-ceremony-action" aria-label="${equippedCeremony?.name ?? "챔피언 인사"}">${getCeremonyEmoji(equippedCeremony?.animation ?? "wave")}</div>
       </div>
-      <div class="mvp-name" style="color: ${firstPlace.color}">${firstPlace.name}</div>
-      <div class="winner-ceremony-name">${equippedCeremony?.name ?? "챔피언 인사"}</div>
       <div class="mvp-stats-grid">
         <div class="mvp-stat-box">
           <div class="mvp-stat-label">⚔️ 처치</div>
