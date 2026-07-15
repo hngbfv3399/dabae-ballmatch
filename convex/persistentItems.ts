@@ -214,38 +214,46 @@ export const claimAvailableItemTickets = mutation({
       }
     }
 
-    let availableTickets = 0;
-    if (newTickets > 0) {
-      const balanceDoc = await ctx.db
-        .query("itemTicketBalances")
-        .withIndex("by_clientId_and_characterId", (q) =>
-          q.eq("clientId", args.clientId).eq("characterId", args.characterId)
-        )
-        .unique();
+    const balanceDoc = await ctx.db
+      .query("itemTicketBalances")
+      .withIndex("by_clientId_and_characterId", (q) =>
+        q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+      )
+      .unique();
 
-      if (balanceDoc) {
-        availableTickets = balanceDoc.availableTickets + newTickets;
+    let availableTickets = 0;
+    if (balanceDoc) {
+      availableTickets = balanceDoc.availableTickets + newTickets;
+      if (newTickets > 0) {
         await ctx.db.patch(balanceDoc._id, {
-          availableTickets,
-          updatedAt: now,
-        });
-      } else {
-        availableTickets = newTickets;
-        await ctx.db.insert("itemTicketBalances", {
-          clientId: args.clientId,
-          characterId: args.characterId,
           availableTickets,
           updatedAt: now,
         });
       }
     } else {
-      const balanceDoc = await ctx.db
-        .query("itemTicketBalances")
+      // Self-healing migration: count existing claims and unlocks to restore balance
+      const claims = await ctx.db
+        .query("itemTicketClaims")
         .withIndex("by_clientId_and_characterId", (q) =>
           q.eq("clientId", args.clientId).eq("characterId", args.characterId)
         )
-        .unique();
-      availableTickets = balanceDoc?.availableTickets ?? 0;
+        .collect();
+      const unlocks = await ctx.db
+        .query("persistentItemUnlocks")
+        .withIndex("by_clientId_and_characterId", (q) =>
+          q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+        )
+        .collect();
+
+      const migratedTickets = Math.max(0, claims.length - newTickets - unlocks.length);
+      availableTickets = migratedTickets + newTickets;
+
+      await ctx.db.insert("itemTicketBalances", {
+        clientId: args.clientId,
+        characterId: args.characterId,
+        availableTickets,
+        updatedAt: now,
+      });
     }
 
     return {
@@ -500,10 +508,12 @@ export const getPersistentItemSummary = query({
       .query("persistentItemUnlocks")
       .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
       .take(500);
-    const unlocks = unlocksDocs.map((u) => ({
-      characterId: u.characterId,
-      itemId: u.itemId,
-    }));
+        const unlocks = unlocksDocs
+      .filter((u) => u.characterId !== undefined)
+      .map((u) => ({
+        characterId: u.characterId,
+        itemId: u.itemId,
+      }));
 
     const loadouts = await ctx.db
       .query("characterItemLoadouts")
@@ -514,10 +524,12 @@ export const getPersistentItemSummary = query({
       .query("itemTicketBalances")
       .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
       .take(100);
-    const ticketBalances = balancesDocs.map((b) => ({
-      characterId: b.characterId,
-      availableTickets: b.availableTickets,
-    }));
+    const ticketBalances = balancesDocs
+      .filter((b) => b.characterId !== undefined)
+      .map((b) => ({
+        characterId: b.characterId,
+        availableTickets: b.availableTickets,
+      }));
 
     return {
       catalog,
