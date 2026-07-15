@@ -2404,6 +2404,16 @@ body {
 .item-catalog-card.unlocked .item-catalog-header strong {
   color: var(--neon-cyan);
 }
+.item-catalog-card.rarity-common { border-color: rgba(213, 217, 232, 0.25); }
+.item-catalog-card.rarity-rare { border-color: rgba(96, 165, 250, 0.48); }
+.item-catalog-card.rarity-epic { border-color: rgba(192, 132, 252, 0.55); box-shadow: inset 0 0 18px rgba(192, 132, 252, 0.08); }
+.item-catalog-card.rarity-legendary { border-color: rgba(251, 191, 36, 0.62); box-shadow: inset 0 0 18px rgba(251, 191, 36, 0.08); }
+.item-catalog-card.rarity-unique { border-color: rgba(244, 114, 182, 0.7); box-shadow: inset 0 0 22px rgba(244, 114, 182, 0.12); }
+.persistent-item-reveal-name.rarity-common { color: #d5d9e8; }
+.persistent-item-reveal-name.rarity-rare { color: #60a5fa; }
+.persistent-item-reveal-name.rarity-epic { color: #c084fc; }
+.persistent-item-reveal-name.rarity-legendary { color: #fbbf24; }
+.persistent-item-reveal-name.rarity-unique { color: #f472b6; }
 .item-catalog-rarity-badge {
   font-size: 0.65rem;
   padding: 0.1rem 0.3rem;
@@ -2460,4 +2470,3 @@ body {
   .item-slots-grid { grid-template-columns: 1fr; }
   .item-catalog-grid { grid-template-columns: 1fr; }
 }
-

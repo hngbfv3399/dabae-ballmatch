@@ -2,6 +2,14 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { isV3CharacterId } from "./v3Constants";
 
+const RARITY_DRAW_WEIGHTS = {
+  common: 50,
+  rare: 30,
+  epic: 14,
+  legendary: 5,
+  unique: 1,
+} as const;
+
 const SEED_ITEMS = [
   {
     itemId: "inertial_bearing",
@@ -13,6 +21,8 @@ const SEED_ITEMS = [
       speedMultiplier: 1.08,
     },
   },
+  { itemId: "tempered_core", name: "단련 코어", description: "공격력 +7%", rarity: "common" as const, isActive: true, effects: { attackMultiplier: 1.07 } },
+  { itemId: "quick_charge_cell", name: "급속 충전 셀", description: "스킬 충전 속도 +10%", rarity: "common" as const, isActive: true, effects: { skillChargeRateMultiplier: 1.1 } },
   {
     itemId: "reinforced_shell",
     name: "강화 외피",
@@ -43,6 +53,21 @@ const SEED_ITEMS = [
       maxHpMultiplier: 1.08,
     },
   },
+  { itemId: "carbon_plating", name: "카본 장갑판", description: "받는 피해 -6%", rarity: "common" as const, isActive: true, effects: { damageReductionMultiplier: 0.94 } },
+  { itemId: "longshot_scope", name: "롱샷 스코프", description: "기본 공격 사거리 +30px", rarity: "rare" as const, isActive: true, effects: { baseAttackRangeBonus: 30 } },
+  { itemId: "vital_reactor", name: "생명 반응로", description: "최대 체력 +14%", rarity: "rare" as const, isActive: true, effects: { maxHpMultiplier: 1.14 } },
+  { itemId: "turbo_servo", name: "터보 서보", description: "이동 속도 +14%", rarity: "rare" as const, isActive: true, effects: { speedMultiplier: 1.14 } },
+  { itemId: "titanium_guard", name: "티타늄 가드", description: "최대 DEF 보호막 +24", rarity: "rare" as const, isActive: true, effects: { defenseShieldBonus: 24 } },
+  { itemId: "amplifier_chip", name: "증폭 칩", description: "공격력 +13%", rarity: "rare" as const, isActive: true, effects: { attackMultiplier: 1.13 } },
+  { itemId: "adaptive_mesh", name: "적응형 메시", description: "받는 피해 -11%", rarity: "rare" as const, isActive: true, effects: { damageReductionMultiplier: 0.89 } },
+  { itemId: "orbiting_shard", name: "궤도 파편", description: "주변 82px 궤도 링이 1.4초마다 적에게 9 피해", rarity: "epic" as const, isActive: true, effects: { orbitDamage: 9, orbitRadius: 82, orbitInterval: 1.4 } },
+  { itemId: "resonance_emitter", name: "공명 방출기", description: "주변 116px에 3초마다 충격파 16 피해", rarity: "epic" as const, isActive: true, effects: { pulseDamage: 16, pulseRadius: 116, pulseInterval: 3 } },
+  { itemId: "overclock_matrix", name: "오버클록 매트릭스", description: "공격력 +18%, 스킬 충전 속도 +18%", rarity: "epic" as const, isActive: true, effects: { attackMultiplier: 1.18, skillChargeRateMultiplier: 1.18 } },
+  { itemId: "fortress_heart", name: "요새의 심장", description: "최대 체력 +18%, 최대 DEF 보호막 +20", rarity: "epic" as const, isActive: true, effects: { maxHpMultiplier: 1.18, defenseShieldBonus: 20 } },
+  { itemId: "nova_ring", name: "노바 링", description: "주변 104px 궤도 링이 1초마다 적에게 16 피해", rarity: "legendary" as const, isActive: true, effects: { orbitDamage: 16, orbitRadius: 104, orbitInterval: 1 } },
+  { itemId: "aegis_protocol", name: "이지스 프로토콜", description: "최대 DEF 보호막 +38, 받는 피해 -15%", rarity: "legendary" as const, isActive: true, effects: { defenseShieldBonus: 38, damageReductionMultiplier: 0.85 } },
+  { itemId: "apex_drive", name: "에이펙스 드라이브", description: "공격력 +22%, 이동 속도 +16%", rarity: "legendary" as const, isActive: true, effects: { attackMultiplier: 1.22, speedMultiplier: 1.16 } },
+  { itemId: "singularity_engine", name: "특이점 엔진", description: "주변 132px에 2.4초마다 충격파 28 피해, 스킬 충전 속도 +25%", rarity: "unique" as const, isActive: true, effects: { pulseDamage: 28, pulseRadius: 132, pulseInterval: 2.4, skillChargeRateMultiplier: 1.25 } },
 ];
 
 const MILESTONES = [5, 10, 15, 20, 25, 30] as const;
@@ -51,6 +76,16 @@ function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) {
     throw new Error("Unknown character ID");
   }
+}
+
+function pickWeightedLockedItem<T extends { rarity: keyof typeof RARITY_DRAW_WEIGHTS }>(items: T[]): T {
+  const totalWeight = items.reduce((total, item) => total + RARITY_DRAW_WEIGHTS[item.rarity], 0);
+  let roll = Math.random() * totalWeight;
+  for (const item of items) {
+    roll -= RARITY_DRAW_WEIGHTS[item.rarity];
+    if (roll < 0) return item;
+  }
+  return items[items.length - 1];
 }
 
 // 1. Seed / ensure catalog items
@@ -96,7 +131,7 @@ export const listPersistentItemCatalog = query({
   handler: async (ctx, args) => {
     const activeCatalog = await ctx.db
       .query("persistentItemCatalog")
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .withIndex("by_isActive", (q) => q.eq("isActive", true))
       .take(100);
 
     const unlocks = await ctx.db
@@ -289,7 +324,7 @@ export const drawPersistentItem = mutation({
     // Get catalog and unlocks
     const activeCatalog = await ctx.db
       .query("persistentItemCatalog")
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .withIndex("by_isActive", (q) => q.eq("isActive", true))
       .take(100);
 
     const unlocks = await ctx.db
@@ -310,9 +345,8 @@ export const drawPersistentItem = mutation({
       };
     }
 
-    // Draw one random locked item
-    const drawIndex = Math.floor(Math.random() * lockedItems.length);
-    const drawnItem = lockedItems[drawIndex];
+    // 등급 확률은 남은 아이템만 대상으로 계산한다. 이미 보유한 아이템은 재추첨 대상이 아니다.
+    const drawnItem = pickWeightedLockedItem(lockedItems);
 
     // Create unlock
     await ctx.db.insert("persistentItemUnlocks", {
@@ -501,7 +535,7 @@ export const getPersistentItemSummary = query({
 
     const catalog = await ctx.db
       .query("persistentItemCatalog")
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .withIndex("by_isActive", (q) => q.eq("isActive", true))
       .take(100);
 
     const unlocksDocs = await ctx.db

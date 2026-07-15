@@ -1037,6 +1037,7 @@ export class GameLounge {
       }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
       char.onUpdate?.(char, dt, context);
+      this.updatePersistentItemCombatEffects(char, dt, context);
       if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
       this.updateKnockbackInertia(char, dt);
 
@@ -1414,6 +1415,8 @@ export class GameLounge {
       }
     }
 
+    finalDamage *= target.persistentItemDamageReductionMultiplier ?? 1;
+
     // 방어력은 피해 감소율이 아닌 HP 앞의 정수 보호막이다.
     // 체력, 전적, 콘솔 로그, 플로팅 텍스트가 같은 값을 사용하도록 이 지점에서 한 번만 반올림한다.
     finalDamage = Math.round(finalDamage);
@@ -1548,6 +1551,38 @@ export class GameLounge {
         color: "#ff0000",
         life: 1.5,
       });
+    }
+  }
+
+  /** 영구 아이템 전투 효과는 캐릭터 ID와 무관한 공통 엔진 규칙으로 처리한다. */
+  private updatePersistentItemCombatEffects(
+    char: CharacterState,
+    dt: number,
+    context: CharacterBehaviorContext,
+  ) {
+    if (char.isDead) return;
+    const enemies = this.characters.filter((target) =>
+      !target.isDead && target.id !== char.id && (char.teamId === undefined || target.teamId === undefined || char.teamId !== target.teamId),
+    );
+
+    if (char.persistentItemOrbitDamage && char.persistentItemOrbitRadius && char.persistentItemOrbitInterval) {
+      char.persistentItemOrbitTimer = (char.persistentItemOrbitTimer ?? 0) - dt;
+      if (char.persistentItemOrbitTimer <= 0) {
+        const targets = enemies.filter((target) => Math.hypot(target.x - char.x, target.y - char.y) <= char.persistentItemOrbitRadius! + target.radius);
+        targets.forEach((target) => context.dealDamage(char, target, char.persistentItemOrbitDamage!, "궤도 링"));
+        if (targets.length > 0) context.createExplosion(char.x, char.y, "#a78bfa", 5);
+        char.persistentItemOrbitTimer = char.persistentItemOrbitInterval;
+      }
+    }
+
+    if (char.persistentItemPulseDamage && char.persistentItemPulseRadius && char.persistentItemPulseInterval) {
+      char.persistentItemPulseTimer = (char.persistentItemPulseTimer ?? char.persistentItemPulseInterval) - dt;
+      if (char.persistentItemPulseTimer <= 0) {
+        const targets = enemies.filter((target) => Math.hypot(target.x - char.x, target.y - char.y) <= char.persistentItemPulseRadius! + target.radius);
+        targets.forEach((target) => context.dealDamage(char, target, char.persistentItemPulseDamage!, "충격파"));
+        context.createExplosion(char.x, char.y, "#fbbf24", 10);
+        char.persistentItemPulseTimer = char.persistentItemPulseInterval;
+      }
     }
   }
 
@@ -2054,6 +2089,7 @@ export class GameLounge {
 
       // 캐릭터 고유 렌더링 확장 훅 위임 (코딩진행바, 기절별 등)
       char.onRenderExtra?.(char, this.ctx, currentRadius);
+      this.renderPersistentItemCombatEffects(char);
       this.renderStatusEffects(char, currentRadius);
 
       // 2-B. 팀전/보스전 소속 머리 위 텍스트 라벨 렌더링
@@ -2263,6 +2299,32 @@ export class GameLounge {
     this.ctx.restore();
 
     this.ctx.restore(); // 전체 흔들림 복구
+  }
+
+  private renderPersistentItemCombatEffects(char: CharacterState) {
+    const orbitRadius = char.persistentItemOrbitRadius;
+    if (orbitRadius) {
+      this.ctx.save();
+      this.ctx.strokeStyle = "rgba(167, 139, 250, 0.68)";
+      this.ctx.lineWidth = 2;
+      this.ctx.setLineDash([5, 6]);
+      this.ctx.lineDashOffset = -performance.now() / 25;
+      this.ctx.beginPath();
+      this.ctx.arc(char.x, char.y, orbitRadius, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+      this.ctx.restore();
+    }
+    const pulseRadius = char.persistentItemPulseRadius;
+    if (pulseRadius) {
+      this.ctx.save();
+      this.ctx.strokeStyle = "rgba(251, 191, 36, 0.32)";
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.arc(char.x, char.y, pulseRadius, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
   }
 
   private renderCinematic() {

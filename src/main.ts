@@ -834,9 +834,9 @@ async function drawPersistentItemUI() {
       const tickets = persistentItemTicketBalances.get(managedCharacterId) ?? 0;
       gachaRevealContent.innerHTML = `
         <div class="gacha-reveal revealed" style="--skin-border:var(--neon-cyan);--skin-fill:#121225;--skin-text:#fff;--skin-glow:var(--neon-cyan)">
-          <span class="eyebrow rarity-epic">PLAYER ITEM DRAW</span>
+          <span class="eyebrow rarity-${item.rarity}">${item.rarity.toUpperCase()} · PLAYER ITEM DRAW</span>
           <div style="font-size:3rem; margin:1rem 0;">🎁</div>
-          <h2 style="color:var(--neon-cyan);">${item.name}</h2>
+          <h2 class="persistent-item-reveal-name rarity-${item.rarity}">${item.name}</h2>
           <p>새 영구 전투 아이템을 획득했습니다!</p>
           <div class="gacha-reveal-effect" style="margin: 1rem 0; padding: 0.8rem; background: rgba(0,242,254,0.05); border: 1px solid rgba(0,242,254,0.1); border-radius:8px; font-size:0.85rem;">
             <strong>효과:</strong> ${item.description}
@@ -3377,7 +3377,7 @@ function renderManagedCharacter() {
       <div>
         <span class="eyebrow">PERMANENT PLAYER ITEMS</span>
         <strong>영구 전투 아이템</strong>
-        <p>전투 보조 영구 아이템을 획득하고 장착하여 능력치 보정을 받으세요.</p>
+        <p>등급별 확률 뽑기로 획득한 영구 아이템을 최대 3개까지 장착하세요. 능력치와 전투형 효과는 PvE·PvP에 모두 적용됩니다.</p>
       </div>
       <div class="draw-ticket-panel">
         <div class="draw-ticket-info">
@@ -3512,13 +3512,20 @@ function renderManagedCharacter() {
   const equippedIds = new Set(getEquippedPersistentItemIds(loadout));
 
   let unlockedCount = 0;
+  const rarityLabels: Record<CatalogItem["rarity"], string> = {
+    common: "일반",
+    rare: "레어",
+    epic: "에픽",
+    legendary: "레전더리",
+    unique: "유니크",
+  };
   persistentItemCatalog.forEach((item) => {
     const isUnlocked = persistentItemUnlocks.has(`${character.id}:${item.itemId}`);
     if (!isUnlocked) return;
     unlockedCount++;
 
     const card = document.createElement("div");
-    card.className = `item-catalog-card unlocked`;
+    card.className = `item-catalog-card unlocked rarity-${item.rarity}`;
     
     let actionBtnHtml = "";
     if (equippedIds.has(item.itemId)) {
@@ -3532,7 +3539,7 @@ function renderManagedCharacter() {
     card.innerHTML = `
       <div class="item-catalog-header">
         <strong>${item.name}</strong>
-        <span class="item-catalog-rarity-badge">보유</span>
+        <span class="item-catalog-rarity-badge rarity-${item.rarity}">${rarityLabels[item.rarity]} · 보유</span>
       </div>
       <p class="item-catalog-desc">${item.description}</p>
       <div class="item-catalog-btn-group">

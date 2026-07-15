@@ -287,10 +287,21 @@ export default defineSchema({
     effects: v.object({
       maxHpMultiplier: v.optional(v.number()),
       speedMultiplier: v.optional(v.number()),
+      attackMultiplier: v.optional(v.number()),
       baseAttackRangeBonus: v.optional(v.number()),
       defenseShieldBonus: v.optional(v.number()),
+      damageReductionMultiplier: v.optional(v.number()),
+      skillChargeRateMultiplier: v.optional(v.number()),
+      orbitDamage: v.optional(v.number()),
+      orbitRadius: v.optional(v.number()),
+      orbitInterval: v.optional(v.number()),
+      pulseDamage: v.optional(v.number()),
+      pulseRadius: v.optional(v.number()),
+      pulseInterval: v.optional(v.number()),
     }),
-  }).index("by_itemId", ["itemId"]),
+  })
+    .index("by_itemId", ["itemId"])
+    .index("by_isActive", ["isActive"]),
 
   // 플레이어가 해금한 아이템 목록
   persistentItemUnlocks: defineTable({
@@ -346,4 +357,3 @@ export default defineSchema({
     .index("by_clientId_and_createdAt", ["clientId", "createdAt"])
     .index("by_clientId_and_characterId_and_createdAt", ["clientId", "characterId", "createdAt"]),
 });
-

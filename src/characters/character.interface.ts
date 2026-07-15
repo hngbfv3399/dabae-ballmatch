@@ -195,6 +195,16 @@ export interface CharacterState extends CharacterConfig {
   raidSpeedMultiplier?: number;
   raidBuffTimeLeft?: number;
   raidImmunityTimeLeft?: number;
+  // 영구 아이템의 공통 전투 효과. 캐릭터별 분기 없이 엔진에서 처리한다.
+  persistentItemDamageReductionMultiplier?: number;
+  persistentItemOrbitDamage?: number;
+  persistentItemOrbitRadius?: number;
+  persistentItemOrbitInterval?: number;
+  persistentItemOrbitTimer?: number;
+  persistentItemPulseDamage?: number;
+  persistentItemPulseRadius?: number;
+  persistentItemPulseInterval?: number;
+  persistentItemPulseTimer?: number;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀
