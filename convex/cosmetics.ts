@@ -38,6 +38,16 @@ type VictoryBackgroundDefinition = {
   animation: VictoryCeremonyAnimation;
 };
 
+// 승리 모달 전체를 덮는 연출은 무대 배경과 분리한다. effect 값을 추가하면 프론트 렌더러에서 확장한다.
+type VictorySpecialEventEffect = "sniper";
+type VictorySpecialEventDefinition = {
+  specialEventId: string;
+  name: string;
+  characterId?: string;
+  rarity: Rarity;
+  effect: VictorySpecialEventEffect;
+};
+
 const INITIAL_COSMETICS: readonly CosmeticDefinition[] = [
   { cosmeticId: "palette-ruby", name: "루비", rarity: "common", style: { textColor: "#fff1f2", borderColor: "#ef4444", fillColor: "#7f1d1d", glowColor: "#ef4444", borderAnimation: "none", trail: "none" } },
   { cosmeticId: "palette-cobalt", name: "코발트", rarity: "common", style: { textColor: "#eff6ff", borderColor: "#2563eb", fillColor: "#172554", glowColor: "#2563eb", borderAnimation: "none", trail: "none" } },
@@ -82,7 +92,10 @@ const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
   { backgroundId: "background-neon-rhythm", name: "네온 리듬", rarity: "epic", animation: "dance" },
   { backgroundId: "background-champion-gold", name: "챔피언 골드", rarity: "legendary", animation: "trophy" },
   { backgroundId: "background-fireworks-festival", name: "불꽃 축제", rarity: "unique", animation: "fireworks" },
-  { backgroundId: "background-su-crosshair", name: "검은 조준선", characterId: "su", rarity: "unique", animation: "sniper" },
+];
+
+const INITIAL_VICTORY_SPECIAL_EVENTS: readonly VictorySpecialEventDefinition[] = [
+  { specialEventId: "event-su-one-shot", name: "검은 조준선", characterId: "su", rarity: "unique", effect: "sniper" },
 ];
 
 const LEGACY_CEREMONY_PART_IDS: Record<string, { actionId: string; backgroundId: string }> = {
@@ -185,6 +198,33 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
         created += 1;
       }
     }
+    for (const specialEvent of INITIAL_VICTORY_SPECIAL_EVENTS) {
+      const existing = await ctx.db
+        .query("victorySpecialEvents")
+        .withIndex("by_specialEventId", (q) => q.eq("specialEventId", specialEvent.specialEventId))
+        .unique();
+      if (!existing) {
+        await ctx.db.insert("victorySpecialEvents", { ...specialEvent, isActive: true, createdAt: now });
+        created += 1;
+      }
+    }
+    // v3.2.2에서 배경으로 저장된 수 조준선은 특수 이벤트로 이전한다.
+    const legacySniperBackground = await ctx.db
+      .query("victoryBackgrounds")
+      .withIndex("by_backgroundId", (q) => q.eq("backgroundId", "background-su-crosshair"))
+      .unique();
+    if (legacySniperBackground?.isActive) await ctx.db.patch(legacySniperBackground._id, { isActive: false });
+    const legacySniperUnlock = await ctx.db
+      .query("victoryBackgroundUnlocks")
+      .withIndex("by_backgroundId", (q) => q.eq("backgroundId", "background-su-crosshair"))
+      .unique();
+    if (legacySniperUnlock) {
+      const specialUnlock = await ctx.db
+        .query("victorySpecialEventUnlocks")
+        .withIndex("by_specialEventId", (q) => q.eq("specialEventId", "event-su-one-shot"))
+        .unique();
+      if (!specialUnlock) await ctx.db.insert("victorySpecialEventUnlocks", { specialEventId: "event-su-one-shot", unlockedAt: legacySniperUnlock.unlockedAt, unlockedByClientId: legacySniperUnlock.unlockedByClientId });
+    }
     // 기존 통합 세레모니를 이미 획득한 경우, 대응하는 행동과 배경을 모두 보존한다.
     const legacyUnlocks = await ctx.db.query("victoryCeremonyUnlocks").take(50);
     for (const legacyUnlock of legacyUnlocks) {
@@ -199,7 +239,18 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
     const partLoadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
     const legacyPartIds = legacyLoadout ? LEGACY_CEREMONY_PART_IDS[legacyLoadout.ceremonyId] : undefined;
     if (!partLoadout && legacyPartIds) await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", ...legacyPartIds, updatedAt: now, updatedByClientId: legacyLoadout?.updatedByClientId });
-    return { created, total: INITIAL_VICTORY_ACTIONS.length + INITIAL_VICTORY_BACKGROUNDS.length };
+    const legacySniperLoadout = partLoadout?.backgroundId === "background-su-crosshair";
+    const specialEventLoadout = await ctx.db.query("victorySpecialEventLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (!specialEventLoadout && legacySniperLoadout) await ctx.db.insert("victorySpecialEventLoadouts", { key: "global", specialEventId: "event-su-one-shot", updatedAt: now });
+    if (legacySniperLoadout && partLoadout) {
+      await ctx.db.replace("victoryCeremonyPartLoadouts", partLoadout._id, {
+        key: "global",
+        actionId: partLoadout.actionId,
+        updatedAt: now,
+        updatedByClientId: partLoadout.updatedByClientId,
+      });
+    }
+    return { created, total: INITIAL_VICTORY_ACTIONS.length + INITIAL_VICTORY_BACKGROUNDS.length + INITIAL_VICTORY_SPECIAL_EVENTS.length };
   },
 });
 
@@ -223,11 +274,29 @@ export const listVictoryBackgroundCatalog = query({
   },
 });
 
+export const listVictorySpecialEventCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const specialEvents = await ctx.db.query("victorySpecialEvents").take(50);
+    const unlocks = await ctx.db.query("victorySpecialEventUnlocks").take(50);
+    const unlockedIds = new Set(unlocks.map((unlock) => unlock.specialEventId));
+    return specialEvents.filter((event) => event.isActive).map((event) => ({ ...event, isUnlocked: unlockedIds.has(event.specialEventId) }));
+  },
+});
+
 export const getVictoryCeremonyLoadout = query({
   args: {},
   handler: async (ctx) => {
     const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
     return { actionId: loadout?.actionId ?? null, backgroundId: loadout?.backgroundId ?? null };
+  },
+});
+
+export const getVictorySpecialEventLoadout = query({
+  args: {},
+  handler: async (ctx) => {
+    const loadout = await ctx.db.query("victorySpecialEventLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    return { specialEventId: loadout?.specialEventId ?? null };
   },
 });
 
@@ -408,7 +477,7 @@ export const drawVictoryCeremony = mutation({
   },
 });
 
-// 가챠 탭 분류와 무관하게 스킨·승리 행동·승리 배경 전체 풀에서 하나를 뽑는다.
+// 가챠 탭 분류와 무관하게 스킨·승리 행동·승리 배경·특수 이벤트 전체 풀에서 하나를 뽑는다.
 export const drawUnified = mutation({
   args: { clientId: v.string() },
   handler: async (ctx, args) => {
@@ -432,17 +501,20 @@ export const drawUnified = mutation({
     );
     const activeActions = (await ctx.db.query("victoryActions").take(50)).filter((action) => action.isActive);
     const activeBackgrounds = (await ctx.db.query("victoryBackgrounds").take(50)).filter((background) => background.isActive);
-    if (activeCosmetics.length + activeActions.length + activeBackgrounds.length === 0) throw new Error("Gacha catalog has not been initialized");
+    const activeSpecialEvents = (await ctx.db.query("victorySpecialEvents").take(50)).filter((event) => event.isActive);
+    if (activeCosmetics.length + activeActions.length + activeBackgrounds.length + activeSpecialEvents.length === 0) throw new Error("Gacha catalog has not been initialized");
 
     const rarity = rollRarity();
     const rarityCosmetics = activeCosmetics.filter((cosmetic) => cosmetic.rarity === rarity);
     const rarityActions = activeActions.filter((action) => action.rarity === rarity);
     const rarityBackgrounds = activeBackgrounds.filter((background) => background.rarity === rarity);
-    const hasRarityCandidates = rarityCosmetics.length + rarityActions.length + rarityBackgrounds.length > 0;
+    const raritySpecialEvents = activeSpecialEvents.filter((event) => event.rarity === rarity);
+    const hasRarityCandidates = rarityCosmetics.length + rarityActions.length + rarityBackgrounds.length + raritySpecialEvents.length > 0;
     const candidates = [
       ...(hasRarityCandidates ? rarityCosmetics : activeCosmetics).map((cosmetic) => ({ itemType: "skin" as const, item: cosmetic })),
       ...(hasRarityCandidates ? rarityActions : activeActions).map((action) => ({ itemType: "action" as const, item: action })),
       ...(hasRarityCandidates ? rarityBackgrounds : activeBackgrounds).map((background) => ({ itemType: "background" as const, item: background })),
+      ...(hasRarityCandidates ? raritySpecialEvents : activeSpecialEvents).map((event) => ({ itemType: "specialEvent" as const, item: event })),
     ];
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     if (!selected) throw new Error("Gacha draw failed");
@@ -463,11 +535,16 @@ export const drawUnified = mutation({
       result = unlock ? "duplicateExperience" : "unlocked";
       experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
       if (!unlock) await ctx.db.insert("victoryActionUnlocks", { actionId: selected.item.actionId, unlockedAt: now, unlockedByClientId: args.clientId });
-    } else {
+    } else if (selected.itemType === "background") {
       const unlock = await ctx.db.query("victoryBackgroundUnlocks").withIndex("by_backgroundId", (q) => q.eq("backgroundId", selected.item.backgroundId)).unique();
       result = unlock ? "duplicateExperience" : "unlocked";
       experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
       if (!unlock) await ctx.db.insert("victoryBackgroundUnlocks", { backgroundId: selected.item.backgroundId, unlockedAt: now, unlockedByClientId: args.clientId });
+    } else {
+      const unlock = await ctx.db.query("victorySpecialEventUnlocks").withIndex("by_specialEventId", (q) => q.eq("specialEventId", selected.item.specialEventId)).unique();
+      result = unlock ? "duplicateExperience" : "unlocked";
+      experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
+      if (!unlock) await ctx.db.insert("victorySpecialEventUnlocks", { specialEventId: selected.item.specialEventId, unlockedAt: now, unlockedByClientId: args.clientId });
     }
     if (experienceGranted > 0) {
       await ctx.db.insert("experiencePointItems", { clientId: args.clientId, amount: experienceGranted, rarity: selected.item.rarity, createdAt: now });
@@ -487,7 +564,8 @@ export const drawUnified = mutation({
 
     if (selected.itemType === "skin") return { itemType: "skin" as const, cosmetic: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
     if (selected.itemType === "action") return { itemType: "action" as const, action: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
-    return { itemType: "background" as const, background: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+    if (selected.itemType === "background") return { itemType: "background" as const, background: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+    return { itemType: "specialEvent" as const, specialEvent: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
   },
 });
 
@@ -520,6 +598,22 @@ export const equipVictoryBackground = mutation({
     if (loadout) await ctx.db.patch(loadout._id, { backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
     else await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
     return { backgroundId: args.backgroundId };
+  },
+});
+
+export const equipVictorySpecialEvent = mutation({
+  args: { clientId: v.string(), specialEventId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const specialEvent = await ctx.db.query("victorySpecialEvents").withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.specialEventId)).unique();
+    if (!specialEvent?.isActive) throw new Error("Unknown victory special event");
+    const unlock = await ctx.db.query("victorySpecialEventUnlocks").withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.specialEventId)).unique();
+    if (!unlock) throw new Error("Victory special event has not been unlocked globally");
+    const now = Date.now();
+    const loadout = await ctx.db.query("victorySpecialEventLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (loadout) await ctx.db.patch(loadout._id, { specialEventId: args.specialEventId, updatedAt: now, updatedByClientId: args.clientId });
+    else await ctx.db.insert("victorySpecialEventLoadouts", { key: "global", specialEventId: args.specialEventId, updatedAt: now, updatedByClientId: args.clientId });
+    return { specialEventId: args.specialEventId };
   },
 });
 

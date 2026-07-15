@@ -207,6 +207,30 @@ export default defineSchema({
     updatedByClientId: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
+  // 특수 이벤트는 승리 모달 전체에 적용되는 연출이다. 행동·무대 배경과 별도 수집·장착한다.
+  victorySpecialEvents: defineTable({
+    specialEventId: v.string(),
+    name: v.string(),
+    characterId: v.optional(v.string()),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    effect: v.union(v.literal("sniper")),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_specialEventId", ["specialEventId"]),
+
+  victorySpecialEventUnlocks: defineTable({
+    specialEventId: v.string(),
+    unlockedAt: v.number(),
+    unlockedByClientId: v.optional(v.string()),
+  }).index("by_specialEventId", ["specialEventId"]),
+
+  victorySpecialEventLoadouts: defineTable({
+    key: v.literal("global"),
+    specialEventId: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedByClientId: v.optional(v.string()),
+  }).index("by_key", ["key"]),
+
   // 로그인 없는 환경의 일일 뽑기·플레이·경험치 포인트 상태. 브라우저 익명 ID 단위로만 관리한다.
   anonymousGachaStates: defineTable({
     clientId: v.string(),
