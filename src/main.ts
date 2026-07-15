@@ -223,6 +223,7 @@ let experiencePointItemsUnsubscribe: (() => void) | null = null;
 let managedCharacterId: string | null = null;
 let activeMatchSlot = -1;
 let matchSlotIds: Array<string | null> = [];
+const randomMatchSlotIndexes = new Set<number>();
 let previewGachaCosmeticId: string | null = null;
 let previewMatchCharacterId: string | null = null;
 let isPickingPveCharacter = false;
@@ -2760,6 +2761,7 @@ function selectGameplayMode(selectedMode: Exclude<GameMode, "boss">) {
   if (heading) heading.textContent = "게임플레이";
   selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear(); bossCharacterId = null;
   matchSlotIds = Array.from({ length: selectedMode === "team" ? 6 : selectedMode === "tournament" ? 16 : 2 }, () => null);
+  randomMatchSlotIndexes.clear();
   renderMatchSlots();
   initLobby(true);
 }
@@ -2771,22 +2773,29 @@ function renderMatchSlots() {
     const character = availableCharacters.find((entry) => entry.id === id);
     const slot = document.createElement("button"); slot.type = "button";
     slot.className = `match-character-slot ${character ? "filled" : ""} ${currentMode === "team" ? index < 3 ? "red" : "blue" : ""}`;
-    slot.innerHTML = character ? `<strong style="color:${character.color}">${character.name}</strong><small>${currentMode === "team" ? index < 3 ? "RED" : "BLUE" : "선택됨"}</small>` : `<b>?</b><small>${currentMode === "team" ? index < 3 ? "RED 슬롯" : "BLUE 슬롯" : `참가자 ${index + 1}`}</small>`;
+    const slotLabel = currentMode === "team" ? index < 3 ? "RED" : "BLUE" : "선택됨";
+    slot.innerHTML = character ? `<strong style="color:${character.color}">${character.name}</strong><small>${slotLabel}${randomMatchSlotIndexes.has(index) ? " · 랜덤" : ""}</small>` : `<b>?</b><small>${currentMode === "team" ? index < 3 ? "RED 슬롯" : "BLUE 슬롯" : `참가자 ${index + 1}`}</small>`;
     slot.addEventListener("click", () => { isPickingPveCharacter = false; activeMatchSlot = index; renderMatchCharacterPicker(); matchCharacterPickerModal.classList.remove("hidden"); });
     matchSelectionSlots.appendChild(slot);
   });
 }
 
-function fillEmptyMatchSlotsRandomly() {
-  const preservedCharacterIds = new Set(matchSlotIds.filter((id): id is string => id !== null));
+function fillMatchSlotsRandomly() {
+  const slotsToRandomize = matchSlotIds
+    .map((characterId, index) => characterId === null || randomMatchSlotIndexes.has(index) ? index : null)
+    .filter((index): index is number => index !== null);
+  const preservedCharacterIds = new Set(matchSlotIds
+    .filter((id, index): id is string => id !== null && !slotsToRandomize.includes(index)));
   const candidates = availableCharacters.filter((character) => !preservedCharacterIds.has(character.id));
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
     [candidates[index], candidates[randomIndex]] = [candidates[randomIndex], candidates[index]];
   }
 
-  let candidateIndex = 0;
-  matchSlotIds = matchSlotIds.map((characterId) => characterId ?? candidates[candidateIndex++]?.id ?? null);
+  slotsToRandomize.forEach((slotIndex, candidateIndex) => {
+    matchSlotIds[slotIndex] = candidates[candidateIndex]?.id ?? null;
+    randomMatchSlotIndexes.add(slotIndex);
+  });
   selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear();
   matchSlotIds.forEach((characterId, index) => {
     if (!characterId) return;
@@ -2811,7 +2820,7 @@ function renderMatchCharacterPicker() {
     const usedByOtherSlots = isPickingPveCharacter ? new Set<string>() : new Set(matchSlotIds.filter((id, index) => index !== activeMatchSlot && id));
     const eligible = availableCharacters.filter((character) => !usedByOtherSlots.has(character.id));
     const picked = eligible[Math.floor(Math.random() * eligible.length)];
-    if (picked) chooseMatchCharacter(picked.id);
+    if (picked) chooseMatchCharacter(picked.id, true);
   });
   matchCharacterPickerList.appendChild(randomButton);
   candidates.forEach((character) => {
@@ -2834,7 +2843,7 @@ function renderMatchCharacterPreview() {
   document.getElementById("confirm-match-character-btn")?.addEventListener("click", () => chooseMatchCharacter(character.id));
 }
 
-function chooseMatchCharacter(characterId: string) {
+function chooseMatchCharacter(characterId: string, selectedRandomly = false) {
   if (isPickingPveCharacter) {
     selectedPveCharacterId = characterId;
     updatePveSelectionUI();
@@ -2842,7 +2851,10 @@ function chooseMatchCharacter(characterId: string) {
     isPickingPveCharacter = false;
     return;
   }
-  matchSlotIds[activeMatchSlot] = characterId; selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear();
+  matchSlotIds[activeMatchSlot] = characterId;
+  if (selectedRandomly) randomMatchSlotIndexes.add(activeMatchSlot);
+  else randomMatchSlotIndexes.delete(activeMatchSlot);
+  selectedIds.clear(); selectedRedIds.clear(); selectedBlueIds.clear();
   matchSlotIds.forEach((id, index) => { if (!id) return; selectedIds.add(id); if (currentMode === "team") (index < 3 ? selectedRedIds : selectedBlueIds).add(id); });
   matchCharacterPickerModal.classList.add("hidden"); renderMatchSlots(); updateStartButtonState();
 }
@@ -3031,7 +3043,7 @@ updateTeamGameTypeVisibility();
   pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);
   pveCharacterModalClose.addEventListener("click", () => pveCharacterModal.classList.add("hidden"));
   pveStartBtn.addEventListener("click", startPveDungeon);
-  fillRandomSlotsBtn.addEventListener("click", fillEmptyMatchSlotsRandomly);
+  fillRandomSlotsBtn.addEventListener("click", fillMatchSlotsRandomly);
   initCosmetics();
   gachaDrawBtn.addEventListener("click", () => void drawGacha());
   matchCharacterPickerClose.addEventListener("click", () => matchCharacterPickerModal.classList.add("hidden"));
