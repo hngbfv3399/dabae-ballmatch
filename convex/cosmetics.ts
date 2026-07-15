@@ -22,8 +22,15 @@ type CosmeticDefinition = {
 };
 
 type VictoryCeremonyAnimation = "wave" | "jump" | "clap" | "dance" | "trophy" | "fireworks";
-type VictoryCeremonyDefinition = {
-  ceremonyId: string;
+type VictoryActionDefinition = {
+  actionId: string;
+  name: string;
+  rarity: Rarity;
+  animation: VictoryCeremonyAnimation;
+};
+
+type VictoryBackgroundDefinition = {
+  backgroundId: string;
   name: string;
   rarity: Rarity;
   animation: VictoryCeremonyAnimation;
@@ -56,14 +63,32 @@ const INITIAL_COSMETICS: readonly CosmeticDefinition[] = [
   { cosmeticId: "palette-eclipse", name: "이클립스", rarity: "unique", style: { textColor: "#f8fafc", borderColor: "#a855f7", fillColor: "#09090b", glowColor: "#c084fc", borderAnimation: "aurora", trail: "spark" } },
 ];
 
-const INITIAL_VICTORY_CEREMONIES: readonly VictoryCeremonyDefinition[] = [
-  { ceremonyId: "ceremony-champion-wave", name: "챔피언 인사", rarity: "common", animation: "wave" },
-  { ceremonyId: "ceremony-victory-jump", name: "승리 점프", rarity: "common", animation: "jump" },
-  { ceremonyId: "ceremony-spotlight-clap", name: "스포트라이트 박수", rarity: "rare", animation: "clap" },
-  { ceremonyId: "ceremony-rhythm-dance", name: "리듬 댄스", rarity: "epic", animation: "dance" },
-  { ceremonyId: "ceremony-trophy-lift", name: "트로피 리프트", rarity: "legendary", animation: "trophy" },
-  { ceremonyId: "ceremony-fireworks-finale", name: "불꽃 피날레", rarity: "unique", animation: "fireworks" },
+const INITIAL_VICTORY_ACTIONS: readonly VictoryActionDefinition[] = [
+  { actionId: "action-champion-wave", name: "챔피언 인사", rarity: "common", animation: "wave" },
+  { actionId: "action-victory-jump", name: "승리 점프", rarity: "common", animation: "jump" },
+  { actionId: "action-spotlight-clap", name: "박자 튀기", rarity: "rare", animation: "clap" },
+  { actionId: "action-rhythm-dance", name: "리듬 댄스", rarity: "epic", animation: "dance" },
+  { actionId: "action-trophy-lift", name: "승리 상승", rarity: "legendary", animation: "trophy" },
+  { actionId: "action-fireworks-finale", name: "반짝임", rarity: "unique", animation: "fireworks" },
 ];
+
+const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
+  { backgroundId: "background-starlight-stage", name: "별빛 무대", rarity: "common", animation: "wave" },
+  { backgroundId: "background-clear-sky", name: "맑은 하늘", rarity: "common", animation: "jump" },
+  { backgroundId: "background-gold-spotlight", name: "골드 스포트라이트", rarity: "rare", animation: "clap" },
+  { backgroundId: "background-neon-rhythm", name: "네온 리듬", rarity: "epic", animation: "dance" },
+  { backgroundId: "background-champion-gold", name: "챔피언 골드", rarity: "legendary", animation: "trophy" },
+  { backgroundId: "background-fireworks-festival", name: "불꽃 축제", rarity: "unique", animation: "fireworks" },
+];
+
+const LEGACY_CEREMONY_PART_IDS: Record<string, { actionId: string; backgroundId: string }> = {
+  "ceremony-champion-wave": { actionId: "action-champion-wave", backgroundId: "background-starlight-stage" },
+  "ceremony-victory-jump": { actionId: "action-victory-jump", backgroundId: "background-clear-sky" },
+  "ceremony-spotlight-clap": { actionId: "action-spotlight-clap", backgroundId: "background-gold-spotlight" },
+  "ceremony-rhythm-dance": { actionId: "action-rhythm-dance", backgroundId: "background-neon-rhythm" },
+  "ceremony-trophy-lift": { actionId: "action-trophy-lift", backgroundId: "background-champion-gold" },
+  "ceremony-fireworks-finale": { actionId: "action-fireworks-finale", backgroundId: "background-fireworks-festival" },
+};
 
 const RARITY_WEIGHTS: readonly { rarity: Rarity; weight: number }[] = [
   { rarity: "common", weight: 47 },
@@ -136,40 +161,69 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
   handler: async (ctx) => {
     const now = Date.now();
     let created = 0;
-    for (const ceremony of INITIAL_VICTORY_CEREMONIES) {
+    for (const action of INITIAL_VICTORY_ACTIONS) {
       const existing = await ctx.db
-        .query("victoryCeremonies")
-        .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", ceremony.ceremonyId))
+        .query("victoryActions")
+        .withIndex("by_actionId", (q) => q.eq("actionId", action.actionId))
         .unique();
       if (!existing) {
-        await ctx.db.insert("victoryCeremonies", { ...ceremony, isActive: true, createdAt: now });
+        await ctx.db.insert("victoryActions", { ...action, isActive: true, createdAt: now });
         created += 1;
       }
     }
-    return { created, total: INITIAL_VICTORY_CEREMONIES.length };
+    for (const background of INITIAL_VICTORY_BACKGROUNDS) {
+      const existing = await ctx.db
+        .query("victoryBackgrounds")
+        .withIndex("by_backgroundId", (q) => q.eq("backgroundId", background.backgroundId))
+        .unique();
+      if (!existing) {
+        await ctx.db.insert("victoryBackgrounds", { ...background, isActive: true, createdAt: now });
+        created += 1;
+      }
+    }
+    // 기존 통합 세레모니를 이미 획득한 경우, 대응하는 행동과 배경을 모두 보존한다.
+    const legacyUnlocks = await ctx.db.query("victoryCeremonyUnlocks").take(50);
+    for (const legacyUnlock of legacyUnlocks) {
+      const partIds = LEGACY_CEREMONY_PART_IDS[legacyUnlock.ceremonyId];
+      if (!partIds) continue;
+      const actionUnlock = await ctx.db.query("victoryActionUnlocks").withIndex("by_actionId", (q) => q.eq("actionId", partIds.actionId)).unique();
+      if (!actionUnlock) await ctx.db.insert("victoryActionUnlocks", { actionId: partIds.actionId, unlockedAt: legacyUnlock.unlockedAt, unlockedByClientId: legacyUnlock.unlockedByClientId });
+      const backgroundUnlock = await ctx.db.query("victoryBackgroundUnlocks").withIndex("by_backgroundId", (q) => q.eq("backgroundId", partIds.backgroundId)).unique();
+      if (!backgroundUnlock) await ctx.db.insert("victoryBackgroundUnlocks", { backgroundId: partIds.backgroundId, unlockedAt: legacyUnlock.unlockedAt, unlockedByClientId: legacyUnlock.unlockedByClientId });
+    }
+    const legacyLoadout = await ctx.db.query("victoryCeremonyLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    const partLoadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    const legacyPartIds = legacyLoadout ? LEGACY_CEREMONY_PART_IDS[legacyLoadout.ceremonyId] : undefined;
+    if (!partLoadout && legacyPartIds) await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", ...legacyPartIds, updatedAt: now, updatedByClientId: legacyLoadout?.updatedByClientId });
+    return { created, total: INITIAL_VICTORY_ACTIONS.length + INITIAL_VICTORY_BACKGROUNDS.length };
   },
 });
 
-export const listVictoryCeremonyCatalog = query({
+export const listVictoryActionCatalog = query({
   args: {},
   handler: async (ctx) => {
-    const ceremonies = await ctx.db.query("victoryCeremonies").take(50);
-    const unlocks = await ctx.db.query("victoryCeremonyUnlocks").take(50);
-    const unlockedIds = new Set(unlocks.map((unlock) => unlock.ceremonyId));
-    return ceremonies
-      .filter((ceremony) => ceremony.isActive)
-      .map((ceremony) => ({ ...ceremony, isUnlocked: unlockedIds.has(ceremony.ceremonyId) }));
+    const actions = await ctx.db.query("victoryActions").take(50);
+    const unlocks = await ctx.db.query("victoryActionUnlocks").take(50);
+    const unlockedIds = new Set(unlocks.map((unlock) => unlock.actionId));
+    return actions.filter((action) => action.isActive).map((action) => ({ ...action, isUnlocked: unlockedIds.has(action.actionId) }));
+  },
+});
+
+export const listVictoryBackgroundCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const backgrounds = await ctx.db.query("victoryBackgrounds").take(50);
+    const unlocks = await ctx.db.query("victoryBackgroundUnlocks").take(50);
+    const unlockedIds = new Set(unlocks.map((unlock) => unlock.backgroundId));
+    return backgrounds.filter((background) => background.isActive).map((background) => ({ ...background, isUnlocked: unlockedIds.has(background.backgroundId) }));
   },
 });
 
 export const getVictoryCeremonyLoadout = query({
   args: {},
   handler: async (ctx) => {
-    const loadout = await ctx.db
-      .query("victoryCeremonyLoadouts")
-      .withIndex("by_key", (q) => q.eq("key", "global"))
-      .unique();
-    return loadout?.ceremonyId ?? null;
+    const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    return { actionId: loadout?.actionId ?? null, backgroundId: loadout?.backgroundId ?? null };
   },
 });
 
@@ -350,7 +404,7 @@ export const drawVictoryCeremony = mutation({
   },
 });
 
-// 가챠 탭 분류와 무관하게 스킨·승리 세레모니 전체 풀에서 하나를 뽑는다.
+// 가챠 탭 분류와 무관하게 스킨·승리 행동·승리 배경 전체 풀에서 하나를 뽑는다.
 export const drawUnified = mutation({
   args: { clientId: v.string() },
   handler: async (ctx, args) => {
@@ -372,15 +426,19 @@ export const drawUnified = mutation({
     const activeCosmetics = (await ctx.db.query("cosmetics").take(100)).filter(
       (cosmetic) => cosmetic.isActive && cosmetic.scope === "global",
     );
-    const activeCeremonies = (await ctx.db.query("victoryCeremonies").take(50)).filter((ceremony) => ceremony.isActive);
-    if (activeCosmetics.length + activeCeremonies.length === 0) throw new Error("Gacha catalog has not been initialized");
+    const activeActions = (await ctx.db.query("victoryActions").take(50)).filter((action) => action.isActive);
+    const activeBackgrounds = (await ctx.db.query("victoryBackgrounds").take(50)).filter((background) => background.isActive);
+    if (activeCosmetics.length + activeActions.length + activeBackgrounds.length === 0) throw new Error("Gacha catalog has not been initialized");
 
     const rarity = rollRarity();
     const rarityCosmetics = activeCosmetics.filter((cosmetic) => cosmetic.rarity === rarity);
-    const rarityCeremonies = activeCeremonies.filter((ceremony) => ceremony.rarity === rarity);
+    const rarityActions = activeActions.filter((action) => action.rarity === rarity);
+    const rarityBackgrounds = activeBackgrounds.filter((background) => background.rarity === rarity);
+    const hasRarityCandidates = rarityCosmetics.length + rarityActions.length + rarityBackgrounds.length > 0;
     const candidates = [
-      ...(rarityCosmetics.length + rarityCeremonies.length > 0 ? rarityCosmetics : activeCosmetics).map((cosmetic) => ({ itemType: "skin" as const, item: cosmetic })),
-      ...(rarityCosmetics.length + rarityCeremonies.length > 0 ? rarityCeremonies : activeCeremonies).map((ceremony) => ({ itemType: "ceremony" as const, item: ceremony })),
+      ...(hasRarityCandidates ? rarityCosmetics : activeCosmetics).map((cosmetic) => ({ itemType: "skin" as const, item: cosmetic })),
+      ...(hasRarityCandidates ? rarityActions : activeActions).map((action) => ({ itemType: "action" as const, item: action })),
+      ...(hasRarityCandidates ? rarityBackgrounds : activeBackgrounds).map((background) => ({ itemType: "background" as const, item: background })),
     ];
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     if (!selected) throw new Error("Gacha draw failed");
@@ -396,15 +454,16 @@ export const drawUnified = mutation({
       experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
       if (!unlock) await ctx.db.insert("cosmeticUnlocks", { cosmeticId: selected.item.cosmeticId, unlockedAt: now, unlockedByClientId: args.clientId });
       await ctx.db.insert("gachaDrawHistory", { clientId: args.clientId, cosmeticId: selected.item.cosmeticId, result, experienceGranted, createdAt: now });
-    } else {
-      const unlock = await ctx.db
-        .query("victoryCeremonyUnlocks")
-        .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", selected.item.ceremonyId))
-        .unique();
+    } else if (selected.itemType === "action") {
+      const unlock = await ctx.db.query("victoryActionUnlocks").withIndex("by_actionId", (q) => q.eq("actionId", selected.item.actionId)).unique();
       result = unlock ? "duplicateExperience" : "unlocked";
       experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
-      if (!unlock) await ctx.db.insert("victoryCeremonyUnlocks", { ceremonyId: selected.item.ceremonyId, unlockedAt: now, unlockedByClientId: args.clientId });
-      await ctx.db.insert("victoryCeremonyDrawHistory", { clientId: args.clientId, ceremonyId: selected.item.ceremonyId, result, experienceGranted, createdAt: now });
+      if (!unlock) await ctx.db.insert("victoryActionUnlocks", { actionId: selected.item.actionId, unlockedAt: now, unlockedByClientId: args.clientId });
+    } else {
+      const unlock = await ctx.db.query("victoryBackgroundUnlocks").withIndex("by_backgroundId", (q) => q.eq("backgroundId", selected.item.backgroundId)).unique();
+      result = unlock ? "duplicateExperience" : "unlocked";
+      experienceGranted = unlock ? DUPLICATE_EXPERIENCE[selected.item.rarity] : 0;
+      if (!unlock) await ctx.db.insert("victoryBackgroundUnlocks", { backgroundId: selected.item.backgroundId, unlockedAt: now, unlockedByClientId: args.clientId });
     }
     if (experienceGranted > 0) {
       await ctx.db.insert("experiencePointItems", { clientId: args.clientId, amount: experienceGranted, rarity: selected.item.rarity, createdAt: now });
@@ -422,9 +481,41 @@ export const drawUnified = mutation({
       await ctx.db.insert("anonymousGachaStates", { clientId: args.clientId, dailyResetDate: today, dailyDrawsUsed: 1, completedPlayCount: 0, bonusDrawsUsed: 0, experiencePoints: 0, updatedAt: now });
     }
 
-    return selected.itemType === "skin"
-      ? { itemType: "skin" as const, cosmetic: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" }
-      : { itemType: "ceremony" as const, ceremony: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+    if (selected.itemType === "skin") return { itemType: "skin" as const, cosmetic: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+    if (selected.itemType === "action") return { itemType: "action" as const, action: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+    return { itemType: "background" as const, background: selected.item, result, experienceGranted, drawSource: hasDailyDraw ? "daily" : "bonus" };
+  },
+});
+
+export const equipVictoryAction = mutation({
+  args: { clientId: v.string(), actionId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const action = await ctx.db.query("victoryActions").withIndex("by_actionId", (q) => q.eq("actionId", args.actionId)).unique();
+    if (!action?.isActive) throw new Error("Unknown victory action");
+    const unlock = await ctx.db.query("victoryActionUnlocks").withIndex("by_actionId", (q) => q.eq("actionId", args.actionId)).unique();
+    if (!unlock) throw new Error("Victory action has not been unlocked globally");
+    const now = Date.now();
+    const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (loadout) await ctx.db.patch(loadout._id, { actionId: args.actionId, updatedAt: now, updatedByClientId: args.clientId });
+    else await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", actionId: args.actionId, updatedAt: now, updatedByClientId: args.clientId });
+    return { actionId: args.actionId };
+  },
+});
+
+export const equipVictoryBackground = mutation({
+  args: { clientId: v.string(), backgroundId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const background = await ctx.db.query("victoryBackgrounds").withIndex("by_backgroundId", (q) => q.eq("backgroundId", args.backgroundId)).unique();
+    if (!background?.isActive) throw new Error("Unknown victory background");
+    const unlock = await ctx.db.query("victoryBackgroundUnlocks").withIndex("by_backgroundId", (q) => q.eq("backgroundId", args.backgroundId)).unique();
+    if (!unlock) throw new Error("Victory background has not been unlocked globally");
+    const now = Date.now();
+    const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (loadout) await ctx.db.patch(loadout._id, { backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
+    else await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
+    return { backgroundId: args.backgroundId };
   },
 });
 

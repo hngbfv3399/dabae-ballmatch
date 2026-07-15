@@ -166,6 +166,45 @@ export default defineSchema({
     updatedByClientId: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
+  // v3.2.2: 승리 세레모니는 행동과 배경을 독립 수집·장착한다. 이전 통합 세레모니 테이블은 호환용으로 유지한다.
+  victoryActions: defineTable({
+    actionId: v.string(),
+    name: v.string(),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks")),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_actionId", ["actionId"]),
+
+  victoryActionUnlocks: defineTable({
+    actionId: v.string(),
+    unlockedAt: v.number(),
+    unlockedByClientId: v.optional(v.string()),
+  }).index("by_actionId", ["actionId"]),
+
+  victoryBackgrounds: defineTable({
+    backgroundId: v.string(),
+    name: v.string(),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    animation: v.union(v.literal("wave"), v.literal("jump"), v.literal("clap"), v.literal("dance"), v.literal("trophy"), v.literal("fireworks")),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_backgroundId", ["backgroundId"]),
+
+  victoryBackgroundUnlocks: defineTable({
+    backgroundId: v.string(),
+    unlockedAt: v.number(),
+    unlockedByClientId: v.optional(v.string()),
+  }).index("by_backgroundId", ["backgroundId"]),
+
+  victoryCeremonyPartLoadouts: defineTable({
+    key: v.literal("global"),
+    actionId: v.optional(v.string()),
+    backgroundId: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedByClientId: v.optional(v.string()),
+  }).index("by_key", ["key"]),
+
   // 로그인 없는 환경의 일일 뽑기·플레이·경험치 포인트 상태. 브라우저 익명 ID 단위로만 관리한다.
   anonymousGachaStates: defineTable({
     clientId: v.string(),
