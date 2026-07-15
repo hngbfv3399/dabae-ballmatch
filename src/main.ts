@@ -13,7 +13,7 @@ import {
 } from "./maps";
 import { GameLounge } from "./maingame/gameLounge";
 import { getCharacterStatusEffects } from "./maingame/statusEffects";
-import { clearPveRunModifiers, createPveRunModifiers, getAllRunModifiers, type PveRunModifiers } from "./maingame/runModifiers";
+import { addPveRunAugment, applyPveRunModifierStats, clearPveRunModifiers, createPveRunModifiers, getAllRunModifiers, rollPveAugmentChoices, type PveRunModifiers, type RunModifierRarity } from "./maingame/runModifiers";
 import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
@@ -87,6 +87,11 @@ const totalCountEl = document.getElementById("total-count") as HTMLElement;
 const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
 const pveRunModifiersPanel = document.getElementById("pve-run-modifiers") as HTMLElement;
+const augmentChoiceModal = document.getElementById("augment-choice-modal") as HTMLElement;
+const augmentChoiceTier = document.getElementById("augment-choice-tier") as HTMLElement;
+const augmentChoiceTitle = document.getElementById("augment-choice-title") as HTMLElement;
+const augmentChoiceSubtitle = document.getElementById("augment-choice-subtitle") as HTMLElement;
+const augmentChoiceCards = document.getElementById("augment-choice-cards") as HTMLElement;
 const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
 const randomStartBtn = document.getElementById(
   "random-start-btn",
@@ -1675,6 +1680,45 @@ function getPveRunSummaryMarkup(run: PveRun): string {
   return `<div class="pve-run-summary"><strong>이번 런 빌드</strong>${modifiers.map((modifier) => `<span>${modifier.icon} ${modifier.name}</span>`).join("")}</div>`;
 }
 
+function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
+  if (stageNumber === 1) return "silver";
+  if (stageNumber === 3) return "gold";
+  if (stageNumber === 4) return "platinum";
+  return null;
+}
+
+function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: () => void) {
+  const rarity = getPveAugmentRarityForClearedStage(clearedStageNumber);
+  if (!rarity) { onChoose(); return; }
+  const choices = rollPveAugmentChoices(rarity, run.modifiers.augments.map((augment) => augment.id), clearedStageNumber);
+  if (choices.length === 0) { onChoose(); return; }
+  const labels: Record<Extract<RunModifierRarity, "silver" | "gold" | "platinum">, { tier: string; title: string; subtitle: string }> = {
+    silver: { tier: "SILVER AUGMENT · 1/3", title: "전투 방식을 선택하세요", subtitle: "선택한 증강은 이번 던전 런이 끝날 때까지 유지됩니다." },
+    gold: { tier: "GOLD AUGMENT · 2/3", title: "빌드를 강화하세요", subtitle: "강력한 효과 하나를 골라 다음 전투를 준비하세요." },
+    platinum: { tier: "PLATINUM AUGMENT · 3/3", title: "최종 증강을 선택하세요", subtitle: "5스테이지 진입 전에 마지막 빌드 완성을 선택하세요." },
+  };
+  const label = labels[rarity];
+  augmentChoiceTier.textContent = label.tier;
+  augmentChoiceTier.className = `augment-choice-tier rarity-${rarity}`;
+  augmentChoiceTitle.textContent = label.title;
+  augmentChoiceSubtitle.textContent = label.subtitle;
+  augmentChoiceCards.innerHTML = "";
+  choices.forEach((augment) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `augment-choice-card rarity-${augment.rarity}`;
+    card.innerHTML = `<span class="augment-choice-icon">${augment.icon}</span><strong>${augment.name}</strong><small>${augment.description}</small><em>선택하기</em>`;
+    card.addEventListener("click", () => {
+      addPveRunAugment(run.modifiers, augment);
+      augmentChoiceModal.classList.add("hidden");
+      renderPveRunModifiers();
+      onChoose();
+    }, { once: true });
+    augmentChoiceCards.appendChild(card);
+  });
+  augmentChoiceModal.classList.remove("hidden");
+}
+
 // Countdown handler
 function updateCountdown(seconds: number) {
   if (seconds > 0) {
@@ -1723,10 +1767,13 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       pveAdvancePending = true;
       gameStatusText.textContent = `던전 1-${clearedStageNumber} 클리어 · 다음 스테이지 대기 중`;
       void recordPveStageExperience(run, clearedStageNumber).then((result) => {
-        if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
-        winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 1-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div><div class="stat-row"><span>다음 전투</span><strong>던전 1-${run.stage}</strong></div></div><p class="win-desc" style="margin-top:0.9rem">가챠 진행도는 던전 1-1부터 1-5까지 완주할 때만 증가합니다.</p>`;
-        modalCloseBtn.textContent = "다음 스테이지";
-        winnerModal.classList.remove("hidden");
+        const showStageClearResult = () => {
+          if (winnerTitle) winnerTitle.textContent = "STAGE CLEARED";
+          winnerInfo.innerHTML = `<div class="winner-trophy">⚔️</div><div class="win-name" style="color:${player.color}">던전 1-${clearedStageNumber} 클리어!</div><div class="win-desc">HP 25%를 회복했습니다.</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 획득 경험치</span><strong class="text-neon-yellow">+${result.experienceGranted} XP</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div><div class="stat-row"><span>다음 전투</span><strong>던전 1-${run.stage}</strong></div></div><p class="win-desc" style="margin-top:0.9rem">가챠 진행도는 던전 1-1부터 1-5까지 완주할 때만 증가합니다.</p>`;
+          modalCloseBtn.textContent = "다음 스테이지";
+          winnerModal.classList.remove("hidden");
+        };
+        showAugmentChoice(run, clearedStageNumber, showStageClearResult);
       }).catch(() => {
         pveAdvancePending = false;
         if (winnerTitle) winnerTitle.textContent = "STAGE SAVE FAILED";
@@ -2020,6 +2067,7 @@ function closeWinnerModal() {
 
 function goBackToLobby() {
   if (gameView.classList.contains("is-focus-mode")) void setFocusMode(false);
+  augmentChoiceModal.classList.add("hidden");
   isPracticeMode = false;
   if (pveRun) clearPveRunModifiers(pveRun.modifiers);
   pveRun = null;
@@ -2556,8 +2604,9 @@ function startPveStage() {
   const player = createCharacterState(character, 0, enemies.length + 1, gameCanvas.width, gameCanvas.height);
   applyEquippedCosmetic(player);
   player.maxHp = getLeveledHp(character.maxHp, progress);
-  player.hp = Math.min(player.maxHp, pveRun.currentHp);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
+  applyPveRunModifierStats(player, pveRun.modifiers);
+  player.hp = Math.min(player.maxHp, pveRun.currentHp);
   player.teamId = 1;
   player.x = player.radius * 2.5;
   player.y = gameCanvas.height / 2;
