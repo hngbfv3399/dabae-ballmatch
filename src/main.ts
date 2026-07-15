@@ -13,7 +13,7 @@ import {
 } from "./maps";
 import { GameLounge } from "./maingame/gameLounge";
 import { getCharacterStatusEffects } from "./maingame/statusEffects";
-import { addPveRunAugment, applyPveRunModifierStats, clearPveRunModifiers, createPveRunModifiers, getAllRunModifiers, rollPveAugmentChoices, type PveRunModifiers, type RunModifierRarity } from "./maingame/runModifiers";
+import { addPveRunAugment, addPveRunItem, applyPveRunModifierStats, clearPveRunModifiers, createPveRunModifiers, getAllRunModifiers, rollPveAugmentChoices, rollPveItemChoices, type PveRunModifiers, type RunModifierRarity } from "./maingame/runModifiers";
 import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
@@ -204,7 +204,7 @@ const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
 type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
-type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
+type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -1698,6 +1698,14 @@ function getPveAugmentContext(run: PveRun) {
   };
 }
 
+function applyPveRunSelectionEffect(run: PveRun, effects: { maxHpMultiplier?: number; instantHealPercent?: number; shieldPercent?: number } | undefined) {
+  if (!effects) return;
+  const maxHp = getPveRunMaximumHp(run);
+  if (effects.maxHpMultiplier) run.currentHp = maxHp;
+  if (effects.instantHealPercent) run.currentHp = Math.min(maxHp, run.currentHp + maxHp * effects.instantHealPercent);
+  if (effects.shieldPercent) run.currentShield += Math.round(maxHp * effects.shieldPercent);
+}
+
 function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
   if (stageNumber === 0) return "silver";
   if (stageNumber === 1) return "silver";
@@ -1732,7 +1740,37 @@ function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: ()
     card.innerHTML = `<span class="augment-choice-icon">${augment.icon}</span><b class="augment-choice-source">${source}</b><strong>${augment.name}</strong><small>${augment.description}</small><em>선택하기</em>`;
     card.addEventListener("click", () => {
       addPveRunAugment(run.modifiers, augment);
-      if (augment.effects?.maxHpMultiplier) run.currentHp = getPveRunMaximumHp(run);
+      applyPveRunSelectionEffect(run, augment.effects);
+      augmentChoiceModal.classList.add("hidden");
+      renderPveRunModifiers();
+      onChoose();
+    }, { once: true });
+    augmentChoiceCards.appendChild(card);
+  });
+  augmentChoiceModal.classList.remove("hidden");
+}
+
+function showItemChoice(run: PveRun, clearedStageNumber: number, onChoose: () => void) {
+  const rarity: Extract<RunModifierRarity, "common" | "rare"> | null = clearedStageNumber === 2 ? "common" : clearedStageNumber === 4 ? "rare" : null;
+  if (!rarity || run.modifiers.items.length >= 3) { onChoose(); return; }
+  const choices = rollPveItemChoices(rarity, run.modifiers.items.map((item) => item.id), clearedStageNumber);
+  if (choices.length === 0) { onChoose(); return; }
+  const label = rarity === "common"
+    ? { tier: "COMMON ITEM · 1/2", title: "보급품을 선택하세요", subtitle: "아이템은 이번 던전 런이 끝날 때까지 유지됩니다." }
+    : { tier: "RARE ITEM · 2/2", title: "희귀 보급품을 선택하세요", subtitle: "마지막 전투를 위한 아이템 하나를 고르세요." };
+  augmentChoiceTier.textContent = label.tier;
+  augmentChoiceTier.className = `augment-choice-tier rarity-${rarity}`;
+  augmentChoiceTitle.textContent = label.title;
+  augmentChoiceSubtitle.textContent = label.subtitle;
+  augmentChoiceCards.innerHTML = "";
+  choices.forEach((item) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `augment-choice-card rarity-${item.rarity}`;
+    card.innerHTML = `<span class="augment-choice-icon">${item.icon}</span><b class="augment-choice-source">런 전용 아이템</b><strong>${item.name}</strong><small>${item.description}</small><em>획득하기</em>`;
+    card.addEventListener("click", () => {
+      addPveRunItem(run.modifiers, item);
+      applyPveRunSelectionEffect(run, item.effects);
       augmentChoiceModal.classList.add("hidden");
       renderPveRunModifiers();
       onChoose();
@@ -1784,6 +1822,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     }
 
     run.currentHp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
+    run.currentShield = player.runShield ?? 0;
     if (run.stage < SLIME_MEADOW_STAGE_COUNT) {
       const clearedStageNumber = run.stage;
       run.stage += 1;
@@ -1796,7 +1835,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
           modalCloseBtn.textContent = "다음 스테이지";
           winnerModal.classList.remove("hidden");
         };
-        showAugmentChoice(run, clearedStageNumber, showStageClearResult);
+        showItemChoice(run, clearedStageNumber, () => showAugmentChoice(run, clearedStageNumber, showStageClearResult));
       }).catch(() => {
         pveAdvancePending = false;
         if (winnerTitle) winnerTitle.textContent = "STAGE SAVE FAILED";
@@ -2607,7 +2646,7 @@ function startPveDungeon() {
   pveCharacterModal.classList.add("hidden");
   gameModeModal.classList.add("hidden");
   const stage = Number(pveStageSelect.value);
-  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
+  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), currentShield: 0, rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
   showAugmentChoice(pveRun, 0, startPveStage);
 }
 
@@ -2630,6 +2669,7 @@ function startPveStage() {
   player.attackPower = getLeveledAttack(character.attackPower, progress);
   applyPveRunModifierStats(player, pveRun.modifiers);
   player.hp = Math.min(player.maxHp, pveRun.currentHp);
+  player.runShield = pveRun.currentShield;
   player.teamId = 1;
   player.x = player.radius * 2.5;
   player.y = gameCanvas.height / 2;

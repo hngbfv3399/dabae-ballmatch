@@ -21,6 +21,8 @@ export interface RunModifierEffects {
   attackMultiplier?: number;
   speedMultiplier?: number;
   skillChargeMultiplier?: number;
+  instantHealPercent?: number;
+  shieldPercent?: number;
 }
 
 export interface PveAugmentRequirements {
@@ -60,6 +62,19 @@ const PVE_AUGMENTS: readonly AugmentDefinition[] = [
   { id: "puman-venom-silver", rarity: "silver", name: "독성 촉진", description: "독사의 맹독액 충전 속도가 45% 증가합니다.", icon: "☣", effects: { skillChargeMultiplier: 1.45 }, requirements: { characterId: "puman", equippedSkillName: "독사의 맹독액" } },
   { id: "puman-venom-gold", rarity: "gold", name: "맹독 순환", description: "독사의 맹독액 충전 속도가 70%, 이동 속도가 10% 증가합니다.", icon: "🐍", effects: { skillChargeMultiplier: 1.7, speedMultiplier: 1.1 }, requirements: { characterId: "puman", equippedSkillName: "독사의 맹독액" } },
   { id: "puman-venom-platinum", rarity: "platinum", name: "포식자의 혈청", description: "독사의 맹독액 충전 속도가 100%, 최대 체력이 20% 증가하고 체력을 모두 회복합니다.", icon: "🧪", effects: { skillChargeMultiplier: 2, maxHpMultiplier: 1.2 }, requirements: { characterId: "puman", equippedSkillName: "독사의 맹독액" } },
+];
+
+const PVE_ITEMS: readonly AugmentDefinition[] = [
+  { id: "item-field-medkit", rarity: "common", name: "야전 구급상자", description: "현재 체력을 최대 체력의 35%만큼 회복합니다.", icon: "🩹", effects: { instantHealPercent: 0.35 } },
+  { id: "item-charge-cell", rarity: "common", name: "충전 셀", description: "스킬 게이지 충전 속도가 25% 증가합니다.", icon: "🔋", effects: { skillChargeMultiplier: 1.25 } },
+  { id: "item-combat-chip", rarity: "common", name: "전투 칩", description: "공격력이 18% 증가합니다.", icon: "▣", effects: { attackMultiplier: 1.18 } },
+  { id: "item-light-boots", rarity: "common", name: "경량 부츠", description: "이동 속도가 15% 증가합니다.", icon: "👟", effects: { speedMultiplier: 1.15 } },
+  { id: "item-barrier-pack", rarity: "common", name: "방벽 팩", description: "최대 체력의 25%만큼 보호막을 얻습니다.", icon: "🛡", effects: { shieldPercent: 0.25 } },
+  { id: "item-emergency-kit", rarity: "rare", name: "응급 처치 키트", description: "현재 체력을 최대 체력의 65%만큼 회복합니다.", icon: "⛑", effects: { instantHealPercent: 0.65 } },
+  { id: "item-overclock-core", rarity: "rare", name: "오버클럭 코어", description: "공격력이 20%, 스킬 게이지 충전 속도가 45% 증가합니다.", icon: "⚡", effects: { attackMultiplier: 1.2, skillChargeMultiplier: 1.45 } },
+  { id: "item-thruster", rarity: "rare", name: "추진 엔진", description: "이동 속도가 30%, 공격력이 15% 증가합니다.", icon: "🚀", effects: { speedMultiplier: 1.3, attackMultiplier: 1.15 } },
+  { id: "item-fortress-shell", rarity: "rare", name: "요새 외피", description: "최대 체력이 15% 증가하고, 최대 체력의 55%만큼 보호막을 얻습니다.", icon: "⬢", effects: { maxHpMultiplier: 1.15, shieldPercent: 0.55 } },
+  { id: "item-execution-module", rarity: "rare", name: "처형 모듈", description: "공격력이 42% 증가합니다.", icon: "⚔", effects: { attackMultiplier: 1.42 } },
 ];
 
 export interface PveRunModifiers {
@@ -108,6 +123,18 @@ export function rollPveAugmentChoices(rarity: Extract<RunModifierRarity, "silver
 export function addPveRunAugment(modifiers: PveRunModifiers, augment: RunModifier): void {
   if (augment.kind !== "augment" || modifiers.augments.some((entry) => entry.id === augment.id)) return;
   modifiers.augments.push(augment);
+}
+
+export function rollPveItemChoices(rarity: Extract<RunModifierRarity, "common" | "rare" | "epic">, selectedIds: readonly string[], acquiredAtStage: number): RunModifier[] {
+  const selected = new Set(selectedIds);
+  return shuffle(PVE_ITEMS.filter((item) => item.rarity === rarity && !selected.has(item.id)))
+    .slice(0, 3)
+    .map((item) => ({ ...item, kind: "item", stacks: 1, acquiredAtStage }));
+}
+
+export function addPveRunItem(modifiers: PveRunModifiers, item: RunModifier): void {
+  if (item.kind !== "item" || modifiers.items.length >= 3 || modifiers.items.some((entry) => entry.id === item.id)) return;
+  modifiers.items.push(item);
 }
 
 export function applyPveRunModifierStats(state: CharacterState, modifiers: PveRunModifiers): void {

@@ -1381,6 +1381,14 @@ export class GameLounge {
       }
     }
 
+    if (target.runShield && target.runShield > 0 && finalDamage > 0) {
+      const absorbed = Math.min(target.runShield, finalDamage);
+      target.runShield -= absorbed;
+      finalDamage -= absorbed;
+      context.addFloatingText(target.x, target.y - target.radius - 12, `🛡 -${Math.round(absorbed)}`, "#67e8f9", 0.45);
+      if (finalDamage <= 0) return;
+    }
+
     // 가한 피해량/받은 피해량 누적 (즉사 대미지 등으로 인한 전적 인플레이션 방지를 위해 대상의 남은 체력 한도로 제한)
     const statDamage = Math.min(finalDamage, Math.max(0, target.hp));
 
