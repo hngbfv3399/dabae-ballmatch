@@ -224,6 +224,17 @@
         <div id="gacha-reveal-content" class="gacha-reveal-content card"></div>
       </div>
 
+      <div id="persistent-item-rate-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="persistent-item-rate-title">
+        <div class="modal-content card persistent-item-rate-modal-content">
+          <div class="gacha-modal-header persistent-item-rate-header">
+            <div><span class="eyebrow">PLAYER ITEM DRAW INFO</span><h2 id="persistent-item-rate-title">영구 아이템 확률표</h2></div>
+            <button id="persistent-item-rate-close" class="btn btn-secondary" type="button">닫기</button>
+          </div>
+          <p class="persistent-item-rate-note">미보유 아이템만 뽑기 후보에 남습니다. 이미 보유한 아이템은 다시 나오지 않습니다.</p>
+          <div id="persistent-item-rate-content" class="persistent-item-rate-content"></div>
+        </div>
+      </div>
+
       <!-- 게임 화면 -->
       <section id="game-view" class="view hidden">
         <header class="game-header" style="margin-bottom: 1rem;">

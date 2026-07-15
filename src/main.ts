@@ -78,6 +78,8 @@ const gachaCatalog = document.getElementById("gacha-catalog") as HTMLElement;
 const gachaPreview = document.getElementById("gacha-preview") as HTMLElement;
 const gachaRevealModal = document.getElementById("gacha-reveal-modal") as HTMLElement;
 const gachaRevealContent = document.getElementById("gacha-reveal-content") as HTMLElement;
+const persistentItemRateModal = document.getElementById("persistent-item-rate-modal") as HTMLElement;
+const persistentItemRateContent = document.getElementById("persistent-item-rate-content") as HTMLElement;
 
 function applyArenaToCanvas(arena: ArenaConfig = defaultArena) {
   gameCanvas.width = arena.width;
@@ -866,6 +868,43 @@ async function drawPersistentItemUI() {
     if (drawBtn) drawBtn.disabled = false;
   }
 }
+
+const PERSISTENT_ITEM_RARITY_INFO: Array<{ rarity: CatalogItem["rarity"]; label: string; chance: number }> = [
+  { rarity: "common", label: "일반", chance: 50 },
+  { rarity: "rare", label: "레어", chance: 30 },
+  { rarity: "epic", label: "에픽", chance: 14 },
+  { rarity: "legendary", label: "레전더리", chance: 5 },
+  { rarity: "unique", label: "유니크", chance: 1 },
+];
+
+function openPersistentItemRateModal(characterId: string) {
+  const loadout = persistentItemLoadouts.get(characterId);
+  const equippedIds = new Set(getEquippedPersistentItemIds(loadout));
+  persistentItemRateContent.innerHTML = PERSISTENT_ITEM_RARITY_INFO.map(({ rarity, label, chance }) => {
+    const items = persistentItemCatalog.filter((item) => item.rarity === rarity);
+    const cards = items.map((item) => {
+      const isOwned = persistentItemUnlocks.has(`${characterId}:${item.itemId}`);
+      const isEquipped = equippedIds.has(item.itemId);
+      const status = isEquipped ? "장착 중" : isOwned ? "보유" : "미보유";
+      return `<article class="persistent-item-rate-card rarity-${rarity} ${isOwned ? "owned" : "locked"}">
+        <div><strong>${item.name}</strong><span>${status}</span></div>
+        <p>${item.description}</p>
+      </article>`;
+    }).join("") || `<p class="persistent-item-rate-empty">해당 등급 아이템을 불러오는 중입니다.</p>`;
+    return `<section class="persistent-item-rate-tier rarity-${rarity}">
+      <header><strong>${label}</strong><b>${chance}%</b><small>${items.length}종</small></header>
+      <div class="persistent-item-rate-grid">${cards}</div>
+    </section>`;
+  }).join("");
+  persistentItemRateModal.classList.remove("hidden");
+}
+
+document.getElementById("persistent-item-rate-close")?.addEventListener("click", () => {
+  persistentItemRateModal.classList.add("hidden");
+});
+persistentItemRateModal.addEventListener("click", (event) => {
+  if (event.target === persistentItemRateModal) persistentItemRateModal.classList.add("hidden");
+});
 
 
 async function useExperiencePointItem(characterId: string, item: ExperiencePointItem, resultElement: HTMLElement, useButton: HTMLButtonElement) {
@@ -3386,7 +3425,10 @@ function renderManagedCharacter() {
             ${progress.level >= 30 ? "모든 레벨 보상 수령 완료" : `다음 티켓 지급 레벨: ${getNextMilestoneLabel(progress.level)}`}
           </small>
         </div>
-        <button id="persistent-item-draw-btn" class="btn btn-primary" type="button" ${tickets > 0 ? "" : "disabled"}>아이템 뽑기</button>
+        <div class="persistent-item-draw-actions">
+          <button id="persistent-item-rate-btn" class="btn btn-secondary" type="button">확률표</button>
+          <button id="persistent-item-draw-btn" class="btn btn-primary" type="button" ${tickets > 0 ? "" : "disabled"}>아이템 뽑기</button>
+        </div>
       </div>
       
       <div class="item-slots-grid">
@@ -3446,7 +3488,8 @@ function renderManagedCharacter() {
   `;
 
   // Bind Draw Button
-  document.getElementById("persistent-item-draw-btn")?.addEventListener("click", drawPersistentItemUI);
+document.getElementById("persistent-item-draw-btn")?.addEventListener("click", drawPersistentItemUI);
+  document.getElementById("persistent-item-rate-btn")?.addEventListener("click", () => openPersistentItemRateModal(character.id));
 
   // Render slots
   const loadout = persistentItemLoadouts.get(character.id);
