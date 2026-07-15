@@ -82,7 +82,6 @@ const INITIAL_VICTORY_ACTIONS: readonly VictoryActionDefinition[] = [
   { actionId: "action-rhythm-dance", name: "리듬 댄스", rarity: "epic", animation: "dance" },
   { actionId: "action-trophy-lift", name: "승리 상승", rarity: "legendary", animation: "trophy" },
   { actionId: "action-fireworks-finale", name: "반짝임", rarity: "unique", animation: "fireworks" },
-  { actionId: "action-su-one-shot", name: "원 샷", characterId: "su", rarity: "unique", animation: "sniper" },
 ];
 
 const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
@@ -95,7 +94,7 @@ const INITIAL_VICTORY_BACKGROUNDS: readonly VictoryBackgroundDefinition[] = [
 ];
 
 const INITIAL_VICTORY_SPECIAL_EVENTS: readonly VictorySpecialEventDefinition[] = [
-  { specialEventId: "event-su-one-shot", name: "검은 조준선", characterId: "su", rarity: "unique", effect: "sniper" },
+  { specialEventId: "event-su-one-shot", name: "원 샷", characterId: "su", rarity: "unique", effect: "sniper" },
 ];
 
 const LEGACY_CEREMONY_PART_IDS: Record<string, { actionId: string; backgroundId: string }> = {
@@ -206,6 +205,8 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
       if (!existing) {
         await ctx.db.insert("victorySpecialEvents", { ...specialEvent, isActive: true, createdAt: now });
         created += 1;
+      } else if (existing.name !== specialEvent.name) {
+        await ctx.db.patch(existing._id, { name: specialEvent.name });
       }
     }
     // v3.2.2에서 배경으로 저장된 수 조준선은 특수 이벤트로 이전한다.
@@ -214,6 +215,11 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
       .withIndex("by_backgroundId", (q) => q.eq("backgroundId", "background-su-crosshair"))
       .unique();
     if (legacySniperBackground?.isActive) await ctx.db.patch(legacySniperBackground._id, { isActive: false });
+    const legacySuAction = await ctx.db
+      .query("victoryActions")
+      .withIndex("by_actionId", (q) => q.eq("actionId", "action-su-one-shot"))
+      .unique();
+    if (legacySuAction?.isActive) await ctx.db.patch(legacySuAction._id, { isActive: false });
     const legacySniperUnlock = await ctx.db
       .query("victoryBackgroundUnlocks")
       .withIndex("by_backgroundId", (q) => q.eq("backgroundId", "background-su-crosshair"))
@@ -224,6 +230,17 @@ export const ensureInitialVictoryCeremonyCatalog = mutation({
         .withIndex("by_specialEventId", (q) => q.eq("specialEventId", "event-su-one-shot"))
         .unique();
       if (!specialUnlock) await ctx.db.insert("victorySpecialEventUnlocks", { specialEventId: "event-su-one-shot", unlockedAt: legacySniperUnlock.unlockedAt, unlockedByClientId: legacySniperUnlock.unlockedByClientId });
+    }
+    const legacySuActionUnlock = await ctx.db
+      .query("victoryActionUnlocks")
+      .withIndex("by_actionId", (q) => q.eq("actionId", "action-su-one-shot"))
+      .unique();
+    if (legacySuActionUnlock) {
+      const specialUnlock = await ctx.db
+        .query("victorySpecialEventUnlocks")
+        .withIndex("by_specialEventId", (q) => q.eq("specialEventId", "event-su-one-shot"))
+        .unique();
+      if (!specialUnlock) await ctx.db.insert("victorySpecialEventUnlocks", { specialEventId: "event-su-one-shot", unlockedAt: legacySuActionUnlock.unlockedAt, unlockedByClientId: legacySuActionUnlock.unlockedByClientId });
     }
     // 기존 통합 세레모니를 이미 획득한 경우, 대응하는 행동과 배경을 모두 보존한다.
     const legacyUnlocks = await ctx.db.query("victoryCeremonyUnlocks").take(50);
@@ -602,11 +619,13 @@ export const equipVictoryBackground = mutation({
 });
 
 export const equipVictorySpecialEvent = mutation({
-  args: { clientId: v.string(), specialEventId: v.string() },
+  args: { clientId: v.string(), characterId: v.string(), specialEventId: v.string() },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) throw new Error("Client ID is required");
+    assertCharacterId(args.characterId);
     const specialEvent = await ctx.db.query("victorySpecialEvents").withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.specialEventId)).unique();
     if (!specialEvent?.isActive) throw new Error("Unknown victory special event");
+    if (specialEvent.characterId && specialEvent.characterId !== args.characterId) throw new Error("This special event is exclusive to another character");
     const unlock = await ctx.db.query("victorySpecialEventUnlocks").withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.specialEventId)).unique();
     if (!unlock) throw new Error("Victory special event has not been unlocked globally");
     const now = Date.now();
