@@ -290,7 +290,8 @@ let experiencePointItemsUnsubscribe: (() => void) | null = null;
 // 영구 플레이어 아이템 관련 전역 상태
 let persistentItemCatalog: CatalogItem[] = [];
 let persistentItemLoadouts = new Map<string, CharacterItemLoadout>(); // characterId -> loadout
-let persistentItemTickets = 0;
+let persistentItemTicketBalances = new Map<string, number>(); // characterId -> tickets balance
+let persistentItemUnlocks = new Set<string>(); // Set of "characterId:itemId"
 let persistentItemTicketClaimPending = false;
 let persistentItemSummaryUnsubscribe: (() => void) | null = null;
 
@@ -756,7 +757,17 @@ function initPersistentItems() {
       persistentItemLoadouts = new Map(
         summary.loadouts.map((loadout: any) => [loadout.characterId, loadout as CharacterItemLoadout])
       );
-      persistentItemTickets = summary.ticketBalance;
+      
+      // Populate ticket balances map
+      persistentItemTicketBalances = new Map(
+        summary.ticketBalances.map((b: any) => [b.characterId, b.availableTickets])
+      );
+
+      // Populate unlocks set formatted as `${characterId}:${itemId}`
+      persistentItemUnlocks = new Set(
+        summary.unlocks.map((u: any) => `${u.characterId}:${u.itemId}`)
+      );
+
       if (!collectionHubPanel.classList.contains("hidden")) {
         renderCollection();
       }
@@ -787,6 +798,7 @@ async function autoClaimTickets(characterId: string) {
 }
 
 async function drawPersistentItemUI() {
+  if (!managedCharacterId) return;
   const drawBtn = document.getElementById("persistent-item-draw-btn") as HTMLButtonElement;
   if (drawBtn) drawBtn.disabled = true;
 
@@ -805,6 +817,7 @@ async function drawPersistentItemUI() {
   try {
     const result = (await convexClient.mutation(api.persistentItems.drawPersistentItem, {
       clientId: anonymousClientId,
+      characterId: managedCharacterId,
     })) as { catalogComplete: boolean; item: CatalogItem | null };
 
     if (result.catalogComplete) {
@@ -818,6 +831,7 @@ async function drawPersistentItemUI() {
       `;
     } else if (result.item) {
       const item = result.item;
+      const tickets = persistentItemTicketBalances.get(managedCharacterId) ?? 0;
       gachaRevealContent.innerHTML = `
         <div class="gacha-reveal revealed" style="--skin-border:var(--neon-cyan);--skin-fill:#121225;--skin-text:#fff;--skin-glow:var(--neon-cyan)">
           <span class="eyebrow rarity-epic">PLAYER ITEM DRAW</span>
@@ -827,7 +841,7 @@ async function drawPersistentItemUI() {
           <div class="gacha-reveal-effect" style="margin: 1rem 0; padding: 0.8rem; background: rgba(0,242,254,0.05); border: 1px solid rgba(0,242,254,0.1); border-radius:8px; font-size:0.85rem;">
             <strong>효과:</strong> ${item.description}
           </div>
-          <p style="font-size:0.75rem; color:var(--text-secondary);">남은 티켓: ${persistentItemTickets}장</p>
+          <p style="font-size:0.75rem; color:var(--text-secondary);">남은 티켓: ${tickets}장</p>
           <button id="gacha-reveal-close" class="btn btn-primary" type="button" style="margin-top:1.5rem;">확인</button>
         </div>
       `;
@@ -3334,6 +3348,8 @@ function renderManagedCharacter() {
   // Auto-claim any eligible tickets on render
   void autoClaimTickets(character.id);
 
+  const tickets = persistentItemTicketBalances.get(character.id) ?? 0;
+
   function getNextMilestoneLabel(lvl: number): string {
     const milestones = [5, 10, 15, 20, 25, 30];
     const next = milestones.find((m) => lvl < m);
@@ -3365,12 +3381,12 @@ function renderManagedCharacter() {
       </div>
       <div class="draw-ticket-panel">
         <div class="draw-ticket-info">
-          <strong>보유 아이템 뽑기권: ${persistentItemTickets}장</strong>
+          <strong>보유 아이템 뽑기권: ${tickets}장</strong>
           <small id="milestone-claim-status-text">
             ${progress.level >= 30 ? "모든 레벨 보상 수령 완료" : `다음 티켓 지급 레벨: ${getNextMilestoneLabel(progress.level)}`}
           </small>
         </div>
-        <button id="persistent-item-draw-btn" class="btn btn-primary" type="button" ${persistentItemTickets > 0 ? "" : "disabled"}>아이템 뽑기</button>
+        <button id="persistent-item-draw-btn" class="btn btn-primary" type="button" ${tickets > 0 ? "" : "disabled"}>아이템 뽑기</button>
       </div>
       
       <div class="item-slots-grid">
@@ -3496,11 +3512,12 @@ function renderManagedCharacter() {
   const equippedIds = new Set(getEquippedPersistentItemIds(loadout));
 
   persistentItemCatalog.forEach((item) => {
+    const isUnlocked = persistentItemUnlocks.has(`${character.id}:${item.itemId}`);
     const card = document.createElement("div");
-    card.className = `item-catalog-card ${item.isUnlocked ? "unlocked" : "locked"}`;
+    card.className = `item-catalog-card ${isUnlocked ? "unlocked" : "locked"}`;
     
     let actionBtnHtml = "";
-    if (!item.isUnlocked) {
+    if (!isUnlocked) {
       actionBtnHtml = `<button class="item-catalog-action-btn" disabled>미보유</button>`;
     } else if (equippedIds.has(item.itemId)) {
       actionBtnHtml = `<button class="item-catalog-action-btn" disabled>장착 중</button>`;
@@ -3513,7 +3530,7 @@ function renderManagedCharacter() {
     card.innerHTML = `
       <div class="item-catalog-header">
         <strong>${item.name}</strong>
-        <span class="item-catalog-rarity-badge">${item.isUnlocked ? "보유" : "미보유"}</span>
+        <span class="item-catalog-rarity-badge">${isUnlocked ? "보유" : "미보유"}</span>
       </div>
       <p class="item-catalog-desc">${item.description}</p>
       <div class="item-catalog-btn-group">
@@ -3521,7 +3538,7 @@ function renderManagedCharacter() {
       </div>
     `;
 
-    if (item.isUnlocked && !equippedIds.has(item.itemId) && activeEquipSlot !== null) {
+    if (isUnlocked && !equippedIds.has(item.itemId) && activeEquipSlot !== null) {
       card.querySelector(`#equip-btn-${item.itemId}`)?.addEventListener("click", async () => {
         const resultEl = document.getElementById("persistent-item-action-result") as HTMLElement;
         try {

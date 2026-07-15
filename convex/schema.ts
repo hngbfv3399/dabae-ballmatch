@@ -295,11 +295,14 @@ export default defineSchema({
   // 플레이어가 해금한 아이템 목록
   persistentItemUnlocks: defineTable({
     clientId: v.string(),
+    characterId: v.string(),
     itemId: v.string(),
     unlockedAt: v.number(),
   })
+    .index("by_clientId", ["clientId"])
     .index("by_clientId_and_itemId", ["clientId", "itemId"])
-    .index("by_clientId", ["clientId"]),
+    .index("by_clientId_and_characterId", ["clientId", "characterId"])
+    .index("by_clientId_and_characterId_and_itemId", ["clientId", "characterId", "itemId"]),
 
   // 캐릭터별 영구 아이템 장착 정보
   characterItemLoadouts: defineTable({
@@ -314,9 +317,12 @@ export default defineSchema({
   // 뽑기권 잔액
   itemTicketBalances: defineTable({
     clientId: v.string(),
+    characterId: v.string(),
     availableTickets: v.number(),
     updatedAt: v.number(),
-  }).index("by_clientId", ["clientId"]),
+  })
+    .index("by_clientId", ["clientId"])
+    .index("by_clientId_and_characterId", ["clientId", "characterId"]),
 
   // 마일스톤 레벨 보상 티켓 수령 여부
   itemTicketClaims: defineTable({
@@ -331,10 +337,13 @@ export default defineSchema({
   // 뽑기 이력
   itemDrawHistory: defineTable({
     clientId: v.string(),
+    characterId: v.string(),
     itemId: v.string(),
     result: v.literal("unlocked"),
     ticketConsumed: v.number(),
     createdAt: v.number(),
-  }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
+  })
+    .index("by_clientId_and_createdAt", ["clientId", "createdAt"])
+    .index("by_clientId_and_characterId_and_createdAt", ["clientId", "characterId", "createdAt"]),
 });
 

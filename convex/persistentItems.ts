@@ -150,7 +150,9 @@ export const getItemTicketSummary = query({
     // Get available tickets
     const balanceDoc = await ctx.db
       .query("itemTicketBalances")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId_and_characterId", (q) =>
+        q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+      )
       .unique();
     const availableTickets = balanceDoc?.availableTickets ?? 0;
 
@@ -216,7 +218,9 @@ export const claimAvailableItemTickets = mutation({
     if (newTickets > 0) {
       const balanceDoc = await ctx.db
         .query("itemTicketBalances")
-        .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+        .withIndex("by_clientId_and_characterId", (q) =>
+          q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+        )
         .unique();
 
       if (balanceDoc) {
@@ -229,6 +233,7 @@ export const claimAvailableItemTickets = mutation({
         availableTickets = newTickets;
         await ctx.db.insert("itemTicketBalances", {
           clientId: args.clientId,
+          characterId: args.characterId,
           availableTickets,
           updatedAt: now,
         });
@@ -236,7 +241,9 @@ export const claimAvailableItemTickets = mutation({
     } else {
       const balanceDoc = await ctx.db
         .query("itemTicketBalances")
-        .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+        .withIndex("by_clientId_and_characterId", (q) =>
+          q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+        )
         .unique();
       availableTickets = balanceDoc?.availableTickets ?? 0;
     }
@@ -251,16 +258,19 @@ export const claimAvailableItemTickets = mutation({
 
 // 6. Draw persistent item (Gacha)
 export const drawPersistentItem = mutation({
-  args: { clientId: v.string() },
+  args: { clientId: v.string(), characterId: v.string() },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) throw new Error("Client ID is required");
+    assertCharacterId(args.characterId);
 
     const now = Date.now();
 
     // Check ticket balance
     const balanceDoc = await ctx.db
       .query("itemTicketBalances")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId_and_characterId", (q) =>
+        q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+      )
       .unique();
 
     const availableTickets = balanceDoc?.availableTickets ?? 0;
@@ -276,7 +286,9 @@ export const drawPersistentItem = mutation({
 
     const unlocks = await ctx.db
       .query("persistentItemUnlocks")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId_and_characterId", (q) =>
+        q.eq("clientId", args.clientId).eq("characterId", args.characterId)
+      )
       .take(100);
 
     const unlockedIds = new Set(unlocks.map((u) => u.itemId));
@@ -297,6 +309,7 @@ export const drawPersistentItem = mutation({
     // Create unlock
     await ctx.db.insert("persistentItemUnlocks", {
       clientId: args.clientId,
+      characterId: args.characterId,
       itemId: drawnItem.itemId,
       unlockedAt: now,
     });
@@ -312,6 +325,7 @@ export const drawPersistentItem = mutation({
     // Log draw history
     await ctx.db.insert("itemDrawHistory", {
       clientId: args.clientId,
+      characterId: args.characterId,
       itemId: drawnItem.itemId,
       result: "unlocked",
       ticketConsumed: 1,
@@ -365,11 +379,13 @@ export const equipPersistentItem = mutation({
       throw new Error("이 캐릭터 전용 아이템이 아닙니다.");
     }
 
-    // Verify item is unlocked by player
+    // Verify item is unlocked by player for this specific character
     const isUnlocked = await ctx.db
       .query("persistentItemUnlocks")
-      .withIndex("by_clientId_and_itemId", (q) =>
-        q.eq("clientId", args.clientId).eq("itemId", args.itemId)
+      .withIndex("by_clientId_and_characterId_and_itemId", (q) =>
+        q.eq("clientId", args.clientId)
+          .eq("characterId", args.characterId)
+          .eq("itemId", args.itemId)
       )
       .unique();
     if (!isUnlocked) {
@@ -468,12 +484,11 @@ export const clearPersistentItemSlot = mutation({
   },
 });
 
-// 9. Bounded combined summary
 export const getPersistentItemSummary = query({
   args: { clientId: v.string() },
   handler: async (ctx, args) => {
     if (!args.clientId.trim()) {
-      return { catalog: [], loadouts: [], ticketBalance: 0 };
+      return { catalog: [], loadouts: [], unlocks: [], ticketBalances: [] };
     }
 
     const catalog = await ctx.db
@@ -481,15 +496,13 @@ export const getPersistentItemSummary = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .take(100);
 
-    const unlocks = await ctx.db
+    const unlocksDocs = await ctx.db
       .query("persistentItemUnlocks")
       .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .take(100);
-
-    const unlockedIds = new Set(unlocks.map((u) => u.itemId));
-    const catalogWithUnlock = catalog.map((item) => ({
-      ...item,
-      isUnlocked: unlockedIds.has(item.itemId),
+      .take(500);
+    const unlocks = unlocksDocs.map((u) => ({
+      characterId: u.characterId,
+      itemId: u.itemId,
     }));
 
     const loadouts = await ctx.db
@@ -497,16 +510,20 @@ export const getPersistentItemSummary = query({
       .withIndex("by_clientId_and_characterId", (q) => q.eq("clientId", args.clientId))
       .take(100);
 
-    const balanceDoc = await ctx.db
+    const balancesDocs = await ctx.db
       .query("itemTicketBalances")
       .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique();
-    const ticketBalance = balanceDoc?.availableTickets ?? 0;
+      .take(100);
+    const ticketBalances = balancesDocs.map((b) => ({
+      characterId: b.characterId,
+      availableTickets: b.availableTickets,
+    }));
 
     return {
-      catalog: catalogWithUnlock,
+      catalog,
       loadouts,
-      ticketBalance,
+      unlocks,
+      ticketBalances,
     };
   },
 });

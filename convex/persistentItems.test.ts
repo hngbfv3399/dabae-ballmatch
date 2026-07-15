@@ -198,7 +198,7 @@ async function runTests() {
     const result1 = await getHandler(claimAvailableItemTickets)(ctx, { clientId, characterId });
     assert(result1.claimedCount === 5, "Should claim 5 tickets for Lv.25 (milestones 5, 10, 15, 20, 25)");
 
-    const balanceDoc1 = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId).unique();
+    const balanceDoc1 = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId && b.characterId === characterId).unique();
     assert(balanceDoc1 !== null && balanceDoc1.availableTickets === 5, "Ticket balance should be 5");
 
     // Try claiming again (idempotence check)
@@ -213,7 +213,7 @@ async function runTests() {
     const result3 = await getHandler(claimAvailableItemTickets)(ctx, { clientId, characterId });
     assert(result3.claimedCount === 1, "Should claim 1 more ticket for Lv.30");
 
-    const balanceDoc2 = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId).unique();
+    const balanceDoc2 = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId && b.characterId === characterId).unique();
     assert(balanceDoc2 !== null && balanceDoc2.availableTickets === 6, "Ticket balance should be 6 now");
   }
 
@@ -223,43 +223,44 @@ async function runTests() {
   {
     const { ctx, mockDb } = createMockCtx();
     const clientId = "test_client_1";
+    const characterId = "seojun";
 
     // Seed catalog
     await getHandler(ensureInitialPersistentItemCatalog)(ctx, {});
 
     // Try drawing with 0 tickets balance
     try {
-      await getHandler(drawPersistentItem)(ctx, { clientId });
+      await getHandler(drawPersistentItem)(ctx, { clientId, characterId });
       assert(false, "Should have thrown error due to 0 tickets balance");
     } catch (e: any) {
       assert(e.message.includes("보유한 아이템 뽑기권이 부족합니다."), "Should throw insufficient tickets error");
     }
 
     // Set ticket balance = 1
-    mockDb.insert("itemTicketBalances", { clientId, availableTickets: 1 });
+    mockDb.insert("itemTicketBalances", { clientId, characterId, availableTickets: 1 });
 
     // Draw
-    const drawRes = await getHandler(drawPersistentItem)(ctx, { clientId });
+    const drawRes = await getHandler(drawPersistentItem)(ctx, { clientId, characterId });
     assert(drawRes.catalogComplete === false, "Catalog should not be complete");
     assert(drawRes.item !== null, "Should return drawn item");
 
-    const balanceDoc = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId).unique();
+    const balanceDoc = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId && b.characterId === characterId).unique();
     assert(balanceDoc.availableTickets === 0, "Ticket should be deducted to 0");
 
     // Mock catalog completion
-    // Add unlocks for all catalog items
+    // Add unlocks for all catalog items for this specific character
     const catalog = mockDb.query("persistentItemCatalog").collect();
     catalog.forEach(item => {
-      mockDb.insert("persistentItemUnlocks", { clientId, itemId: item.itemId });
+      mockDb.insert("persistentItemUnlocks", { clientId, characterId, itemId: item.itemId });
     });
 
     // Draw with catalog complete (give 1 ticket again)
     mockDb.patch(balanceDoc._id, { availableTickets: 1 });
-    const drawResComp = await getHandler(drawPersistentItem)(ctx, { clientId });
+    const drawResComp = await getHandler(drawPersistentItem)(ctx, { clientId, characterId });
     assert(drawResComp.catalogComplete === true, "Should detect catalog complete");
     assert(drawResComp.item === null, "Should return null item");
 
-    const balanceDocAfter = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId).unique();
+    const balanceDocAfter = mockDb.query("itemTicketBalances").filter(b => b.clientId === clientId && b.characterId === characterId).unique();
     assert(balanceDocAfter.availableTickets === 1, "Ticket should NOT be deducted when catalog is complete");
   }
 
@@ -278,8 +279,8 @@ async function runTests() {
     mockDb.insert("persistentItemCatalog", { itemId: "buff_hp", name: "생체 완충재", rarity: "rare", isActive: true });
     mockDb.insert("persistentItemCatalog", { itemId: "booster_speed", name: "과과급 동력장치", rarity: "rare", isActive: true });
     
-    mockDb.insert("persistentItemUnlocks", { clientId, itemId: "buff_hp" });
-    mockDb.insert("persistentItemUnlocks", { clientId, itemId: "booster_speed" });
+    mockDb.insert("persistentItemUnlocks", { clientId, characterId, itemId: "buff_hp" });
+    mockDb.insert("persistentItemUnlocks", { clientId, characterId, itemId: "booster_speed" });
 
     // Try equipping locked slot 3
     try {
