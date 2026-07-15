@@ -1381,6 +1381,8 @@ export class GameLounge {
       }
     }
 
+    finalDamage *= target.levelDamageTakenMultiplier ?? 1;
+
     if (target.runShield && target.runShield > 0 && finalDamage > 0) {
       const absorbed = Math.min(target.runShield, finalDamage);
       target.runShield -= absorbed;

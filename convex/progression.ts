@@ -39,6 +39,7 @@ export function growthSummary(experience: number) {
   const isMaxLevel = level === MAX_CHARACTER_LEVEL;
   const healthMultiplier = 1 + 0.02 * (level - 1);
   const attackMultiplier = 1 + 0.0125 * (level - 1);
+  const damageTakenMultiplier = 1 - Math.min(0.29, 0.01 * (level - 1));
   const experienceToNextLevel =
     isMaxLevel ? 0 : experienceRequiredForLevel(level);
 
@@ -50,6 +51,7 @@ export function growthSummary(experience: number) {
     isMaxLevel,
     healthMultiplier,
     attackMultiplier,
+    damageTakenMultiplier,
   };
 }
 

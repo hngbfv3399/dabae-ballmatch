@@ -148,6 +148,7 @@ export interface CharacterState extends CharacterConfig {
   doyunShield?: number; // 도윤 덩크슛 실드 양
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
   runShield?: number; // PvE 런 아이템으로 얻는 보호막
+  levelDamageTakenMultiplier?: number; // 영구 레벨 성장 방어력 보정
   isSuInvisible?: boolean; // 수 정밀 저격 은신 및 무적 여부
   totalDamageDealt?: number; // 한 게임 내 가한 총 피해량
   totalDamageTaken?: number; // 한 게임 내 받은 총 피해량

@@ -203,7 +203,7 @@ let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
-type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
+type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; damageTakenMultiplier: number; totalDungeonClears: number };
 type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
@@ -261,6 +261,14 @@ function getLeveledAttack(baseAttack: number, progress: PveProgress): number {
   return Math.ceil(baseAttack * progress.attackMultiplier);
 }
 
+function getLeveledDamageTakenMultiplier(progress: PveProgress): number {
+  return progress.damageTakenMultiplier ?? 1;
+}
+
+function getLeveledDefensePercent(progress: PveProgress): number {
+  return Math.round((1 - getLeveledDamageTakenMultiplier(progress)) * 100);
+}
+
 function getExperienceLabel(progress: PveProgress): string {
   return progress.isMaxLevel ? "MAX" : `${progress.experienceInCurrentLevel} / ${progress.experienceToNextLevel} XP`;
 }
@@ -279,6 +287,7 @@ function applyCharacterLevel(state: CharacterState) {
   state.maxHp = getLeveledHp(state.maxHp, progress);
   state.hp = state.maxHp;
   state.attackPower = getLeveledAttack(state.attackPower, progress);
+  state.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
   return state;
 }
 
@@ -2571,7 +2580,7 @@ function openCharacterDetail(charId: string) {
 }
 
 function getPveProgress(characterId: string): PveProgress {
-  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, experienceInCurrentLevel: 0, experienceToNextLevel: 100, isMaxLevel: false, healthMultiplier: 1, attackMultiplier: 1, totalDungeonClears: 0 };
+  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, experienceInCurrentLevel: 0, experienceToNextLevel: 100, isMaxLevel: false, healthMultiplier: 1, attackMultiplier: 1, damageTakenMultiplier: 1, totalDungeonClears: 0 };
 }
 
 function updatePveSelectionUI() {
@@ -2587,7 +2596,7 @@ function updatePveSelectionUI() {
   pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
   pveCharacterSelectAvatar.style.color = selected.color;
   pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
-  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getLeveledDefensePercent(progress)}% · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
   pveStartBtn.disabled = false;
 }
 
@@ -2610,7 +2619,7 @@ function renderPveCharacterList() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
-    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>던전 ${progress.totalDungeonClears}회 클리어 · 누적 ${progress.experience} XP</small></div>`;
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getLeveledDefensePercent(progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>던전 ${progress.totalDungeonClears}회 클리어 · 누적 ${progress.experience} XP</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
       pveCharacterModal.classList.add("hidden");
@@ -2667,6 +2676,7 @@ function startPveStage() {
   applyEquippedCosmetic(player);
   player.maxHp = getLeveledHp(character.maxHp, progress);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
+  player.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
   applyPveRunModifierStats(player, pveRun.modifiers);
   player.hp = Math.min(player.maxHp, pveRun.currentHp);
   player.runShield = pveRun.currentShield;
