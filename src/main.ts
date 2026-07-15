@@ -384,7 +384,7 @@ function renderGachaPreview() {
     const ceremony = victoryCeremonyCatalog.find((entry) => entry.ceremonyId === previewVictoryCeremonyId) ?? victoryCeremonyCatalog[0];
     if (!ceremony) { gachaPreview.textContent = "승리 세레모니를 불러오는 중입니다."; return; }
     const isEquipped = ceremony.ceremonyId === equippedVictoryCeremonyId;
-    gachaPreview.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "preview")}<span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${getCeremonyDisplayName(ceremony.animation)}</h3><p>게임 종료 시 1위 플레이어 공이 이 배경 안에서 세레모니 동작을 합니다.</p><div class="skill-slot"><b>배경 + 플레이어 행동</b><br>${getCeremonyBackgroundDescription(ceremony.animation)}</div><p class="gacha-preview-note">세레모니는 배경과 행동이 묶인 하나의 연출입니다. 획득한 세레모니 장착은 <b>도감 탭</b>에서 할 수 있습니다.</p>`;
+    gachaPreview.innerHTML = `<div class="ceremony-preview-parts"><section class="ceremony-preview-part"><span class="eyebrow">CHARACTER ACTION</span>${getCeremonyActionPreviewMarkup(ceremony.animation)}<strong>${getCeremonyActionName(ceremony.animation)}</strong><small>결과 화면의 실제 1위 플레이어 공에 적용됩니다.</small></section><section class="ceremony-preview-part"><span class="eyebrow">BACKGROUND EFFECT</span>${getCeremonyBackgroundPreviewMarkup(ceremony.animation)}<strong>${getCeremonyDisplayName(ceremony.animation)}</strong><small>플레이어 공 뒤에 표시되는 승리 무대입니다.</small></section></div><span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${getCeremonyDisplayName(ceremony.animation)}</h3><p>미리보기에서는 행동과 배경을 따로 확인하고, 실제 게임 결과에서만 하나의 세레모니로 결합됩니다.</p><p class="gacha-preview-note">세레모니는 배경과 행동이 묶인 하나의 연출입니다. 획득한 세레모니 장착은 <b>도감 탭</b>에서 할 수 있습니다.</p>`;
     return;
   }
   const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === previewGachaCosmeticId) ?? cosmeticCatalog[0];
@@ -439,12 +439,24 @@ function getCeremonyDisplayName(animation: VictoryCeremony["animation"]): string
   return ({ wave: "별빛 무대", jump: "맑은 하늘", clap: "골드 스포트라이트", dance: "네온 리듬", trophy: "챔피언 골드", fireworks: "불꽃 축제" })[animation];
 }
 
+function getCeremonyActionName(animation: VictoryCeremony["animation"]): string {
+  return ({ wave: "좌우 흔들기", jump: "점프", clap: "박자 튀기", dance: "리듬 이동", trophy: "승리 상승", fireworks: "반짝임" })[animation];
+}
+
 function getCeremonyBackgroundDescription(animation: VictoryCeremony["animation"]): string {
   return ({ wave: "푸른 별빛 무대에서 플레이어 공이 가볍게 좌우로 흔들립니다.", jump: "맑은 하늘 무대에서 플레이어 공이 힘차게 뛰어오릅니다.", clap: "골드 조명 무대에서 플레이어 공이 박자에 맞춰 튀어 오릅니다.", dance: "네온 배경과 함께 플레이어 공이 리듬감 있게 춤춥니다.", trophy: "황금빛 무대에서 플레이어 공이 위로 떠오르며 빛납니다.", fireworks: "불꽃 배경에서 플레이어 공이 반짝이며 승리를 장식합니다." })[animation];
 }
 
 function getCeremonySceneMarkup(animation: VictoryCeremony["animation"], size: "catalog" | "preview" | "reveal", playerMarkup = "<b>PLAYER</b>"): string {
   return `<div class="ceremony-scene ceremony-scene-${size} ceremony-scene-${animation}" aria-hidden="true"><i></i><i></i><i></i><span class="ceremony-scene-ball">${playerMarkup}</span></div>`;
+}
+
+function getCeremonyActionPreviewMarkup(animation: VictoryCeremony["animation"]): string {
+  return `<div class="ceremony-action-preview ceremony-scene-${animation}" aria-hidden="true"><span class="ceremony-scene-ball"><b>PLAYER</b></span></div>`;
+}
+
+function getCeremonyBackgroundPreviewMarkup(animation: VictoryCeremony["animation"]): string {
+  return `<div class="ceremony-background-preview ceremony-scene ceremony-scene-${animation}" aria-hidden="true"><i></i><i></i><i></i></div>`;
 }
 
 function showVictoryCeremonyRevealResult(result: VictoryCeremonyDrawResult) {
