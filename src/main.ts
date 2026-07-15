@@ -13,6 +13,7 @@ import {
 } from "./maps";
 import { GameLounge } from "./maingame/gameLounge";
 import { getCharacterStatusEffects } from "./maingame/statusEffects";
+import { clearPveRunModifiers, createPveRunModifiers, getAllRunModifiers, type PveRunModifiers } from "./maingame/runModifiers";
 import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
@@ -85,6 +86,7 @@ const aliveCountEl = document.getElementById("alive-count") as HTMLElement;
 const totalCountEl = document.getElementById("total-count") as HTMLElement;
 const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
+const pveRunModifiersPanel = document.getElementById("pve-run-modifiers") as HTMLElement;
 const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
 const randomStartBtn = document.getElementById(
   "random-start-btn",
@@ -197,7 +199,7 @@ const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
 type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; totalDungeonClears: number };
-type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number; rewardEligible: boolean };
+type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -1499,6 +1501,7 @@ function formatHp(hp: number): string {
 
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
+  renderPveRunModifiers();
   // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
   const aliveCount = characters.filter(
     (c) => !c.isDead && !c.id.includes("eunsu_clone"),
@@ -1655,6 +1658,23 @@ function updateHUD(characters: CharacterState[]) {
   });
 }
 
+function renderPveRunModifiers() {
+  if (currentMode !== "pve" || !pveRun) {
+    pveRunModifiersPanel.classList.add("hidden");
+    pveRunModifiersPanel.innerHTML = "";
+    return;
+  }
+  const modifiers = getAllRunModifiers(pveRun.modifiers);
+  pveRunModifiersPanel.classList.remove("hidden");
+  pveRunModifiersPanel.innerHTML = `<div class="pve-run-modifiers-head"><span>이번 런 빌드</span><strong>증강 ${pveRun.modifiers.augments.length} · 아이템 ${pveRun.modifiers.items.length}</strong></div>${modifiers.length > 0 ? `<div class="pve-run-modifier-list">${modifiers.map((modifier) => `<span class="pve-run-modifier ${modifier.kind} rarity-${modifier.rarity}" title="${modifier.description}">${modifier.icon} ${modifier.name}${modifier.stacks > 1 ? ` ×${modifier.stacks}` : ""}</span>`).join("")}</div>` : `<small>다음 단계부터 증강과 아이템 선택이 이곳에 기록됩니다.</small>`}`;
+}
+
+function getPveRunSummaryMarkup(run: PveRun): string {
+  const modifiers = getAllRunModifiers(run.modifiers);
+  if (modifiers.length === 0) return `<p class="win-desc">이번 런에서는 아직 증강과 인게임 아이템을 선택하지 않았습니다.</p>`;
+  return `<div class="pve-run-summary"><strong>이번 런 빌드</strong>${modifiers.map((modifier) => `<span>${modifier.icon} ${modifier.name}</span>`).join("")}</div>`;
+}
+
 // Countdown handler
 function updateCountdown(seconds: number) {
   if (seconds > 0) {
@@ -1685,7 +1705,9 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     const player = allChars.find((character) => character.id === run.characterId);
     const clearedStage = winner?.teamId === 1 && player && !player.isDead;
     if (!clearedStage || !player) {
+      clearPveRunModifiers(run.modifiers);
       pveRun = null;
+      renderPveRunModifiers();
       pveAdvancePending = false;
       if (winnerTitle) winnerTitle.textContent = "DUNGEON FAILED";
       winnerInfo.innerHTML = `<div class="winner-trophy">💀</div><div class="win-name" style="color:#ff5e5e">던전 실패</div><div class="win-desc">이번 스테이지 보상은 획득하지 못했습니다. 이전에 클리어한 스테이지의 XP는 유지됩니다.</div>`;
@@ -1715,7 +1737,10 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       return;
     }
 
+    const runSummary = getPveRunSummaryMarkup(run);
+    clearPveRunModifiers(run.modifiers);
     pveRun = null;
+    renderPveRunModifiers();
     pveAdvancePending = false;
     const clearTimeMs = Date.now() - run.startedAt;
     gameStatusText.textContent = "던전 클리어";
@@ -1734,7 +1759,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
         clearTimeMs,
       }).then((result) => {
         if (winnerTitle) winnerTitle.textContent = "DUNGEON CLEARED";
-        winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · 던전 1 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 1-1부터 1-5까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 1-5 경험치</span><strong class="text-neon-yellow">+${stageResult.experienceGranted} XP</strong></div><div class="stat-row"><span>가챠 진행도</span><strong>${result.completedDungeonClears % 3} / 3 던전 클리어</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>`;
+        winnerInfo.innerHTML = `<div class="winner-trophy">🧪</div><div class="win-name" style="color:${player.color}">${player.name} · 던전 1 클리어</div><div class="win-desc">${Math.ceil(clearTimeMs / 1000)}초 · 스테이지 1-1부터 1-5까지 적 전멸 성공</div><div class="char-stats" style="margin-top:1.2rem"><div class="stat-row"><span>스테이지 1-5 경험치</span><strong class="text-neon-yellow">+${stageResult.experienceGranted} XP</strong></div><div class="stat-row"><span>가챠 진행도</span><strong>${result.completedDungeonClears % 3} / 3 던전 클리어</strong></div><div class="stat-row"><span>현재 레벨</span><strong>Lv.${result.level}</strong></div></div>${runSummary}`;
         modalCloseBtn.textContent = "던전 선택으로";
         winnerModal.classList.remove("hidden");
       });
@@ -1996,7 +2021,9 @@ function closeWinnerModal() {
 function goBackToLobby() {
   if (gameView.classList.contains("is-focus-mode")) void setFocusMode(false);
   isPracticeMode = false;
+  if (pveRun) clearPveRunModifiers(pveRun.modifiers);
   pveRun = null;
+  renderPveRunModifiers();
   pveAdvancePending = false;
   tournamentState = null;
   if (tournamentHeader) tournamentHeader.classList.add("hidden");
@@ -2509,7 +2536,7 @@ function startPveDungeon() {
   pveCharacterModal.classList.add("hidden");
   gameModeModal.classList.add("hidden");
   const stage = Number(pveStageSelect.value);
-  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), rewardEligible: stage === 1 };
+  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
   startPveStage();
 }
 
