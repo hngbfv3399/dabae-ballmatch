@@ -9,6 +9,7 @@ export const eunsuConfig: CharacterConfig = {
   maxHp: 130,
   speed: 1.3,
   attackPower: 16,
+  defense: 8,
   baseAttackRange: 45,
   skillName: '색욕의 도플갱어',
   skillDescription: '10초 쿨타임. 스킬 사용 시 80% 확률로 자신과 비슷한 약체 분신(은수 분신)을 소환하고, 20% 확률로 실패합니다. 패시브: 적과 접촉 충돌 시 25% 확률로 상대를 0.8초간 기절시키며 "팡! 팡!" 연속 2연타 타격 대미지를 입힙니다.',

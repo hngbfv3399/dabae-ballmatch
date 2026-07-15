@@ -60,6 +60,7 @@ export const mongshilConfig: CharacterConfig = {
   maxHp: 145,
   speed: 1.35,
   attackPower: 13,
+  defense: 8,
   baseAttackRange: 50,
   skillName: '독성 잔향',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초마다 가장 가까운 적의 위치로 독성 물질을 투척합니다. 착탄 지점에는 ${SKILL_CONSTANTS.RESIDUE_LIFETIME}초간 독성 잔상 ${SKILL_CONSTANTS.RESIDUE_COUNT}개가 남습니다. 적은 잔상당 ${SKILL_CONSTANTS.RESIDUE_ENEMY_DAMAGE} 피해를 받고, 아군은 ${SKILL_CONSTANTS.RESIDUE_ALLY_HEAL} 회복합니다. 패시브: 평타 적중 시 ${SKILL_CONSTANTS.HEAT_CHANCE * 100}% 확률로 ${SKILL_CONSTANTS.HEAT_DURATION}초간 초당 ${SKILL_CONSTANTS.HEAT_DAMAGE_PER_SECOND} 열기 피해를 줍니다.`,

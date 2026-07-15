@@ -40,6 +40,7 @@ export const chanikConfig: CharacterConfig = {
   maxHp: 170,
   speed: 1.3,
   attackPower: 14,
+  defense: 10,
   baseAttackRange: 45,
   skillName: '포격 지원 요청 (Artillery Strike)',
   skillDescription: '8초 쿨타임. 맵 전체에 공습경보를 내리고 무차별 전탄 폭격을 요청합니다. 스킬이 유지되는 동안 맵 전체의 모든 적은 이동 속도가 20% 감소하며, 1.5초 뒤 맵 전체 영역에 4.8초 동안 포탄들이 무차별 연속 낙하하여 폭발당 반경 135px 범위에 10의 피해와 강한 넉백을 입힙니다.',

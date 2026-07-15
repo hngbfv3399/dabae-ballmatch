@@ -43,6 +43,7 @@ export const myeongseokConfig: CharacterConfig = {
   maxHp: 145,
   speed: 1.2,
   attackPower: 14,
+  defense: 11,
   baseAttackRange: 45,
   skillName: '퍼펙트 스트라이크',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 무겁고 빠른 볼링공을 던집니다. 볼링공은 ${SKILL_CONSTANTS.BALL_DURATION}초 동안 벽과 캐릭터 사이를 바운싱하며, 벽에 충돌 시 +${SKILL_CONSTANTS.WALL_DMG_INCREMENT} 대미지, 캐릭터 충돌 시 +${SKILL_CONSTANTS.CHAR_DMG_INCREMENT} 대미지가 영구적으로 중첩됩니다.`,

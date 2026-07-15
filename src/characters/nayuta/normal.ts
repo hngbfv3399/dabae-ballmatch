@@ -39,6 +39,7 @@ export const nayutaConfig: CharacterConfig = {
   maxHp: 140,
   speed: 1.5,
   attackPower: 11,
+  defense: 5,
   baseAttackRange: 45,
   skillName: '지배 (Domination)',
   skillDescription: '스킬 지속 5초. 적과 접촉 시 40% 확률로 10초간 적을 "지배"합니다. 지배된 적은 스킬 게이지가 충전되지 않습니다. 스킬 사용 시 5초간 지배 대상에게 지속 대미지와 디버프를 주고, 스킬을 무효화합니다.',

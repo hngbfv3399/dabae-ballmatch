@@ -54,6 +54,7 @@ export const chanhwiConfig: CharacterConfig = {
   maxHp: 70,
   speed: 1.6,
   attackPower: 25,
+  defense: 2,
   baseAttackRange: 45,
   skillName: '신라천정 (Shinra Tensei)',
   skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 1.8초간 기절시킵니다. 아군은 영향을 받지 않습니다. 보스에게는 최대 체력의 8% 피해만 주며 CC는 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',

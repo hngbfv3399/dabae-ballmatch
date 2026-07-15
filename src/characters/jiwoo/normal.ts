@@ -40,7 +40,7 @@ function clearDebuffs(char: CharacterState): void {
 // #region CONFIG
 // ═══════════════════════════════════════════
 export const jiwooConfig: CharacterConfig = {
-  id: 'jiwoo', name: '지우', maxHp: 130, speed: 1.4, attackPower: 12, baseAttackRange: 48,
+  id: 'jiwoo', name: '지우', maxHp: 130, speed: 1.4, attackPower: 12, defense: 7, baseAttackRange: 48,
   skillName: '허식 (Vanity)',
   skillDescription: `패시브: 같은 적에게 기본 공격을 ${SKILL_CONSTANTS.REALITY_FRACTURE_MAX_STACKS}회 적중하면 현실 균열을 일으켜 ${SKILL_CONSTANTS.REALITY_FRACTURE_DAMAGE} 피해와 ${SKILL_CONSTANTS.REALITY_FRACTURE_CONFUSION_DURATION}초 혼란을 줍니다. 누적은 ${SKILL_CONSTANTS.REALITY_FRACTURE_DURATION}초 뒤 사라집니다. 액티브: ${SKILL_CONSTANTS.VANITY_DURATION}초간 지우의 허상이 남습니다. 적은 허상을 정상적으로 공격하지만 지우는 피해를 전부 무시하며, 허상이 받은 피해의 ${SKILL_CONSTANTS.REFLECT_DAMAGE_RATIO * 100}%를 공격자에게 즉시 되돌립니다.`,
   color: '#b38cff', skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, tier: 'A', role: 'Disabler',

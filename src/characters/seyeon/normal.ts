@@ -18,6 +18,7 @@ export const seyeonConfig: CharacterConfig = {
   maxHp: 130,
   speed: 1.3,
   attackPower: 14,
+  defense: 12,
   baseAttackRange: 45,
   skillName: '치명적인 유혹의 댄스',
   skillDescription: '7초 쿨타임. 4초 동안 매혹의 댄스를 추며 이동 속도가 50% 증가하고 피해 면역 무적 상태가 됩니다. 주변 220px 영역에 매혹 아우라를 전개하여 범위 내 모든 적을 기절(봉쇄)시키고 세연에게로 강렬하게 끌어당깁니다. 아우라 내 적들은 매초 8의 지속 피해를 입고, 받는 모든 피해량이 50% 증폭됩니다.',

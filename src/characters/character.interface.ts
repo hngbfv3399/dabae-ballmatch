@@ -80,6 +80,7 @@ export interface CharacterConfig {
   maxHp: number;
   speed: number;          // 기본 속도 배율
   attackPower: number;    // 기본 공격력
+  defense?: number;       // 기본 방어력 (%). 레벨 성장 방어력과 곱연산으로 합산한다.
   baseAttackRange: number;// 기본 공격 사거리 (px)
   skillName: string;
   skillDescription: string;

@@ -253,20 +253,25 @@ function applyEquippedCosmetic(state: CharacterState) {
 
 // 레벨 성장으로 계산되는 실제 전투 스탯은 항상 정수로 확정한다.
 // 공격력이 0인 특수 캐릭터도 있으므로 고정 +1이 아닌, 양수 기본 스탯의 올림 보정을 사용한다.
+function getLevelStatGrowthSteps(level: number): number {
+  return Math.max(0, (level - 1) - Math.floor(level / 5));
+}
+
 function getLeveledHp(baseHp: number, progress: PveProgress): number {
-  return Math.ceil(baseHp * progress.healthMultiplier);
+  return Math.ceil(baseHp * (1 + 0.02 * getLevelStatGrowthSteps(progress.level)));
 }
 
 function getLeveledAttack(baseAttack: number, progress: PveProgress): number {
-  return Math.ceil(baseAttack * progress.attackMultiplier);
+  return Math.ceil(baseAttack * (1 + 0.0125 * getLevelStatGrowthSteps(progress.level)));
 }
 
 function getLeveledDamageTakenMultiplier(progress: PveProgress): number {
-  return progress.damageTakenMultiplier ?? 1;
+  return 1 - Math.min(0.29, 0.01 * getLevelStatGrowthSteps(progress.level));
 }
 
-function getLeveledDefensePercent(progress: PveProgress): number {
-  return Math.round((1 - getLeveledDamageTakenMultiplier(progress)) * 100);
+function getTotalDefensePercent(character: { defense?: number }, progress: PveProgress): number {
+  const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, character.defense ?? 0) / 100);
+  return Math.round((1 - baseDefenseMultiplier * getLeveledDamageTakenMultiplier(progress)) * 100);
 }
 
 function getNextSkillUnlockLevel(level: number): number | null {
@@ -2602,7 +2607,7 @@ function updatePveSelectionUI() {
   pveCharacterSelectAvatar.style.color = selected.color;
   pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
   const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
-  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getLeveledDefensePercent(progress)}% · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getTotalDefensePercent(selected, progress)}% · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
   pveStartBtn.disabled = false;
 }
 
@@ -2626,7 +2631,7 @@ function renderPveCharacterList() {
     button.type = "button";
     button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
     const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
-    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getLeveledDefensePercent(progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
       pveCharacterModal.classList.add("hidden");
@@ -2796,7 +2801,7 @@ function renderMatchCharacterPreview() {
   const skinEffect = cosmetic
     ? `${cosmetic.rarity.toUpperCase()} · ${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`
     : "기본 외형 · 캐릭터 고유 색상과 테두리를 사용합니다.";
-  matchCharacterPickerDetail.innerHTML = `<div class="picker-detail-head"><div class="picker-preview-avatar">${getAvatarHTML(character.name, character.image, "picker-preview-image")}</div><div><span class="eyebrow">${character.role}</span><h3 style="color:${character.color}">${character.name} <small>Lv.${progress.level}</small></h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><section class="picker-info-block"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><p>캐릭터 고유 전투 로직이 현재 전투에 유지됩니다.</p></section><section class="picker-info-block"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><p>${character.skillDescription}</p></section><section class="picker-info-block skin-info"><em>SKIN · 현재 착용</em><strong>${cosmetic?.name ?? "기본 외형"}</strong><p>${skinEffect}</p></section><button id="confirm-match-character-btn" class="btn btn-primary" type="button">${character.name} 선택하기</button>`;
+  matchCharacterPickerDetail.innerHTML = `<div class="picker-detail-head"><div class="picker-preview-avatar">${getAvatarHTML(character.name, character.image, "picker-preview-image")}</div><div><span class="eyebrow">${character.role}</span><h3 style="color:${character.color}">${character.name} <small>Lv.${progress.level}</small></h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><section class="picker-info-block"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><p>캐릭터 고유 전투 로직이 현재 전투에 유지됩니다.</p></section><section class="picker-info-block"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><p>${character.skillDescription}</p></section><section class="picker-info-block skin-info"><em>SKIN · 현재 착용</em><strong>${cosmetic?.name ?? "기본 외형"}</strong><p>${skinEffect}</p></section><button id="confirm-match-character-btn" class="btn btn-primary" type="button">${character.name} 선택하기</button>`;
   document.getElementById("confirm-match-character-btn")?.addEventListener("click", () => chooseMatchCharacter(character.id));
 }
 
@@ -2834,7 +2839,7 @@ function renderManagedCharacter() {
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
   const canSpendExperiencePoints = false;
-  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section><h4>스킬 장착</h4><div class="skill-equip-grid"><button class="skill-equip equipped" type="button"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><small>캐릭터 고유 전투 로직이 유지됩니다.</small></button><button class="skill-equip equipped" type="button"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><small>${character.skillDescription}</small></button><button class="skill-equip locked" type="button" disabled><em>추가 슬롯</em><strong>업데이트 예정</strong><small>새 스킬 추가 후 장착할 수 있습니다.</small></button></div><h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
   const experienceSection = collectionDetail.querySelector(".experience-point-spend") as HTMLElement;
   experienceSection.innerHTML = `<div><span class="eyebrow">ITEM INVENTORY</span><strong>경험치 포인트 아이템</strong><p>아이템을 누르면 ${character.name}에게 즉시 경험치가 적용됩니다.</p></div><div id="collection-experience-point-items" class="experience-point-item-grid"></div><small id="collection-experience-point-result" aria-live="polite">중복 스킨을 획득하면 경험치 포인트 아이템이 추가됩니다.</small>`;
   const experienceItemGrid = document.getElementById("collection-experience-point-items") as HTMLElement;

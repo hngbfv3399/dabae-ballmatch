@@ -1381,7 +1381,8 @@ export class GameLounge {
       }
     }
 
-    finalDamage *= target.levelDamageTakenMultiplier ?? 1;
+    const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, target.defense ?? 0) / 100);
+    finalDamage *= baseDefenseMultiplier * (target.levelDamageTakenMultiplier ?? 1);
 
     if (target.runShield && target.runShield > 0 && finalDamage > 0) {
       const absorbed = Math.min(target.runShield, finalDamage);

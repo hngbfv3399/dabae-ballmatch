@@ -111,6 +111,7 @@ export const esConfig: CharacterConfig = {
   maxHp: SKILL_CONSTANTS.MAX_HP,
   speed: SKILL_CONSTANTS.SPEED,
   attackPower: SKILL_CONSTANTS.ATTACK_POWER,
+  defense: 5,
   baseAttackRange: SKILL_CONSTANTS.ATTACK_RANGE,
   skillName: '부착형 수류탄',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초마다 가장 가까운 적을 향해 수류탄을 던집니다. 수류탄은 적 또는 벽에 붙고 ${SKILL_CONSTANTS.GRENADE_FUSE_DURATION}초 뒤 반경 ${SKILL_CONSTANTS.GRENADE_RADIUS_DAMAGE}px에 ${SKILL_CONSTANTS.GRENADE_DAMAGE} 피해를 줍니다. 패시브 [폭탄의 악마]: HP가 ${SKILL_CONSTANTS.PASSIVE_HP_THRESHOLD} 이하가 되면 한 번, 반경 ${SKILL_CONSTANTS.PASSIVE_RADIUS}px 적 전원에게 ${SKILL_CONSTANTS.PASSIVE_DAMAGE} 피해를 줍니다.`,

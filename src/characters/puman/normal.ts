@@ -58,6 +58,7 @@ export const pumanConfig: CharacterConfig = {
   maxHp: 145,
   speed: 1.25,
   attackPower: SKILL_CONSTANTS.BASE_ATK,
+  defense: 12,
   baseAttackRange: 45,
   skillName: '독사의 맹독액',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 뽀 액티브 스킬로 맹독액을 발사해 맞은 상대에게 ${SKILL_CONSTANTS.POISON_DURATION}초간 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 입칩니다. 패시브: 화면에 랜덤 생성되는 식물(🌱)을 직접 가서 섭취하면 공격력 +${SKILL_CONSTANTS.ATK_PER_STACK} 스택(최대 ${SKILL_CONSTANTS.MAX_STACKS}회)과 ${SKILL_CONSTANTS.HEAL_ON_EAT} 만큼의 즉시 체력 회복을 얻습니다. 상대방이 식물과 접촉하면 식물이 소멸하며 푸만의 현재 스택x${SKILL_CONSTANTS.ATK_PER_STACK} 만큼의 피해를 입힙니다. 기본 공격 적중 시 보유한 모든 스택을 소모하여 소모한 스택x${SKILL_CONSTANTS.HEAL_ON_EAT} 만큼 체력을 회복하고 공격력이 기본값으로 초기화됩니다.`,

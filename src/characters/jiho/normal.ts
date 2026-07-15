@@ -35,6 +35,7 @@ export const jihoConfig: CharacterConfig = {
   maxHp: 160,
   speed: 1.4,
   attackPower: 10,
+  defense: 9,
   baseAttackRange: 45,
   skillName: '코드 컴파일 및 실행',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 기본 공격 시 ${SKILL_CONSTANTS.BUG_CHANCE * 100}% 확률로 ${SKILL_CONSTANTS.BUG_DURATION}초간 [버그] 디버프(이속 ${SKILL_CONSTANTS.BUG_SPEED_DEBUFF}% 감소)를 걸며, 디버프 적용 시 ${SKILL_CONSTANTS.CRASH_CHANCE * 100}% 확률로 [런타임 에러](${SKILL_CONSTANTS.CRASH_DMG} 피해 + ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절 및 주변 ${SKILL_CONSTANTS.CRASH_SPLASH_RADIUS}px 적들에게 ${SKILL_CONSTANTS.CRASH_SPLASH_DMG} 광역 피해)를 입힙니다. 스킬 성공 시 주변에 ${SKILL_CONSTANTS.COMPILE_SUCCESS_SPLASH_DMG}의 광역 피해와 넉백을 주고 버프를 얻으며, 실패 시 기절합니다.`,

@@ -22,6 +22,7 @@ export const doyunConfig: CharacterConfig = {
   maxHp: 150,
   speed: 1.2,
   attackPower: 13,
+  defense: 14,
   baseAttackRange: 45,
   skillName: '불꽃 덩크슛 슬램',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 가장 가까운 적에게 공중 도약(크기 확대) 후 유도 돌진하여 내리꽂아 반경 ${SKILL_CONSTANTS.SPLASH_RADIUS}px 내의 모든 적에게 광역 폭발 피해(공격력의 ${SKILL_CONSTANTS.DMG_MULTIPLIER}배 + ${SKILL_CONSTANTS.DMG_BASE})를 주고 밀쳐냅니다. 돌진이 적에게 적중했을 경우에만 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 대미지를 막아내는 실드를 획득합니다.`,

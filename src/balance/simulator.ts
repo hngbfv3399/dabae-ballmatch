@@ -104,5 +104,6 @@ function attackInterval(config: CharacterConfig): number {
 function applyHit(attacker: CharacterConfig, target: CharacterConfig, random: () => number): number {
   const rangeFactor = Math.min(1.15, 0.85 + attacker.baseAttackRange / 600);
   const variation = 0.9 + random() * 0.2;
-  return attacker.attackPower * rangeFactor * variation * (1 - Math.min(target.speed, 3) * 0.015);
+  const defenseMultiplier = 1 - Math.min(0.8, Math.max(0, target.defense ?? 0) / 100);
+  return attacker.attackPower * rangeFactor * variation * (1 - Math.min(target.speed, 3) * 0.015) * defenseMultiplier;
 }

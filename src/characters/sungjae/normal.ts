@@ -95,6 +95,7 @@ export const sungjaeConfig: CharacterConfig = {
   maxHp: SKILL_CONSTANTS.MECHA_MAX_HP + SKILL_CONSTANTS.PILOT_MAX_HP, // Visual representation
   speed: 1.15,
   attackPower: 0, // Set to 0 to prevent engine-level automatic contact damage!
+  defense: 20,
   baseAttackRange: SKILL_CONSTANTS.MECHA_RANGE,
   skillName: '회전식 전술 레일건 (Rotating Railgun)',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 1단계 건담 탑승 중에는 주위에 전술 조준선을 1.2초간 회전시키다 궤적 방향으로 2.5초간 매 0.12초마다 플라즈마 탄환(각 ${SKILL_CONSTANTS.RAILGUN_FIRE_DMG} 대미지)을 연사합니다. 연사 중에는 자유롭게 무빙이 가능합니다. 패시브: 메카 탑승 중에는 근거리 칼날 베기 공격을 가하며 넉백을 덜 받습니다. 메카 HP가 0이 되면 대폭발을 유발하며 성재 본체(이속 상승, 극도로 취약한 넉백 저항)가 사출되며, 이 상태에서는 원거리 딱총 연사 평타로 전환됩니다.`,

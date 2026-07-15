@@ -55,6 +55,7 @@ export const juyeonConfig: CharacterConfig = {
   maxHp: 135,
   speed: 1.3,
   attackPower: 12,
+  defense: 7,
   baseAttackRange: 45,
   skillName: '프리미엄 모델링 앰플 팩',
   skillDescription: `${SKILL_CONSTANTS.COOLDOWN}초 쿨타임. 스킬 시전 시 즉시 자가 치유로 체력을 ${SKILL_CONSTANTS.HEAL_AMOUNT} 회복하고 ${SKILL_CONSTANTS.SPEED_BUFF_DURATION}초간 이동속도가 ${SKILL_CONSTANTS.SPEED_BUFF_PCT}% 증가합니다. 동시에 가장 가까운 적에게 앰플 팩을 발사해 적중 즉시 ${SKILL_CONSTANTS.STUN_DURATION}초간 기절시키며, 1초 뒤 굳은 팩이 깨질 때 ${SKILL_CONSTANTS.EXPLOSION_DAMAGE}의 피해를 입힙니다. 패시브: 적과 충돌 시 ${SKILL_CONSTANTS.STEAL_CHANCE * 100}% 확률로 이속 ${SKILL_CONSTANTS.STEAL_SPEED_PCT}%를 강탈해 중첩(최대 ${SKILL_CONSTANTS.STEAL_MAX_STACKS}중첩, ${SKILL_CONSTANTS.STEAL_DURATION}초)하며, 적의 보호막 실드를 즉시 파괴하고 ${SKILL_CONSTANTS.SHIELD_POP_DAMAGE}의 추가 피해를 입힙니다.`,

@@ -52,7 +52,7 @@ function nearestEnemy(char: CharacterState, ctx: CharacterBehaviorContext) {
 // ═══════════════════════════════════════════
 export const junseokConfig: CharacterConfig = {
   id: 'junseok', name: '준석', maxHp: SKILL_CONSTANTS.MAX_HP, speed: SKILL_CONSTANTS.SPEED,
-  attackPower: SKILL_CONSTANTS.ATTACK_POWER, baseAttackRange: SKILL_CONSTANTS.ATTACK_RANGE,
+  attackPower: SKILL_CONSTANTS.ATTACK_POWER, defense: 7, baseAttackRange: SKILL_CONSTANTS.ATTACK_RANGE,
   skillName: '작전명: 차단',
   skillDescription: `가장 가까운 적의 예상 이동 경로에 차단 폭발을 설치합니다. 기본은 ${SKILL_CONSTANTS.BASE_BLOCK_COUNT}회 폭발(각 ${SKILL_CONSTANTS.BASE_DAMAGE} 피해)이며, 작전 자료 ${SKILL_CONSTANTS.MAX_OPERATION_DATA}스택이면 마지막 포위 폭발이 ${SKILL_CONSTANTS.ENHANCED_DAMAGE} 피해로 강화됩니다.`,
   color: '#7dd3fc', skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, tier: 'A', role: 'Specialist',

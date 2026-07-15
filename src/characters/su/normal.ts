@@ -88,6 +88,7 @@ export const suConfig: CharacterConfig = {
   maxHp: 140,
   speed: 1.5,
   attackPower: 0,
+  defense: 4,
   baseAttackRange: 60,
   skillName: '정밀 저격 (Sniper shot)',
   skillDescription: '기본 공격력 0. 가장 가까운 대상을 저격합니다. 다리(30% 확률, 20 피해), 바디(60% 확률, 40 피해), 헤드(10% 확률, 대상 최대 체력의 80% 절대 피해) 중 무작위 부위를 저격합니다. 추가로 스킬 사용 시 1.5초간 은신 및 대미지 면역 상태가 됩니다. (쿨타임 6초)',
