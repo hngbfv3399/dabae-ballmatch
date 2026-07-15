@@ -1,14 +1,28 @@
 import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+function compareVersions(v1: string, v2: string) {
+  const cleanV = (v: string) => v.startsWith("v") ? v.slice(1) : v;
+  const parts1 = cleanV(v1).split(".").map(Number);
+  const parts2 = cleanV(v2).split(".").map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] ?? 0;
+    const p2 = parts2[i] ?? 0;
+    if (p1 !== p2) {
+      return p2 - p1; // descending
+    }
+  }
+  return 0;
+}
+
 // Get the latest patch note
 export const getLatest = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query("patchNotes")
-      .order("desc")
-      .first();
+    const patches = await ctx.db.query("patchNotes").collect();
+    if (patches.length === 0) return null;
+    patches.sort((a, b) => compareVersions(a.version, b.version));
+    return patches[0];
   },
 });
 
@@ -16,10 +30,9 @@ export const getLatest = query({
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query("patchNotes")
-      .order("desc")
-      .take(50);
+    const patches = await ctx.db.query("patchNotes").collect();
+    patches.sort((a, b) => compareVersions(a.version, b.version));
+    return patches.slice(0, 50);
   },
 });
 
