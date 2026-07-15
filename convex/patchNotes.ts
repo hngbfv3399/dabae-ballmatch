@@ -2,9 +2,13 @@ import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 function compareVersions(v1: string, v2: string) {
-  const cleanV = (v: string) => v.startsWith("v") ? v.slice(1) : v;
-  const parts1 = cleanV(v1).split(".").map(Number);
-  const parts2 = cleanV(v2).split(".").map(Number);
+  // `v3.2.3-dev` 같은 개발용 접미사는 숫자 버전 비교에서 제외한다.
+  const numericParts = (version: string) =>
+    (version.replace(/^v/, "").match(/^\d+(?:\.\d+)*/)?.[0] ?? "0")
+      .split(".")
+      .map(Number);
+  const parts1 = numericParts(v1);
+  const parts2 = numericParts(v2);
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const p1 = parts1[i] ?? 0;
     const p2 = parts2[i] ?? 0;
@@ -63,7 +67,6 @@ export const create = internalMutation({
     return patchId;
   },
 });
-
 export const remove = internalMutation({
   args: { id: v.id("patchNotes") },
   handler: async (ctx, args) => {
@@ -179,7 +182,3 @@ export const cleanOutdated = internalMutation({
     }
   }
 });
-
-
-
-
