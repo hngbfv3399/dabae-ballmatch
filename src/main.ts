@@ -1681,6 +1681,7 @@ function getPveRunSummaryMarkup(run: PveRun): string {
 }
 
 function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
+  if (stageNumber === 0) return "silver";
   if (stageNumber === 1) return "silver";
   if (stageNumber === 3) return "gold";
   if (stageNumber === 4) return "platinum";
@@ -1693,7 +1694,7 @@ function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: ()
   const choices = rollPveAugmentChoices(rarity, run.modifiers.augments.map((augment) => augment.id), clearedStageNumber);
   if (choices.length === 0) { onChoose(); return; }
   const labels: Record<Extract<RunModifierRarity, "silver" | "gold" | "platinum">, { tier: string; title: string; subtitle: string }> = {
-    silver: { tier: "SILVER AUGMENT · 1/3", title: "전투 방식을 선택하세요", subtitle: "선택한 증강은 이번 던전 런이 끝날 때까지 유지됩니다." },
+    silver: { tier: clearedStageNumber === 0 ? "INITIAL AUGMENT" : "SILVER AUGMENT · 1/3", title: clearedStageNumber === 0 ? "첫 증강을 선택하세요" : "전투 방식을 선택하세요", subtitle: clearedStageNumber === 0 ? "첫 전투를 시작하기 전, 이번 런의 방향을 정하세요." : "선택한 증강은 이번 던전 런이 끝날 때까지 유지됩니다." },
     gold: { tier: "GOLD AUGMENT · 2/3", title: "빌드를 강화하세요", subtitle: "강력한 효과 하나를 골라 다음 전투를 준비하세요." },
     platinum: { tier: "PLATINUM AUGMENT · 3/3", title: "최종 증강을 선택하세요", subtitle: "5스테이지 진입 전에 마지막 빌드 완성을 선택하세요." },
   };
@@ -2585,7 +2586,7 @@ function startPveDungeon() {
   gameModeModal.classList.add("hidden");
   const stage = Number(pveStageSelect.value);
   pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
-  startPveStage();
+  showAugmentChoice(pveRun, 0, startPveStage);
 }
 
 function startPveStage() {
