@@ -44,6 +44,17 @@ function renderPatchHistory(patches: any[]) {
     // Render categorized sections
     let sectionsHTML = "";
 
+    if (patch.content && patch.content.length > 0) {
+      sectionsHTML += `
+        <div style="margin-top: 0.8rem;">
+          <div style="color: #a78bfa; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem;">✨ 신규 콘텐츠 (Content)</div>
+          <ul class="patch-bullet-list" style="margin: 0; padding: 0;">
+            ${patch.content.map((item: string) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
     if (patch.buffs && patch.buffs.length > 0) {
       sectionsHTML += `
         <div style="margin-top: 0.8rem;">
@@ -88,7 +99,7 @@ function renderPatchHistory(patches: any[]) {
       `;
     }
 
-    // Fallback for old content array
+    // Fallback for legacy content-only patch notes
     if (!sectionsHTML && patch.content && patch.content.length > 0) {
       sectionsHTML = `
         <ul class="patch-bullet-list" style="margin: 0.5rem 0 0 0; padding: 0;">
