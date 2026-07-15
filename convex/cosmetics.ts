@@ -602,6 +602,19 @@ export const equipVictoryAction = mutation({
   },
 });
 
+export const clearVictoryAction = mutation({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (!loadout) return { actionId: null };
+    const now = Date.now();
+    if (loadout.backgroundId) await ctx.db.replace("victoryCeremonyPartLoadouts", loadout._id, { key: "global", backgroundId: loadout.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
+    else await ctx.db.replace("victoryCeremonyPartLoadouts", loadout._id, { key: "global", updatedAt: now, updatedByClientId: args.clientId });
+    return { actionId: null };
+  },
+});
+
 export const equipVictoryBackground = mutation({
   args: { clientId: v.string(), backgroundId: v.string() },
   handler: async (ctx, args) => {
@@ -615,6 +628,19 @@ export const equipVictoryBackground = mutation({
     if (loadout) await ctx.db.patch(loadout._id, { backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
     else await ctx.db.insert("victoryCeremonyPartLoadouts", { key: "global", backgroundId: args.backgroundId, updatedAt: now, updatedByClientId: args.clientId });
     return { backgroundId: args.backgroundId };
+  },
+});
+
+export const clearVictoryBackground = mutation({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const loadout = await ctx.db.query("victoryCeremonyPartLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (!loadout) return { backgroundId: null };
+    const now = Date.now();
+    if (loadout.actionId) await ctx.db.replace("victoryCeremonyPartLoadouts", loadout._id, { key: "global", actionId: loadout.actionId, updatedAt: now, updatedByClientId: args.clientId });
+    else await ctx.db.replace("victoryCeremonyPartLoadouts", loadout._id, { key: "global", updatedAt: now, updatedByClientId: args.clientId });
+    return { backgroundId: null };
   },
 });
 
@@ -633,6 +659,20 @@ export const equipVictorySpecialEvent = mutation({
     if (loadout) await ctx.db.patch(loadout._id, { specialEventId: args.specialEventId, updatedAt: now, updatedByClientId: args.clientId });
     else await ctx.db.insert("victorySpecialEventLoadouts", { key: "global", specialEventId: args.specialEventId, updatedAt: now, updatedByClientId: args.clientId });
     return { specialEventId: args.specialEventId };
+  },
+});
+
+export const clearVictorySpecialEvent = mutation({
+  args: { clientId: v.string(), characterId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    assertCharacterId(args.characterId);
+    const loadout = await ctx.db.query("victorySpecialEventLoadouts").withIndex("by_key", (q) => q.eq("key", "global")).unique();
+    if (!loadout?.specialEventId) return { specialEventId: null };
+    const activeEvent = await ctx.db.query("victorySpecialEvents").withIndex("by_specialEventId", (q) => q.eq("specialEventId", loadout.specialEventId!)).unique();
+    if (activeEvent?.characterId && activeEvent.characterId !== args.characterId) throw new Error("This special event belongs to another character");
+    await ctx.db.replace("victorySpecialEventLoadouts", loadout._id, { key: "global", updatedAt: Date.now(), updatedByClientId: args.clientId });
+    return { specialEventId: null };
   },
 });
 
