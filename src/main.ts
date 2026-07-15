@@ -1690,6 +1690,14 @@ function getPveRunMaximumHp(run: PveRun): number {
   ));
 }
 
+function getPveAugmentContext(run: PveRun) {
+  const character = availableCharacters.find((entry) => entry.id === run.characterId);
+  return {
+    characterId: run.characterId,
+    equippedSkillNames: character ? [character.skillName] : [],
+  };
+}
+
 function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
   if (stageNumber === 0) return "silver";
   if (stageNumber === 1) return "silver";
@@ -1701,7 +1709,7 @@ function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunMod
 function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: () => void) {
   const rarity = getPveAugmentRarityForClearedStage(clearedStageNumber);
   if (!rarity) { onChoose(); return; }
-  const choices = rollPveAugmentChoices(rarity, run.modifiers.augments.map((augment) => augment.id), clearedStageNumber);
+  const choices = rollPveAugmentChoices(rarity, run.modifiers.augments.map((augment) => augment.id), clearedStageNumber, getPveAugmentContext(run));
   if (choices.length === 0) { onChoose(); return; }
   const labels: Record<Extract<RunModifierRarity, "silver" | "gold" | "platinum">, { tier: string; title: string; subtitle: string }> = {
     silver: { tier: clearedStageNumber === 0 ? "INITIAL AUGMENT" : "SILVER AUGMENT · 1/3", title: clearedStageNumber === 0 ? "첫 증강을 선택하세요" : "전투 방식을 선택하세요", subtitle: clearedStageNumber === 0 ? "첫 전투를 시작하기 전, 이번 런의 방향을 정하세요." : "선택한 증강은 이번 던전 런이 끝날 때까지 유지됩니다." },
@@ -1718,7 +1726,10 @@ function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: ()
     const card = document.createElement("button");
     card.type = "button";
     card.className = `augment-choice-card rarity-${augment.rarity}`;
-    card.innerHTML = `<span class="augment-choice-icon">${augment.icon}</span><strong>${augment.name}</strong><small>${augment.description}</small><em>선택하기</em>`;
+    const source = augment.requirements?.equippedSkillName
+      ? `장착 스킬 · ${augment.requirements.equippedSkillName}`
+      : "공용 증강";
+    card.innerHTML = `<span class="augment-choice-icon">${augment.icon}</span><b class="augment-choice-source">${source}</b><strong>${augment.name}</strong><small>${augment.description}</small><em>선택하기</em>`;
     card.addEventListener("click", () => {
       addPveRunAugment(run.modifiers, augment);
       if (augment.effects?.maxHpMultiplier) run.currentHp = getPveRunMaximumHp(run);
