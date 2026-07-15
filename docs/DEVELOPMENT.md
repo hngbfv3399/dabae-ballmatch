@@ -190,3 +190,9 @@ Once the new feature/character is verified and TypeScript compilation succeeds, 
 - **Backend Schema Sync**: If character parameters, databases, or game states are backed by Convex, ensure that any changes are immediately synced.
 - **Commands**: Proactively run `npx convex dev` to push changes to the local development sandbox, or `npx convex deploy` to sync remote server functions.
 - **Verification**: Ensure no backend deployment warnings or database constraints fail after the frontend logic updates.
+
+### 5.4. Dev Database Virtual Data Reset
+- **Command**: `npm run dev:reset-data -- --confirm-dev-reset`
+- **Safety**: The script always targets only `curious-perch-72` and refuses to run unless `.env.local` explicitly names `dev:curious-perch-72`. It accepts no production override.
+- **Seed Profile**: The reset imports deterministic virtual levels, dungeon records, rankings, item tickets, permanent-item unlocks, and loadouts. All other Dev data is removed with Convex `--replace-all`.
+- **Browser Fixture**: After resetting, run `localStorage.setItem("dambae-ballgame-anonymous-client-id", "dev-virtual-client")` in the browser console and refresh to use the seeded item inventory.

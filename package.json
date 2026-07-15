@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "test:balance": "vite build --ssr scripts/balance-smoke.ts --outDir /private/tmp/dambae-ballgame-balance-test --emptyOutDir && node /private/tmp/dambae-ballgame-balance-test/balance-smoke.js",
     "test:growth": "vite build --ssr scripts/growth-regression.ts --outDir /private/tmp/dambae-ballgame-growth-test --emptyOutDir && node /private/tmp/dambae-ballgame-growth-test/growth-regression.js",
+    "dev:reset-data": "node scripts/reset-dev-data.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {
