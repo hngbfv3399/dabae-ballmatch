@@ -17,6 +17,7 @@ const MAX_DUNGEON_CLEAR_TIME_MS = 30 * 60 * 1000;
 const MIN_DUNGEON_CLEAR_TIME_MS = 1_000;
 const FIRST_STAGE_FIRST_CLEAR_EXPERIENCE = FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE / 5;
 const FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE = FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE / 5;
+const SKILL_UNLOCK_LEVELS = [5, 10, 15, 20, 25, 30] as const;
 
 function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) throw new Error("Unknown character ID");
@@ -44,6 +45,8 @@ export function growthSummary(experience: number) {
   const damageTakenMultiplier = 1 - Math.min(0.29, 0.01 * statGrowthSteps);
   const experienceToNextLevel =
     isMaxLevel ? 0 : experienceRequiredForLevel(level);
+  const unlockedSkillLevels = SKILL_UNLOCK_LEVELS.filter((unlockLevel) => level >= unlockLevel);
+  const nextSkillUnlockLevel = SKILL_UNLOCK_LEVELS.find((unlockLevel) => level < unlockLevel) ?? null;
 
   return {
     level,
@@ -54,6 +57,8 @@ export function growthSummary(experience: number) {
     healthMultiplier,
     attackMultiplier,
     damageTakenMultiplier,
+    unlockedSkillLevels,
+    nextSkillUnlockLevel,
   };
 }
 
