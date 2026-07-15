@@ -384,8 +384,7 @@ function renderGachaPreview() {
     const ceremony = victoryCeremonyCatalog.find((entry) => entry.ceremonyId === previewVictoryCeremonyId) ?? victoryCeremonyCatalog[0];
     if (!ceremony) { gachaPreview.textContent = "승리 세레모니를 불러오는 중입니다."; return; }
     const isEquipped = ceremony.ceremonyId === equippedVictoryCeremonyId;
-    gachaPreview.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "preview")}<span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${getCeremonyDisplayName(ceremony.animation)}</h3><p>게임 종료 시 1위 플레이어 공이 이 배경 안에서 세레모니 동작을 합니다.</p><div class="skill-slot"><b>배경 + 플레이어 행동</b><br>${getCeremonyBackgroundDescription(ceremony.animation)}</div>${ceremony.isUnlocked ? `<button id="equip-victory-ceremony" class="btn btn-primary" type="button" ${isEquipped ? "disabled" : ""}>${isEquipped ? "현재 장착 중" : "이 세레모니 장착"}</button>` : ""}<p class="gacha-preview-note">세레모니는 배경과 행동이 묶인 하나의 연출이며, 모든 게임의 결과 화면 1위에게 적용됩니다.</p>`;
-    document.getElementById("equip-victory-ceremony")?.addEventListener("click", () => void equipVictoryCeremony(ceremony));
+    gachaPreview.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "preview")}<span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${getCeremonyDisplayName(ceremony.animation)}</h3><p>게임 종료 시 1위 플레이어 공이 이 배경 안에서 세레모니 동작을 합니다.</p><div class="skill-slot"><b>배경 + 플레이어 행동</b><br>${getCeremonyBackgroundDescription(ceremony.animation)}</div><p class="gacha-preview-note">세레모니는 배경과 행동이 묶인 하나의 연출입니다. 획득한 세레모니 장착은 <b>도감 탭</b>에서 할 수 있습니다.</p>`;
     return;
   }
   const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === previewGachaCosmeticId) ?? cosmeticCatalog[0];
@@ -538,8 +537,12 @@ async function equipVictoryCeremony(ceremony: VictoryCeremony) {
   try {
     await convexClient.mutation(api.cosmetics.equipVictoryCeremony, { clientId: anonymousClientId, ceremonyId: ceremony.ceremonyId });
     gachaResult.textContent = `${getCeremonyDisplayName(ceremony.animation)} 세레모니를 장착했습니다. 다음 게임 결과의 1위 플레이어 공에 적용됩니다.`;
+    const result = document.getElementById("collection-victory-ceremony-result");
+    if (result) result.textContent = `${getCeremonyDisplayName(ceremony.animation)} 세레모니를 장착했습니다.`;
   } catch (error) {
     gachaResult.textContent = error instanceof Error ? error.message : "승리 세레모니 장착에 실패했습니다.";
+    const result = document.getElementById("collection-victory-ceremony-result");
+    if (result) result.textContent = error instanceof Error ? error.message : "승리 세레모니 장착에 실패했습니다.";
   }
 }
 
@@ -554,8 +557,8 @@ function initCosmetics() {
   experiencePointItemsUnsubscribe?.();
   cosmeticCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listCatalog, {}, (catalog) => { cosmeticCatalog = catalog as Cosmetic[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
   cosmeticLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getCharacterLoadouts, {}, (loadouts) => { cosmeticLoadouts = new Map(loadouts.map((loadout) => [loadout.characterId, loadout.cosmeticId])); updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
-  victoryCeremonyCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listVictoryCeremonyCatalog, {}, (catalog) => { victoryCeremonyCatalog = catalog as VictoryCeremony[]; updateGachaUI(); });
-  victoryCeremonyLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getVictoryCeremonyLoadout, {}, (ceremonyId) => { equippedVictoryCeremonyId = ceremonyId; updateGachaUI(); });
+  victoryCeremonyCatalogUnsubscribe = convexClient.onUpdate(api.cosmetics.listVictoryCeremonyCatalog, {}, (catalog) => { victoryCeremonyCatalog = catalog as VictoryCeremony[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
+  victoryCeremonyLoadoutUnsubscribe = convexClient.onUpdate(api.cosmetics.getVictoryCeremonyLoadout, {}, (ceremonyId) => { equippedVictoryCeremonyId = ceremonyId; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
   gachaProgressUnsubscribe = convexClient.onUpdate(api.progression.getClientGachaProgress, { clientId: anonymousClientId }, (progress) => { gachaProgress = { ...progress, experiencePoints: progress.experiencePoints ?? 0 }; updateGachaUI(); });
   experiencePointItemsUnsubscribe = convexClient.onUpdate(api.progression.listExperiencePointItems, { clientId: anonymousClientId }, (items) => { experiencePointItems = items as ExperiencePointItem[]; updateGachaUI(); if (!collectionHubPanel.classList.contains("hidden")) renderCollection(); });
 }
@@ -2977,8 +2980,10 @@ function renderManagedCharacter() {
   if (!character) { collectionDetail.textContent = "왼쪽에서 관리할 캐릭터를 선택하세요."; return; }
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
+  const unlockedCeremonies = victoryCeremonyCatalog.filter((ceremony) => ceremony.isUnlocked);
+  const equippedCeremony = victoryCeremonyCatalog.find((ceremony) => ceremony.ceremonyId === equippedVictoryCeremonyId);
   const canSpendExperiencePoints = false;
-  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section>${getSkillLoadoutMarkup(character, progress)}<h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="collection-victory-ceremony"><div><span class="eyebrow">VICTORY CEREMONY</span><strong>승리 세레모니 장착</strong><p>현재 장착: <b>${equippedCeremony ? getCeremonyDisplayName(equippedCeremony.animation) : "없음"}</b> · 모든 게임 결과의 1위에게 적용됩니다.</p></div><div id="collection-victory-ceremony-grid" class="collection-victory-ceremony-grid"></div><small id="collection-victory-ceremony-result" aria-live="polite">세레모니를 선택하면 즉시 장착됩니다.</small></section><section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section>${getSkillLoadoutMarkup(character, progress)}<h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
   const experienceSection = collectionDetail.querySelector(".experience-point-spend") as HTMLElement;
   experienceSection.innerHTML = `<div><span class="eyebrow">ITEM INVENTORY</span><strong>경험치 포인트 아이템</strong><p>아이템을 누르면 ${character.name}에게 즉시 경험치가 적용됩니다.</p></div><div id="collection-experience-point-items" class="experience-point-item-grid"></div><small id="collection-experience-point-result" aria-live="polite">중복 스킨을 획득하면 경험치 포인트 아이템이 추가됩니다.</small>`;
   const experienceItemGrid = document.getElementById("collection-experience-point-items") as HTMLElement;
@@ -2991,6 +2996,18 @@ function renderManagedCharacter() {
     button.innerHTML = `<b>✦ 경험치 포인트</b><strong>+${item.amount} XP</strong><small>${item.isLegacy ? "기존 보관 포인트" : "클릭하여 즉시 사용"}</small>`;
     button.addEventListener("click", () => void useExperiencePointItem(character.id, item, experienceResult, button));
     experienceItemGrid.appendChild(button);
+  });
+  const ceremonyGrid = document.getElementById("collection-victory-ceremony-grid") as HTMLElement;
+  if (unlockedCeremonies.length === 0) ceremonyGrid.innerHTML = `<p class="collection-ceremony-empty">획득한 승리 세레모니가 없습니다. 가챠 탭에서 통합 뽑기로 획득하세요.</p>`;
+  unlockedCeremonies.forEach((ceremony) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    const isEquipped = ceremony.ceremonyId === equippedVictoryCeremonyId;
+    button.className = `collection-ceremony ${isEquipped ? "equipped" : ""}`;
+    button.disabled = isEquipped;
+    button.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "catalog")}<strong class="rarity-${ceremony.rarity}">${getCeremonyDisplayName(ceremony.animation)}</strong><small>${isEquipped ? "현재 장착 중" : "클릭하여 장착"}</small>`;
+    button.addEventListener("click", () => void equipVictoryCeremony(ceremony));
+    ceremonyGrid.appendChild(button);
   });
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
   const basicSkin = document.createElement("button");
