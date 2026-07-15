@@ -1680,6 +1680,16 @@ function getPveRunSummaryMarkup(run: PveRun): string {
   return `<div class="pve-run-summary"><strong>이번 런 빌드</strong>${modifiers.map((modifier) => `<span>${modifier.icon} ${modifier.name}</span>`).join("")}</div>`;
 }
 
+function getPveRunMaximumHp(run: PveRun): number {
+  const character = availableCharacters.find((entry) => entry.id === run.characterId);
+  if (!character) return run.maxHp;
+  const progress = getPveProgress(character.id);
+  return Math.round(getAllRunModifiers(run.modifiers).reduce(
+    (maxHp, modifier) => maxHp * (modifier.effects?.maxHpMultiplier ?? 1),
+    getLeveledHp(character.maxHp, progress),
+  ));
+}
+
 function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
   if (stageNumber === 0) return "silver";
   if (stageNumber === 1) return "silver";
@@ -1711,6 +1721,7 @@ function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: ()
     card.innerHTML = `<span class="augment-choice-icon">${augment.icon}</span><strong>${augment.name}</strong><small>${augment.description}</small><em>선택하기</em>`;
     card.addEventListener("click", () => {
       addPveRunAugment(run.modifiers, augment);
+      if (augment.effects?.maxHpMultiplier) run.currentHp = getPveRunMaximumHp(run);
       augmentChoiceModal.classList.add("hidden");
       renderPveRunModifiers();
       onChoose();
