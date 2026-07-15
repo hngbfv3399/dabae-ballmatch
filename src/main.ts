@@ -2088,6 +2088,8 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   );
   const firstPlace = sorted[0] ?? winner ?? mvp;
   const equippedCeremony = victoryCeremonyCatalog.find((ceremony) => ceremony.ceremonyId === equippedVictoryCeremonyId);
+  const hasVictoryCeremony = Boolean(equippedCeremony);
+  const ceremonyAnimation = equippedCeremony?.animation ?? "";
 
   // 모드별 팀 승리 배너 정의
   let modeWinnerBanner = "";
@@ -2138,7 +2140,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     winnerTitle.textContent = "VICTORY!";
   }
 
-  // 1위 캐릭터가 장착된 승리 세레모니를 보여주고, MVP 지표는 전투 기록으로 남긴다.
+  // 실제 장착한 세레모니가 있을 때만 1위 캐릭터의 무대 연출을 보여준다.
   const firstPlaceScore = firstPlace.mvpScore
     ? Math.round(firstPlace.mvpScore)
     : 0;
@@ -2162,15 +2164,16 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 
   let html = `
     ${modeWinnerBanner}
-    <!-- First-place victory ceremony -->
-    <div class="winner-ceremony-card ceremony-${equippedCeremony?.animation ?? "wave"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
-      <div class="winner-ceremony-rank">🥇 1위 · VICTORY CEREMONY</div>
+    <!-- First-place result / equipped victory ceremony -->
+    <div class="winner-ceremony-card ${hasVictoryCeremony ? `has-ceremony ceremony-${ceremonyAnimation}` : "no-ceremony"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
+      <div class="winner-ceremony-rank">🥇 1위 ${hasVictoryCeremony ? "· VICTORY CEREMONY" : "결과"}</div>
       <div class="winner-ceremony-main">
-        <div class="winner-ceremony-avatar">
+        <div class="winner-ceremony-stage">
+          ${hasVictoryCeremony ? "<i></i><i></i><i></i>" : ""}
           ${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}
         </div>
-        <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong><span>${equippedCeremony?.name ?? "챔피언 인사"}</span></div>
-        <div class="winner-ceremony-action" aria-label="${equippedCeremony?.name ?? "챔피언 인사"}">${getCeremonyEmoji(equippedCeremony?.animation ?? "wave")}</div>
+        <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong>${equippedCeremony ? `<span>${equippedCeremony.name}</span>` : ""}</div>
+        ${equippedCeremony ? `<div class="winner-ceremony-action" aria-label="${equippedCeremony.name}">${getCeremonyEmoji(equippedCeremony.animation)}</div>` : ""}
       </div>
       <div class="mvp-stats-grid">
         <div class="mvp-stat-box">
