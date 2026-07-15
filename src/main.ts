@@ -476,7 +476,7 @@ function getCeremonySceneMarkup(background: VictoryAnimation | null, action: Vic
 }
 
 function getCeremonyActionPreviewMarkup(animation: VictoryAnimation): string {
-  return `<div class="ceremony-action-preview ceremony-scene-${animation}" aria-hidden="true"><span class="ceremony-scene-ball"><b>PLAYER</b></span></div>`;
+  return `<div class="ceremony-action-preview" aria-hidden="true"><span class="ceremony-scene-ball ceremony-action-${animation}"><b>PLAYER</b></span></div>`;
 }
 
 function getCeremonyBackgroundPreviewMarkup(animation: VictoryAnimation): string {
