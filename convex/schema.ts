@@ -130,6 +130,42 @@ export default defineSchema({
     updatedByClientId: v.optional(v.string()),
   }).index("by_characterId", ["characterId"]),
 
+  // 승리 세레모니는 스킨과 별도 가챠 분류로 관리하며, 전투 결과 1위에게 공용으로 적용된다.
+  victoryCeremonies: defineTable({
+    ceremonyId: v.string(),
+    name: v.string(),
+    rarity: v.union(
+      v.literal("common"),
+      v.literal("rare"),
+      v.literal("epic"),
+      v.literal("legendary"),
+      v.literal("unique"),
+    ),
+    animation: v.union(
+      v.literal("wave"),
+      v.literal("jump"),
+      v.literal("clap"),
+      v.literal("dance"),
+      v.literal("trophy"),
+      v.literal("fireworks"),
+    ),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_ceremonyId", ["ceremonyId"]),
+
+  victoryCeremonyUnlocks: defineTable({
+    ceremonyId: v.string(),
+    unlockedAt: v.number(),
+    unlockedByClientId: v.optional(v.string()),
+  }).index("by_ceremonyId", ["ceremonyId"]),
+
+  victoryCeremonyLoadouts: defineTable({
+    key: v.literal("global"),
+    ceremonyId: v.string(),
+    updatedAt: v.number(),
+    updatedByClientId: v.optional(v.string()),
+  }).index("by_key", ["key"]),
+
   // 로그인 없는 환경의 일일 뽑기·플레이·경험치 포인트 상태. 브라우저 익명 ID 단위로만 관리한다.
   anonymousGachaStates: defineTable({
     clientId: v.string(),
@@ -154,6 +190,15 @@ export default defineSchema({
     clientId: v.string(),
     targetCharacterId: v.optional(v.string()),
     cosmeticId: v.string(),
+    result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
+    experienceGranted: v.number(),
+    createdAt: v.number(),
+  }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
+
+  // 세레모니 이력은 기존 스킨 가챠 이력과 분리해 대상 종류를 명확히 한다.
+  victoryCeremonyDrawHistory: defineTable({
+    clientId: v.string(),
+    ceremonyId: v.string(),
     result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
     experienceGranted: v.number(),
     createdAt: v.number(),

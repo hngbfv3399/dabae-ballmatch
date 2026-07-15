@@ -202,13 +202,17 @@
       <section id="gacha-modal" class="hub-panel gacha-hub-panel hidden">
         <div class="gacha-hub-content">
           <div class="gacha-modal-header">
-            <div><span class="eyebrow">GACHA</span><h2>스킨 뽑기</h2></div>
+            <div><span class="eyebrow">GACHA</span><h2 id="gacha-title">스킨 뽑기</h2></div>
+          </div>
+          <div class="gacha-type-tabs" role="tablist" aria-label="가챠 분류">
+            <button class="gacha-type-tab active" data-gacha-type="skin" type="button" role="tab" aria-selected="true">🎨 스킨</button>
+            <button class="gacha-type-tab" data-gacha-type="ceremony" type="button" role="tab" aria-selected="false">🏆 승리 세레모니</button>
           </div>
           <div class="gacha-controls">
             <p id="gacha-draw-status" class="gacha-draw-status">스킨 도감을 불러오는 중입니다.</p>
             <button id="gacha-draw-btn" class="btn btn-primary" type="button" disabled>뽑기</button>
           </div>
-          <p class="experience-point-help">중복 스킨을 획득하면 등급별 경험치 포인트가 적립됩니다. 적립한 포인트는 <b>도감 탭</b>에서 원하는 캐릭터에게 나누어 사용하세요. 스킨 장착 여부와는 관계없습니다.</p>
+          <p id="gacha-type-help" class="experience-point-help">중복 스킨을 획득하면 등급별 경험치 포인트가 적립됩니다. 적립한 포인트는 <b>도감 탭</b>에서 원하는 캐릭터에게 나누어 사용하세요. 스킨 장착 여부와는 관계없습니다.</p>
           <p id="gacha-result" class="gacha-result" aria-live="polite"></p>
           <div class="gacha-preview-layout"><div id="gacha-catalog" class="gacha-catalog"></div><aside id="gacha-preview" class="gacha-preview">왼쪽 아이콘을 클릭하면 스킨 미리보기가 표시됩니다.</aside></div>
         </div>

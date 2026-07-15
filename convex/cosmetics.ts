@@ -21,6 +21,14 @@ type CosmeticDefinition = {
   };
 };
 
+type VictoryCeremonyAnimation = "wave" | "jump" | "clap" | "dance" | "trophy" | "fireworks";
+type VictoryCeremonyDefinition = {
+  ceremonyId: string;
+  name: string;
+  rarity: Rarity;
+  animation: VictoryCeremonyAnimation;
+};
+
 const INITIAL_COSMETICS: readonly CosmeticDefinition[] = [
   { cosmeticId: "palette-ruby", name: "루비", rarity: "common", style: { textColor: "#fff1f2", borderColor: "#ef4444", fillColor: "#7f1d1d", glowColor: "#ef4444", borderAnimation: "none", trail: "none" } },
   { cosmeticId: "palette-cobalt", name: "코발트", rarity: "common", style: { textColor: "#eff6ff", borderColor: "#2563eb", fillColor: "#172554", glowColor: "#2563eb", borderAnimation: "none", trail: "none" } },
@@ -46,6 +54,15 @@ const INITIAL_COSMETICS: readonly CosmeticDefinition[] = [
   { cosmeticId: "palette-frost-crystal", name: "프로스트 크리스털", rarity: "legendary", style: { textColor: "#f0f9ff", borderColor: "#7dd3fc", fillColor: "#164e63", glowColor: "#e0f2fe", borderAnimation: "frost", trail: "fade" } },
   { cosmeticId: "palette-prism-glitch", name: "프리즘 글리치", rarity: "unique", style: { textColor: "#ffffff", borderColor: "#f472b6", fillColor: "#312e81", glowColor: "#67e8f9", borderAnimation: "glitch", trail: "spark" } },
   { cosmeticId: "palette-eclipse", name: "이클립스", rarity: "unique", style: { textColor: "#f8fafc", borderColor: "#a855f7", fillColor: "#09090b", glowColor: "#c084fc", borderAnimation: "aurora", trail: "spark" } },
+];
+
+const INITIAL_VICTORY_CEREMONIES: readonly VictoryCeremonyDefinition[] = [
+  { ceremonyId: "ceremony-champion-wave", name: "챔피언 인사", rarity: "common", animation: "wave" },
+  { ceremonyId: "ceremony-victory-jump", name: "승리 점프", rarity: "common", animation: "jump" },
+  { ceremonyId: "ceremony-spotlight-clap", name: "스포트라이트 박수", rarity: "rare", animation: "clap" },
+  { ceremonyId: "ceremony-rhythm-dance", name: "리듬 댄스", rarity: "epic", animation: "dance" },
+  { ceremonyId: "ceremony-trophy-lift", name: "트로피 리프트", rarity: "legendary", animation: "trophy" },
+  { ceremonyId: "ceremony-fireworks-finale", name: "불꽃 피날레", rarity: "unique", animation: "fireworks" },
 ];
 
 const RARITY_WEIGHTS: readonly { rarity: Rarity; weight: number }[] = [
@@ -111,6 +128,48 @@ export const listCatalog = query({
     return cosmetics
       .filter((cosmetic) => cosmetic.isActive)
       .map((cosmetic) => ({ ...cosmetic, isUnlocked: unlockedIds.has(cosmetic.cosmeticId) }));
+  },
+});
+
+export const ensureInitialVictoryCeremonyCatalog = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let created = 0;
+    for (const ceremony of INITIAL_VICTORY_CEREMONIES) {
+      const existing = await ctx.db
+        .query("victoryCeremonies")
+        .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", ceremony.ceremonyId))
+        .unique();
+      if (!existing) {
+        await ctx.db.insert("victoryCeremonies", { ...ceremony, isActive: true, createdAt: now });
+        created += 1;
+      }
+    }
+    return { created, total: INITIAL_VICTORY_CEREMONIES.length };
+  },
+});
+
+export const listVictoryCeremonyCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const ceremonies = await ctx.db.query("victoryCeremonies").take(50);
+    const unlocks = await ctx.db.query("victoryCeremonyUnlocks").take(50);
+    const unlockedIds = new Set(unlocks.map((unlock) => unlock.ceremonyId));
+    return ceremonies
+      .filter((ceremony) => ceremony.isActive)
+      .map((ceremony) => ({ ...ceremony, isUnlocked: unlockedIds.has(ceremony.ceremonyId) }));
+  },
+});
+
+export const getVictoryCeremonyLoadout = query({
+  args: {},
+  handler: async (ctx) => {
+    const loadout = await ctx.db
+      .query("victoryCeremonyLoadouts")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .unique();
+    return loadout?.ceremonyId ?? null;
   },
 });
 
@@ -204,6 +263,124 @@ export const draw = mutation({
       experienceGranted,
       drawSource: hasDailyDraw ? "daily" : "bonus",
     };
+  },
+});
+
+export const drawVictoryCeremony = mutation({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+
+    const now = Date.now();
+    const today = kstDate(now);
+    const gachaState = await ctx.db
+      .query("anonymousGachaStates")
+      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .unique();
+    const dailyDrawsUsed = gachaState?.dailyResetDate === today ? gachaState.dailyDrawsUsed : 0;
+    const completedPlayCount = gachaState?.completedPlayCount ?? 0;
+    const bonusDrawsUsed = gachaState?.bonusDrawsUsed ?? 0;
+    const hasDailyDraw = dailyDrawsUsed < 5;
+    const hasBonusDraw = Math.floor(completedPlayCount / 3) > bonusDrawsUsed;
+    if (!hasDailyDraw && !hasBonusDraw) throw new Error("No gacha draws available");
+
+    const activeCeremonies = (await ctx.db.query("victoryCeremonies").take(50)).filter((ceremony) => ceremony.isActive);
+    if (activeCeremonies.length === 0) throw new Error("Victory ceremony catalog has not been initialized");
+
+    const rarity = rollRarity();
+    const rarityPool = activeCeremonies.filter((ceremony) => ceremony.rarity === rarity);
+    const pool = rarityPool.length > 0 ? rarityPool : activeCeremonies;
+    const ceremony = pool[Math.floor(Math.random() * pool.length)];
+    if (!ceremony) throw new Error("Victory ceremony draw failed");
+
+    const unlock = await ctx.db
+      .query("victoryCeremonyUnlocks")
+      .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", ceremony.ceremonyId))
+      .unique();
+    const experienceGranted = unlock ? DUPLICATE_EXPERIENCE[ceremony.rarity] : 0;
+    if (!unlock) {
+      await ctx.db.insert("victoryCeremonyUnlocks", {
+        ceremonyId: ceremony.ceremonyId,
+        unlockedAt: now,
+        unlockedByClientId: args.clientId,
+      });
+    }
+    if (experienceGranted > 0) {
+      await ctx.db.insert("experiencePointItems", {
+        clientId: args.clientId,
+        amount: experienceGranted,
+        rarity: ceremony.rarity,
+        createdAt: now,
+      });
+    }
+
+    if (gachaState) {
+      await ctx.db.patch(gachaState._id, {
+        dailyResetDate: today,
+        dailyDrawsUsed: dailyDrawsUsed + (hasDailyDraw ? 1 : 0),
+        completedPlayCount,
+        bonusDrawsUsed: bonusDrawsUsed + (hasDailyDraw ? 0 : 1),
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("anonymousGachaStates", {
+        clientId: args.clientId,
+        dailyResetDate: today,
+        dailyDrawsUsed: 1,
+        completedPlayCount: 0,
+        bonusDrawsUsed: 0,
+        experiencePoints: 0,
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.insert("victoryCeremonyDrawHistory", {
+      clientId: args.clientId,
+      ceremonyId: ceremony.ceremonyId,
+      result: unlock ? "duplicateExperience" : "unlocked",
+      experienceGranted,
+      createdAt: now,
+    });
+    return {
+      ceremony,
+      result: unlock ? "duplicateExperience" : "unlocked",
+      experienceGranted,
+      drawSource: hasDailyDraw ? "daily" : "bonus",
+    };
+  },
+});
+
+export const equipVictoryCeremony = mutation({
+  args: { clientId: v.string(), ceremonyId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.clientId.trim()) throw new Error("Client ID is required");
+    const ceremony = await ctx.db
+      .query("victoryCeremonies")
+      .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", args.ceremonyId))
+      .unique();
+    if (!ceremony || !ceremony.isActive) throw new Error("Unknown victory ceremony");
+    const unlock = await ctx.db
+      .query("victoryCeremonyUnlocks")
+      .withIndex("by_ceremonyId", (q) => q.eq("ceremonyId", args.ceremonyId))
+      .unique();
+    if (!unlock) throw new Error("Victory ceremony has not been unlocked globally");
+
+    const now = Date.now();
+    const loadout = await ctx.db
+      .query("victoryCeremonyLoadouts")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .unique();
+    if (loadout) {
+      await ctx.db.patch(loadout._id, { ceremonyId: args.ceremonyId, updatedAt: now, updatedByClientId: args.clientId });
+    } else {
+      await ctx.db.insert("victoryCeremonyLoadouts", {
+        key: "global",
+        ceremonyId: args.ceremonyId,
+        updatedAt: now,
+        updatedByClientId: args.clientId,
+      });
+    }
+    return { ceremonyId: args.ceremonyId };
   },
 });
 
