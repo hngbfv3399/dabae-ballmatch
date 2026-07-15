@@ -27,6 +27,8 @@ export const DUNGEON_IDS = [FIRST_DUNGEON_ID, LABORATORY_DUNGEON_ID] as const;
 export const MAX_CHARACTER_LEVEL = 30;
 export const FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE = 450;
 export const FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE = 200;
+export const LABORATORY_FIRST_CLEAR_EXPERIENCE = 600;
+export const LABORATORY_REPEAT_CLEAR_EXPERIENCE = 300;
 
 export function isDungeonId(dungeonId: string): dungeonId is (typeof DUNGEON_IDS)[number] {
   return (DUNGEON_IDS as readonly string[]).includes(dungeonId);

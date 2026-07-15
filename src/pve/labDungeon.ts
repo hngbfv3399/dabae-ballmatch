@@ -10,13 +10,13 @@ const ENEMY_STATS: Record<LaboratoryEnemyKind, Pick<CharacterConfig, "name" | "m
   drone: { name: "추적 드론", maxHp: 38, speed: 0.82, attackPower: 5, baseAttackRange: 38, color: "#38bdf8" },
   tesla: { name: "테슬라 포탑", maxHp: 66, speed: 0.48, attackPower: 7, baseAttackRange: 42, color: "#fbbf24" },
   brute: { name: "방호 실험체", maxHp: 120, speed: 0.7, attackPower: 9, baseAttackRange: 48, color: "#fb7185" },
-  overseer: { name: "폭주한 감독관", maxHp: 390, speed: 0.78, attackPower: 10, baseAttackRange: 54, color: "#e879f9" },
+  overseer: { name: "폭주한 감독관", maxHp: 440, speed: 0.78, attackPower: 11, baseAttackRange: 54, color: "#e879f9" },
 };
 
 const SHOT_CONSTANTS = {
   drone: { cooldown: 2.5, speed: 370, damage: 10, radius: 8, life: 2.4, leadSeconds: 0.38 },
   tesla: { cooldown: 2.1, speed: 410, damage: 13, radius: 9, life: 2.1, leadSeconds: 0.28 },
-  overseer: { cooldown: 1.65, speed: 440, damage: 15, radius: 11, life: 2.0, leadSeconds: 0.42 },
+  overseer: { cooldown: 1.45, speed: 440, damage: 16, radius: 11, life: 2.0, leadSeconds: 0.42 },
 } as const;
 
 type RangedState = CharacterState & { pveShotCooldown?: number };
@@ -69,8 +69,8 @@ const STAGE_LAYOUTS: readonly LaboratoryEnemyKind[][] = [
   ["specimen", "specimen", "drone"],
   ["drone", "drone", "brute"],
   ["tesla", "specimen", "specimen", "drone"],
-  ["tesla", "tesla", "brute", "drone"],
-  ["overseer"],
+  ["tesla", "brute", "drone", "specimen"],
+  ["overseer", "drone"],
 ];
 
 export function createCollapsedLaboratoryStage(stageNumber: number): CharacterConfig[] {

@@ -225,7 +225,7 @@ let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
-type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; defenseShieldBonus: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number };
+type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; defenseShieldBonus: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number; unlockedDungeonIds?: string[] };
 type PveRun = { characterId: string; dungeonId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
@@ -238,13 +238,19 @@ const PVE_DUNGEONS = {
     number: "01",
     name: "초원의 슬라임 소굴",
     description: "기본·빠른·단단한 슬라임을 돌파하는 화력 중심 던전입니다.",
+    firstClearExperience: 450,
+    repeatClearExperience: 200,
+    requiresFirstDungeonClear: false,
     stageCount: SLIME_MEADOW_STAGE_COUNT,
     createStage: createSlimeMeadowStage,
   },
   [LABORATORY_DUNGEON_ID]: {
     number: "02",
     name: "붕괴한 연구소",
-    description: "예측 탄환을 피하며 드론과 포탑을 돌파하는 생존·포지셔닝 던전입니다.",
+    description: "예측 탄환을 피하며 드론과 포탑을 돌파하는 고난도 생존·포지셔닝 던전입니다.",
+    firstClearExperience: 600,
+    repeatClearExperience: 300,
+    requiresFirstDungeonClear: true,
     stageCount: LABORATORY_STAGE_COUNT,
     createStage: createCollapsedLaboratoryStage,
   },
@@ -258,9 +264,16 @@ function getPveDungeon(dungeonId: string) {
 
 function updatePveDungeonUI() {
   const dungeon = getPveDungeon(pveDungeonSelect.value);
+  const selectedProgress = selectedPveCharacterId ? getPveProgress(selectedPveCharacterId) : null;
+  const isLocked = dungeon.requiresFirstDungeonClear === true && !selectedProgress?.unlockedDungeonIds?.includes(LABORATORY_DUNGEON_ID);
   document.getElementById("pve-dungeon-number")!.textContent = `DUNGEON · ${dungeon.number}`;
   document.getElementById("pve-dungeon-name")!.textContent = dungeon.name;
-  document.getElementById("pve-dungeon-description")!.textContent = `${dungeon.description} 각 스테이지를 클리어하면 즉시 경험치를 획득합니다.`;
+  document.getElementById("pve-dungeon-description")!.textContent = isLocked
+    ? "잠김 · 선택한 캐릭터로 초원의 슬라임 소굴을 1회 완주하면 해금됩니다."
+    : `${dungeon.description} 각 스테이지를 클리어하면 즉시 경험치를 획득합니다.`;
+  const rewardCard = document.querySelector(".pve-reward-card");
+  if (rewardCard) rewardCard.innerHTML = `<span>첫 클리어</span><strong>${dungeon.firstClearExperience} XP</strong><small>반복 클리어 ${dungeon.repeatClearExperience} XP${dungeon.requiresFirstDungeonClear ? " · 던전 1 완주 필요" : ""}</small>`;
+  pveStartBtn.disabled = !selectedPveCharacterId || isLocked;
 }
 type Cosmetic = { cosmeticId: string; name: string; rarity: "common" | "rare" | "epic" | "legendary" | "unique"; isUnlocked: boolean; style: CharacterCosmeticStyle };
 type VictoryAnimation = "wave" | "jump" | "clap" | "dance" | "trophy" | "fireworks" | "sniper";
@@ -3149,7 +3162,12 @@ function initPveProgressSubscription() {
   void convexClient.mutation(api.progression.ensureInitialState, {});
   pveProgressUnsubscribe?.();
   pveProgressUnsubscribe = convexClient.onUpdate(api.progression.getOverview, {}, (overview) => {
-    pveProgressByCharacter = new Map(overview.characters.map((progress) => [progress.characterId, progress]));
+    pveProgressByCharacter = new Map(overview.characters.map((progress) => [progress.characterId, {
+      ...progress,
+      unlockedDungeonIds: overview.laboratoryUnlockedCharacterIds?.includes(progress.characterId)
+        ? [SLIME_MEADOW_DUNGEON_ID, LABORATORY_DUNGEON_ID]
+        : [SLIME_MEADOW_DUNGEON_ID],
+    }]));
     updatePveSelectionUI();
     if (!pveCharacterModal.classList.contains("hidden")) renderPveCharacterList();
     if (!collectionHubPanel.classList.contains("hidden")) renderCollection();
@@ -3172,6 +3190,9 @@ function startPveDungeon() {
   gameModeModal.classList.add("hidden");
   const stage = 1;
   const dungeonId = pveDungeonSelect.value;
+  if (dungeonId === LABORATORY_DUNGEON_ID && !progress.unlockedDungeonIds?.includes(LABORATORY_DUNGEON_ID)) {
+    return;
+  }
 
   const loadout = persistentItemLoadouts.get(character.id);
   const effects = resolvePersistentItemEffects(persistentItemCatalog, loadout, character.id);

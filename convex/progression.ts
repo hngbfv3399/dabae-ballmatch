@@ -4,6 +4,9 @@ import {
   FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE,
   FIRST_DUNGEON_ID,
   FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE,
+  LABORATORY_DUNGEON_ID,
+  LABORATORY_FIRST_CLEAR_EXPERIENCE,
+  LABORATORY_REPEAT_CLEAR_EXPERIENCE,
   DUNGEON_IDS,
   MAX_CHARACTER_LEVEL,
   V3_CHARACTER_IDS,
@@ -19,6 +22,8 @@ const MAX_DUNGEON_CLEAR_TIME_MS = 30 * 60 * 1000;
 const MIN_DUNGEON_CLEAR_TIME_MS = 1_000;
 const FIRST_STAGE_FIRST_CLEAR_EXPERIENCE = FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE / 5;
 const FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE = FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE / 5;
+const LABORATORY_STAGE_FIRST_CLEAR_EXPERIENCE = LABORATORY_FIRST_CLEAR_EXPERIENCE / 5;
+const LABORATORY_STAGE_REPEAT_CLEAR_EXPERIENCE = LABORATORY_REPEAT_CLEAR_EXPERIENCE / 5;
 const SKILL_UNLOCK_LEVELS = [5, 10, 15, 20, 25, 30] as const;
 
 function assertCharacterId(characterId: string): void {
@@ -27,6 +32,26 @@ function assertCharacterId(characterId: string): void {
 
 function assertDungeon(dungeonId: string): void {
   if (!isDungeonId(dungeonId)) throw new Error("Unknown or locked dungeon");
+}
+
+function stageExperienceForDungeon(dungeonId: string, isRepeat: boolean): number {
+  if (dungeonId === LABORATORY_DUNGEON_ID) {
+    return isRepeat ? LABORATORY_STAGE_REPEAT_CLEAR_EXPERIENCE : LABORATORY_STAGE_FIRST_CLEAR_EXPERIENCE;
+  }
+  return isRepeat ? FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE : FIRST_STAGE_FIRST_CLEAR_EXPERIENCE;
+}
+
+async function assertDungeonAccess(ctx: Parameters<typeof ensureSeasonReset>[0], dungeonId: string, characterId: string): Promise<void> {
+  if (dungeonId !== LABORATORY_DUNGEON_ID) return;
+  const firstDungeonClear = await ctx.db
+    .query("dungeonCharacterRecords")
+    .withIndex("by_dungeonId_and_characterId", (q) =>
+      q.eq("dungeonId", FIRST_DUNGEON_ID).eq("characterId", characterId)
+    )
+    .unique();
+  if (!firstDungeonClear || firstDungeonClear.clearCount < 1) {
+    throw new Error("붕괴한 연구소는 초원의 슬라임 소굴을 1회 완주한 캐릭터만 입장할 수 있습니다.");
+  }
 }
 
 function experienceAtLevelStart(level: number): number {
@@ -124,8 +149,20 @@ export const getOverview = query({
       .withIndex("by_dungeonId", (q) => q.eq("dungeonId", FIRST_DUNGEON_ID))
       .unique();
 
+    const laboratoryUnlockedCharacterIds: string[] = [];
+    for (const characterId of V3_CHARACTER_IDS) {
+      const clear = await ctx.db
+        .query("dungeonCharacterRecords")
+        .withIndex("by_dungeonId_and_characterId", (q) =>
+          q.eq("dungeonId", FIRST_DUNGEON_ID).eq("characterId", characterId)
+        )
+        .unique();
+      if (clear && clear.clearCount > 0) laboratoryUnlockedCharacterIds.push(characterId);
+    }
+
     return {
       characters,
+      laboratoryUnlockedCharacterIds,
       dungeon: firstDungeon ?? {
         dungeonId: FIRST_DUNGEON_ID,
         isUnlocked: true,
@@ -233,6 +270,7 @@ export const recordDungeonStageClear = mutation({
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
       .unique();
     if (!characterProgress) throw new Error("Character progress has not been initialized");
+    await assertDungeonAccess(ctx, args.dungeonId, args.characterId);
 
     const stageRecord = await ctx.db
       .query("dungeonStageRecords")
@@ -240,9 +278,7 @@ export const recordDungeonStageClear = mutation({
         q.eq("dungeonId", args.dungeonId).eq("characterId", args.characterId).eq("stageNumber", args.stageNumber),
       )
       .unique();
-    const experienceGranted = stageRecord
-      ? FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE
-      : FIRST_STAGE_FIRST_CLEAR_EXPERIENCE;
+    const experienceGranted = stageExperienceForDungeon(args.dungeonId, Boolean(stageRecord));
     const experience = characterProgress.experience + experienceGranted;
 
     await ctx.db.patch(characterProgress._id, {
@@ -286,6 +322,7 @@ export const recordDungeonClear = mutation({
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
       .unique();
     if (!characterProgress) throw new Error("Character progress has not been initialized");
+    await assertDungeonAccess(ctx, args.dungeonId, args.characterId);
 
     const characterRecord = await ctx.db
       .query("dungeonCharacterRecords")
