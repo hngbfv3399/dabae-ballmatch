@@ -42,7 +42,7 @@ export function growthSummary(experience: number) {
   const statGrowthSteps = Math.max(0, (level - 1) - Math.floor(level / 5));
   const healthMultiplier = 1 + 0.02 * statGrowthSteps;
   const attackMultiplier = 1 + 0.0125 * statGrowthSteps;
-  const damageTakenMultiplier = 1 - Math.min(0.29, 0.01 * statGrowthSteps);
+  const defenseShieldBonus = statGrowthSteps;
   const experienceToNextLevel =
     isMaxLevel ? 0 : experienceRequiredForLevel(level);
   const unlockedSkillLevels = SKILL_UNLOCK_LEVELS.filter((unlockLevel) => level >= unlockLevel);
@@ -56,7 +56,7 @@ export function growthSummary(experience: number) {
     isMaxLevel,
     healthMultiplier,
     attackMultiplier,
-    damageTakenMultiplier,
+    defenseShieldBonus,
     unlockedSkillLevels,
     nextSkillUnlockLevel,
   };

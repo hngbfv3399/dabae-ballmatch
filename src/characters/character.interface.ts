@@ -80,7 +80,7 @@ export interface CharacterConfig {
   maxHp: number;
   speed: number;          // 기본 속도 배율
   attackPower: number;    // 기본 공격력
-  defense?: number;       // 기본 방어력 (%). 레벨 성장 방어력과 곱연산으로 합산한다.
+  defense?: number;       // 기본 방어 보호막. 피해를 HP보다 먼저 정수로 흡수한다.
   baseAttackRange: number;// 기본 공격 사거리 (px)
   skillName: string;
   skillDescription: string;
@@ -148,8 +148,9 @@ export interface CharacterState extends CharacterConfig {
   lastContactDmgTime?: number; // 나유타 지배 인형 자폭 충돌 피해 간격 쿨타임 (ms)
   doyunShield?: number; // 도윤 덩크슛 실드 양
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
+  defenseShield?: number; // 기본 DEF에서 생성된 영구 보호막의 현재 값
+  maxDefenseShield?: number; // 기본 DEF와 레벨 성장으로 계산한 보호막 최대값
   runShield?: number; // PvE 런 아이템으로 얻는 보호막
-  levelDamageTakenMultiplier?: number; // 영구 레벨 성장 방어력 보정
   isSuInvisible?: boolean; // 수 정밀 저격 은신 및 무적 여부
   totalDamageDealt?: number; // 한 게임 내 가한 총 피해량
   totalDamageTaken?: number; // 한 게임 내 받은 총 피해량

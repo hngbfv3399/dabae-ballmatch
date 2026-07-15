@@ -195,7 +195,6 @@ const winnerInfo = document.getElementById("winner-info") as HTMLElement;
 const modalCloseBtn = document.getElementById(
   "modal-close-btn",
 ) as HTMLButtonElement;
-let winnerUiBlastTimer: number | null = null;
 
 // Selected characters state
 const selectedIds: Set<string> = new Set();
@@ -215,8 +214,8 @@ let bossCharacterId: string | null = null;
 const LARGE_SOLO_CHARACTER_RADIUS = 53;
 const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
-type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; damageTakenMultiplier: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number };
-type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
+type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; defenseShieldBonus: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number };
+type PveRun = { characterId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -292,18 +291,13 @@ function getLeveledAttack(baseAttack: number, progress: PveProgress): number {
   return Math.ceil(baseAttack * (1 + 0.0125 * getLevelStatGrowthSteps(progress.level)));
 }
 
-function getLeveledDamageTakenMultiplier(progress: PveProgress): number {
-  return 1 - Math.min(0.29, 0.01 * getLevelStatGrowthSteps(progress.level));
+function getLeveledDefenseShield(character: { defense?: number }, progress: PveProgress): number {
+  return Math.max(0, Math.round((character.defense ?? 0) + getLevelStatGrowthSteps(progress.level)));
 }
 
+// 기존 도감 템플릿 호환용. 현재 값은 퍼센트가 아닌 정수 보호막이다.
 function getTotalDefensePercent(character: { defense?: number }, progress: PveProgress): number {
-  const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, character.defense ?? 0) / 100);
-  return Math.round((1 - baseDefenseMultiplier * getLeveledDamageTakenMultiplier(progress)) * 100);
-}
-
-function getCombatDefensePercent(character: Pick<CharacterState, "defense" | "levelDamageTakenMultiplier">): number {
-  const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, character.defense ?? 0) / 100);
-  return Math.round((1 - baseDefenseMultiplier * (character.levelDamageTakenMultiplier ?? 1)) * 100);
+  return getLeveledDefenseShield(character, progress);
 }
 
 function getNextSkillUnlockLevel(level: number): number | null {
@@ -342,7 +336,8 @@ function applyCharacterLevel(state: CharacterState) {
   state.maxHp = getLeveledHp(state.maxHp, progress);
   state.hp = state.maxHp;
   state.attackPower = getLeveledAttack(state.attackPower, progress);
-  state.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
+  state.maxDefenseShield = getLeveledDefenseShield(state, progress);
+  state.defenseShield = state.maxDefenseShield;
   return state;
 }
 
@@ -1786,8 +1781,9 @@ function updateHUD(characters: CharacterState[]) {
   sorted.forEach((char) => {
     const hpPercent = (char.hp / char.maxHp) * 100;
     const skillPercent = char.skillGauge;
-    const defensePercent = getCombatDefensePercent(char);
-    const defenseBarPercent = Math.min(100, defensePercent * 2);
+    const defenseShield = Math.max(0, Math.round(char.defenseShield ?? 0));
+    const maxDefenseShield = Math.max(0, Math.round(char.maxDefenseShield ?? char.defense ?? 0));
+    const defenseBarPercent = maxDefenseShield > 0 ? Math.min(100, (defenseShield / maxDefenseShield) * 100) : 0;
     const shieldPercent = Math.min(100, ((char.runShield ?? 0) / char.maxHp) * 100);
     const isSkillReady = char.skillGauge >= 100;
     const statusEffects = char.isDead ? [] : getCharacterStatusEffects(char);
@@ -1827,16 +1823,10 @@ function updateHUD(characters: CharacterState[]) {
           <span style="color: ${char.color}">${char.name}${char.isBoss ? " (👑)" : ""}</span>
           <span class="hud-hp-text">${char.isDead ? "탈락" : `${formatHp(char.hp)}/${formatHp(char.maxHp)}`}</span>
         </div>
-        <!-- HP Bar -->
+        <!-- Permanent defense shield / HP -->
+        ${maxDefenseShield > 0 ? `<div class="hud-defense-row"><span>DEF ${defenseShield}/${maxDefenseShield}</span><div class="bar-container hud-defense-bar"><div class="bar bar-defense" style="width:${char.isDead ? 0 : defenseBarPercent}%;"></div></div></div>` : ""}
         <div class="bar-container" style="margin-bottom: 4px;">
           <div class="bar bar-hp" style="width: ${hpPercent}%; background: ${char.isDead ? "#333" : ""};"></div>
-        </div>
-        <!-- Defense / Shield Bars -->
-        <div class="hud-defense-row">
-          <span>DEF ${defensePercent}%</span>
-          <div class="bar-container hud-defense-bar">
-            <div class="bar bar-defense" style="width: ${char.isDead ? 0 : defenseBarPercent}%;"></div>
-          </div>
         </div>
         ${shieldPercent > 0 && !char.isDead ? `<div class="hud-defense-row hud-shield-row"><span>🛡 ${Math.round(char.runShield ?? 0)}</span><div class="bar-container hud-shield-bar"><div class="bar bar-shield" style="width:${shieldPercent}%;"></div></div></div>` : ""}
         <!-- Skill Bar -->
@@ -1990,22 +1980,6 @@ function recordPveStageExperience(run: PveRun, stageNumber: number) {
   });
 }
 
-function playWinnerUiBlast() {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  if (winnerUiBlastTimer !== null) window.clearTimeout(winnerUiBlastTimer);
-  const pieces = [
-    winnerModal.querySelector(".winner-title"),
-    ...Array.from(winnerInfo.children),
-  ].filter((element): element is HTMLElement => element instanceof HTMLElement);
-  pieces.forEach((piece, index) => piece.style.setProperty("--winner-blast-index", String(index)));
-  winnerModal.classList.remove("winner-ui-blast");
-  requestAnimationFrame(() => winnerModal.classList.add("winner-ui-blast"));
-  winnerUiBlastTimer = window.setTimeout(() => {
-    winnerModal.classList.remove("winner-ui-blast");
-    winnerUiBlastTimer = null;
-  }, 1500);
-}
-
 // Game End & Show Winner
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = "게임 종료";
@@ -2028,6 +2002,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     }
 
     run.currentHp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
+    run.currentDefenseShield = player.defenseShield ?? 0;
     run.currentShield = player.runShield ?? 0;
     if (run.stage < SLIME_MEADOW_STAGE_COUNT) {
       const clearedStageNumber = run.stage;
@@ -2322,7 +2297,6 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 
   winnerInfo.innerHTML = html;
   winnerModal.classList.remove("hidden");
-  playWinnerUiBlast();
 }
 
 // Close Winner Modal and go to Lobby
@@ -2785,7 +2759,7 @@ function openCharacterDetail(charId: string) {
 }
 
 function getPveProgress(characterId: string): PveProgress {
-  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, experienceInCurrentLevel: 0, experienceToNextLevel: 100, isMaxLevel: false, healthMultiplier: 1, attackMultiplier: 1, damageTakenMultiplier: 1, totalDungeonClears: 0 };
+  return pveProgressByCharacter.get(characterId) ?? { level: 1, experience: 0, experienceInCurrentLevel: 0, experienceToNextLevel: 100, isMaxLevel: false, healthMultiplier: 1, attackMultiplier: 1, defenseShieldBonus: 0, totalDungeonClears: 0 };
 }
 
 function updatePveSelectionUI() {
@@ -2802,7 +2776,7 @@ function updatePveSelectionUI() {
   pveCharacterSelectAvatar.style.color = selected.color;
   pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
   const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
-  pveCharacterSelectStats.textContent = `HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · DEF ${getTotalDefensePercent(selected, progress)}% · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  pveCharacterSelectStats.textContent = `DEF ${getLeveledDefenseShield(selected, progress)} · HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
   pveStartBtn.disabled = false;
 }
 
@@ -2826,7 +2800,7 @@ function renderPveCharacterList() {
     button.type = "button";
     button.className = `character-row ${selectedPveCharacterId === character.id ? "selected" : ""}`;
     const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
-    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
+    button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
       pveCharacterModal.classList.add("hidden");
@@ -2862,7 +2836,7 @@ function startPveDungeon() {
   pveCharacterModal.classList.add("hidden");
   gameModeModal.classList.add("hidden");
   const stage = Number(pveStageSelect.value);
-  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), currentShield: 0, rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
+  pveRun = { characterId: character.id, stage, startedAt: Date.now(), maxHp: getLeveledHp(character.maxHp, progress), currentHp: getLeveledHp(character.maxHp, progress), currentDefenseShield: getLeveledDefenseShield(character, progress), currentShield: 0, rewardEligible: stage === 1, modifiers: createPveRunModifiers() };
   showAugmentChoice(pveRun, 0, startPveStage);
 }
 
@@ -2883,9 +2857,10 @@ function startPveStage() {
   applyEquippedCosmetic(player);
   player.maxHp = getLeveledHp(character.maxHp, progress);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
-  player.levelDamageTakenMultiplier = getLeveledDamageTakenMultiplier(progress);
+  player.maxDefenseShield = getLeveledDefenseShield(character, progress);
   applyPveRunModifierStats(player, pveRun.modifiers);
   player.hp = Math.min(player.maxHp, pveRun.currentHp);
+  player.defenseShield = Math.min(player.maxDefenseShield, pveRun.currentDefenseShield);
   player.runShield = pveRun.currentShield;
   player.teamId = 1;
   player.x = player.radius * 2.5;
@@ -3004,7 +2979,7 @@ function renderMatchCharacterPreview() {
   const skinEffect = cosmetic
     ? `${cosmetic.rarity.toUpperCase()} · ${cosmetic.style.borderAnimation === "none" ? "기본 테두리" : `${cosmetic.style.borderAnimation} 테두리`} · ${cosmetic.style.trail === "none" ? "이동 흔적 없음" : `${cosmetic.style.trail} 이동 흔적`}`
     : "기본 외형 · 캐릭터 고유 색상과 테두리를 사용합니다.";
-  matchCharacterPickerDetail.innerHTML = `<div class="picker-detail-head"><div class="picker-preview-avatar">${getAvatarHTML(character.name, character.image, "picker-preview-image")}</div><div><span class="eyebrow">${character.role}</span><h3 style="color:${character.color}">${character.name} <small>Lv.${progress.level}</small></h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><section class="picker-info-block"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><p>캐릭터 고유 전투 로직이 현재 전투에 유지됩니다.</p></section><section class="picker-info-block"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><p>${character.skillDescription}</p></section><section class="picker-info-block skin-info"><em>SKIN · 현재 착용</em><strong>${cosmetic?.name ?? "기본 외형"}</strong><p>${skinEffect}</p></section><button id="confirm-match-character-btn" class="btn btn-primary" type="button">${character.name} 선택하기</button>`;
+  matchCharacterPickerDetail.innerHTML = `<div class="picker-detail-head"><div class="picker-preview-avatar">${getAvatarHTML(character.name, character.image, "picker-preview-image")}</div><div><span class="eyebrow">${character.role}</span><h3 style="color:${character.color}">${character.name} <small>Lv.${progress.level}</small></h3></div></div><div class="picker-stat-grid"><span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div><section class="picker-info-block"><em>PASSIVE · 장착됨</em><strong>기존 고유 패시브</strong><p>캐릭터 고유 전투 로직이 현재 전투에 유지됩니다.</p></section><section class="picker-info-block"><em>ACTIVE · 장착됨</em><strong>${character.skillName}</strong><p>${character.skillDescription}</p></section><section class="picker-info-block skin-info"><em>SKIN · 현재 착용</em><strong>${cosmetic?.name ?? "기본 외형"}</strong><p>${skinEffect}</p></section><button id="confirm-match-character-btn" class="btn btn-primary" type="button">${character.name} 선택하기</button>`;
   document.getElementById("confirm-match-character-btn")?.addEventListener("click", () => chooseMatchCharacter(character.id));
 }
 
@@ -3051,6 +3026,8 @@ function renderManagedCharacter() {
   const equippedBackground = victoryBackgroundCatalog.find((background) => background.backgroundId === equippedVictoryBackgroundId);
   const canSpendExperiencePoints = false;
   collectionDetail.innerHTML = `<div class="management-head"><span class="collection-avatar" style="--avatar-color:${character.color}">${getAvatarHTML(character.name, character.image, "collection-avatar-image")}</span><div><span class="eyebrow">CHARACTER LOADOUT</span><h3 style="color:${character.color}">${character.name} · Lv.${progress.level}</h3></div></div><div class="picker-stat-grid"><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>DEF <b>${getTotalDefensePercent(character, progress)}%</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span></div>${getExperiencePanelMarkup(progress)}<section class="collection-victory-ceremony"><div><span class="eyebrow">VICTORY CEREMONY</span><strong>승리 세레모니 장착</strong><p>현재 장착: <b>${equippedCeremony ? getCeremonyDisplayName(equippedCeremony.animation) : "없음"}</b> · 모든 게임 결과의 1위에게 적용됩니다.</p></div><div id="collection-victory-ceremony-grid" class="collection-victory-ceremony-grid"></div><small id="collection-victory-ceremony-result" aria-live="polite">세레모니를 선택하면 즉시 장착됩니다.</small></section><section class="experience-point-spend"><div><span class="eyebrow">EXPERIENCE POINT</span><strong>보유 ${gachaProgress.experiencePoints}P</strong><p>중복 스킨으로 얻은 포인트입니다. 이 캐릭터에게 사용할 양을 입력하세요.</p></div><label>사용 포인트 <input id="collection-experience-point-amount" type="number" min="1" max="${gachaProgress.experiencePoints}" step="1" inputmode="numeric" value="1" ${canSpendExperiencePoints ? "" : "disabled"}></label><button id="collection-experience-point-use" class="btn btn-primary" type="button" ${canSpendExperiencePoints ? "" : "disabled"}>${character.name}에게 사용</button><small id="collection-experience-point-result" aria-live="polite">${canSpendExperiencePoints ? "포인트는 여러 캐릭터에게 나누어 사용할 수 있습니다." : "중복 스킨을 획득하면 경험치 포인트가 적립됩니다."}</small></section>${getSkillLoadoutMarkup(character, progress)}<h4>스킨 장착</h4><p class="management-help">스킨을 눌러 이 캐릭터에 장착합니다. 현재 장착: <b>${cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(character.id))?.name ?? "기본 외형"}</b></p><div class="management-skin-grid" id="management-skin-grid"></div>`;
+  const collectionStats = collectionDetail.querySelector(".picker-stat-grid") as HTMLElement;
+  collectionStats.innerHTML = `<span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span><span>SPD <b>${character.speed.toFixed(1)}x</b></span>`;
   const experienceSection = collectionDetail.querySelector(".experience-point-spend") as HTMLElement;
   experienceSection.innerHTML = `<div><span class="eyebrow">ITEM INVENTORY</span><strong>경험치 포인트 아이템</strong><p>아이템을 누르면 ${character.name}에게 즉시 경험치가 적용됩니다.</p></div><div id="collection-experience-point-items" class="experience-point-item-grid"></div><small id="collection-experience-point-result" aria-live="polite">중복 스킨을 획득하면 경험치 포인트 아이템이 추가됩니다.</small>`;
   const experienceItemGrid = document.getElementById("collection-experience-point-items") as HTMLElement;

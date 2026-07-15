@@ -81,6 +81,8 @@ export function createCharacterState(
     vy: 0,
     radius,
     hp: config.maxHp,
+    defenseShield: Math.max(0, Math.round(config.defense ?? 0)),
+    maxDefenseShield: Math.max(0, Math.round(config.defense ?? 0)),
     skillGauge: 0,
     isDead: false,
     baseAttackCooldown: 0,

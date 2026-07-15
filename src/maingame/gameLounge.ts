@@ -1381,13 +1381,18 @@ export class GameLounge {
       }
     }
 
-    const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, target.defense ?? 0) / 100);
-    finalDamage *= baseDefenseMultiplier * (target.levelDamageTakenMultiplier ?? 1);
-
-    // 방어력·레벨 성장 배율까지 적용한 실제 피해는 정수로 확정한다.
+    // 방어력은 피해 감소율이 아닌 HP 앞의 정수 보호막이다.
     // 체력, 전적, 콘솔 로그, 플로팅 텍스트가 같은 값을 사용하도록 이 지점에서 한 번만 반올림한다.
     finalDamage = Math.round(finalDamage);
     if (finalDamage <= 0) return;
+
+    if (target.defenseShield && target.defenseShield > 0) {
+      const absorbed = Math.min(target.defenseShield, finalDamage);
+      target.defenseShield -= absorbed;
+      finalDamage -= absorbed;
+      context.addFloatingText(target.x, target.y - target.radius - 12, `DEF -${Math.round(absorbed)}`, "#60a5fa", 0.45);
+      if (finalDamage <= 0) return;
+    }
 
     if (target.runShield && target.runShield > 0 && finalDamage > 0) {
       const absorbed = Math.min(target.runShield, finalDamage);

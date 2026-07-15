@@ -34,6 +34,7 @@ export function createSeededRandom(seed: number): () => number {
 interface Duelist {
   config: CharacterConfig;
   hp: number;
+  defenseShield: number;
   attackCooldown: number;
 }
 
@@ -78,18 +79,18 @@ export function runBaselineBalanceTest(
 }
 
 function simulateBaselineDuel(leftConfig: CharacterConfig, rightConfig: CharacterConfig, maxSeconds: number, random: () => number): "left" | "right" | "draw" {
-  const left: Duelist = { config: leftConfig, hp: leftConfig.maxHp, attackCooldown: 0 };
-  const right: Duelist = { config: rightConfig, hp: rightConfig.maxHp, attackCooldown: 0 };
+  const left: Duelist = { config: leftConfig, hp: leftConfig.maxHp, defenseShield: Math.max(0, leftConfig.defense ?? 0), attackCooldown: 0 };
+  const right: Duelist = { config: rightConfig, hp: rightConfig.maxHp, defenseShield: Math.max(0, rightConfig.defense ?? 0), attackCooldown: 0 };
   const dt = 0.1;
   for (let elapsed = 0; elapsed < maxSeconds && left.hp > 0 && right.hp > 0; elapsed += dt) {
     left.attackCooldown -= dt;
     right.attackCooldown -= dt;
     if (left.attackCooldown <= 0) {
-      right.hp -= applyHit(left.config, right.config, random);
+      applyHit(left.config, right, random);
       left.attackCooldown += attackInterval(left.config);
     }
     if (right.hp > 0 && right.attackCooldown <= 0) {
-      left.hp -= applyHit(right.config, left.config, random);
+      applyHit(right.config, left, random);
       right.attackCooldown += attackInterval(right.config);
     }
   }
@@ -101,9 +102,12 @@ function attackInterval(config: CharacterConfig): number {
   return Math.max(0.35, 1.2 - Math.min(config.speed, 3) * 0.08);
 }
 
-function applyHit(attacker: CharacterConfig, target: CharacterConfig, random: () => number): number {
+function applyHit(attacker: CharacterConfig, target: Duelist, random: () => number): void {
   const rangeFactor = Math.min(1.15, 0.85 + attacker.baseAttackRange / 600);
   const variation = 0.9 + random() * 0.2;
-  const defenseMultiplier = 1 - Math.min(0.8, Math.max(0, target.defense ?? 0) / 100);
-  return attacker.attackPower * rangeFactor * variation * (1 - Math.min(target.speed, 3) * 0.015) * defenseMultiplier;
+  let damage = attacker.attackPower * rangeFactor * variation * (1 - Math.min(target.config.speed, 3) * 0.015);
+  const absorbed = Math.min(target.defenseShield, damage);
+  target.defenseShield -= absorbed;
+  damage -= absorbed;
+  target.hp -= damage;
 }
