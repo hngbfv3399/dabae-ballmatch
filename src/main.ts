@@ -195,6 +195,7 @@ const winnerInfo = document.getElementById("winner-info") as HTMLElement;
 const modalCloseBtn = document.getElementById(
   "modal-close-btn",
 ) as HTMLButtonElement;
+let winnerUiBlastTimer: number | null = null;
 
 // Selected characters state
 const selectedIds: Set<string> = new Set();
@@ -1989,6 +1990,22 @@ function recordPveStageExperience(run: PveRun, stageNumber: number) {
   });
 }
 
+function playWinnerUiBlast() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (winnerUiBlastTimer !== null) window.clearTimeout(winnerUiBlastTimer);
+  const pieces = [
+    winnerModal.querySelector(".winner-title"),
+    ...Array.from(winnerInfo.children),
+  ].filter((element): element is HTMLElement => element instanceof HTMLElement);
+  pieces.forEach((piece, index) => piece.style.setProperty("--winner-blast-index", String(index)));
+  winnerModal.classList.remove("winner-ui-blast");
+  requestAnimationFrame(() => winnerModal.classList.add("winner-ui-blast"));
+  winnerUiBlastTimer = window.setTimeout(() => {
+    winnerModal.classList.remove("winner-ui-blast");
+    winnerUiBlastTimer = null;
+  }, 1500);
+}
+
 // Game End & Show Winner
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = "게임 종료";
@@ -2305,6 +2322,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 
   winnerInfo.innerHTML = html;
   winnerModal.classList.remove("hidden");
+  playWinnerUiBlast();
 }
 
 // Close Winner Modal and go to Lobby
