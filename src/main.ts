@@ -126,6 +126,15 @@ hudToggleBtn.addEventListener("click", () => {
 async function setFocusMode(enabled: boolean) {
   gameView.classList.toggle("is-focus-mode", enabled);
   focusModeBtn.textContent = enabled ? "✕ 전장 닫기" : "⛶ 전장 확대";
+  focusModeBtn.setAttribute("aria-pressed", String(enabled));
+
+  // 모바일은 전체 화면 API가 브라우저 UI와 충돌하면서 하단을 가리거나
+  // 닫기 버튼에 닿지 못하는 경우가 있어, 스크롤 가능한 CSS 집중 모드만 사용한다.
+  const isMobileFocus = window.matchMedia("(max-width: 700px)").matches;
+  if (isMobileFocus) {
+    if (enabled) gameView.scrollIntoView({ block: "start", behavior: "smooth" });
+    return;
+  }
 
   if (enabled) {
     try {
@@ -149,7 +158,7 @@ focusModeBtn.addEventListener("click", () => {
 });
 
 document.addEventListener("fullscreenchange", () => {
-  if (!document.fullscreenElement && gameView.classList.contains("is-focus-mode")) {
+  if (!document.fullscreenElement && gameView.classList.contains("is-focus-mode") && !window.matchMedia("(max-width: 700px)").matches) {
     void setFocusMode(false);
   }
 });
