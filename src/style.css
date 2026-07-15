@@ -646,6 +646,34 @@ body {
   background: linear-gradient(90deg, #7f00ff, var(--neon-cyan));
 }
 
+.bar-defense {
+  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
+}
+
+.bar-shield {
+  background: linear-gradient(90deg, #67e8f9, #e0f2fe);
+  box-shadow: 0 0 8px rgba(103, 232, 249, 0.8);
+}
+
+.hud-defense-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  margin: -1px 0 3px;
+  color: #93c5fd;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.hud-defense-row .bar-container {
+  height: 5px;
+}
+
+.hud-shield-row {
+  color: #a5f3fc;
+}
+
 .hud-status-list {
   display: flex;
   flex-wrap: wrap;

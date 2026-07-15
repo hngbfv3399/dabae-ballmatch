@@ -274,6 +274,11 @@ function getTotalDefensePercent(character: { defense?: number }, progress: PvePr
   return Math.round((1 - baseDefenseMultiplier * getLeveledDamageTakenMultiplier(progress)) * 100);
 }
 
+function getCombatDefensePercent(character: Pick<CharacterState, "defense" | "levelDamageTakenMultiplier">): number {
+  const baseDefenseMultiplier = 1 - Math.min(0.8, Math.max(0, character.defense ?? 0) / 100);
+  return Math.round((1 - baseDefenseMultiplier * (character.levelDamageTakenMultiplier ?? 1)) * 100);
+}
+
 function getNextSkillUnlockLevel(level: number): number | null {
   if (level >= 30) return null;
   return Math.min(30, (Math.floor(level / 5) + 1) * 5);
@@ -1626,6 +1631,9 @@ function updateHUD(characters: CharacterState[]) {
   sorted.forEach((char) => {
     const hpPercent = (char.hp / char.maxHp) * 100;
     const skillPercent = char.skillGauge;
+    const defensePercent = getCombatDefensePercent(char);
+    const defenseBarPercent = Math.min(100, defensePercent * 2);
+    const shieldPercent = Math.min(100, ((char.runShield ?? 0) / char.maxHp) * 100);
     const isSkillReady = char.skillGauge >= 100;
     const statusEffects = char.isDead ? [] : getCharacterStatusEffects(char);
     const statusBadges = statusEffects.map((effect) => `
@@ -1668,6 +1676,14 @@ function updateHUD(characters: CharacterState[]) {
         <div class="bar-container" style="margin-bottom: 4px;">
           <div class="bar bar-hp" style="width: ${hpPercent}%; background: ${char.isDead ? "#333" : ""};"></div>
         </div>
+        <!-- Defense / Shield Bars -->
+        <div class="hud-defense-row">
+          <span>DEF ${defensePercent}%</span>
+          <div class="bar-container hud-defense-bar">
+            <div class="bar bar-defense" style="width: ${char.isDead ? 0 : defenseBarPercent}%;"></div>
+          </div>
+        </div>
+        ${shieldPercent > 0 && !char.isDead ? `<div class="hud-defense-row hud-shield-row"><span>🛡 ${Math.round(char.runShield ?? 0)}</span><div class="bar-container hud-shield-bar"><div class="bar bar-shield" style="width:${shieldPercent}%;"></div></div></div>` : ""}
         <!-- Skill Bar -->
         <div class="bar-container">
           <div class="bar bar-skill" style="width: ${skillPercent}%; background: ${char.isDead ? "#333" : isSkillReady ? "#ffd700" : ""};"></div>
