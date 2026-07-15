@@ -357,7 +357,7 @@ function renderGachaCatalog() {
       card.type = "button";
       card.className = `gacha-skin-icon ceremony-catalog-icon ${ceremony.isUnlocked ? "unlocked" : "locked"} ${previewVictoryCeremonyId === ceremony.ceremonyId ? "active" : ""}`;
       card.dataset.ceremonyAnimation = ceremony.animation;
-      card.innerHTML = `<span class="ceremony-icon ceremony-${ceremony.animation}" aria-hidden="true">${getCeremonyEmoji(ceremony.animation)}</span><small class="rarity-${ceremony.rarity}">${ceremony.name}</small>`;
+      card.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "catalog")}<small class="rarity-${ceremony.rarity}">${getCeremonyDisplayName(ceremony.animation)}</small>`;
       card.addEventListener("click", () => { previewVictoryCeremonyId = ceremony.ceremonyId; renderGachaCatalog(); });
       gachaCatalog.appendChild(card);
     });
@@ -382,9 +382,9 @@ function renderGachaCatalog() {
 function renderGachaPreview() {
   if (activeGachaType === "ceremony") {
     const ceremony = victoryCeremonyCatalog.find((entry) => entry.ceremonyId === previewVictoryCeremonyId) ?? victoryCeremonyCatalog[0];
-    if (!ceremony) { gachaPreview.textContent = "승리 세레모니를 불러오는 중입니다."; return; }
+    if (!ceremony) { gachaPreview.textContent = "승리 배경을 불러오는 중입니다."; return; }
     const isEquipped = ceremony.ceremonyId === equippedVictoryCeremonyId;
-    gachaPreview.innerHTML = `<div class="ceremony-preview-stage ceremony-${ceremony.animation}"><span>${getCeremonyEmoji(ceremony.animation)}</span></div><span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${ceremony.name}</h3><p>게임 종료 시 1위 캐릭터가 이 동작을 합니다.</p><div class="skill-slot"><b>승리 연출</b><br>${getCeremonyDescription(ceremony.animation)}</div>${ceremony.isUnlocked ? `<button id="equip-victory-ceremony" class="btn btn-primary" type="button" ${isEquipped ? "disabled" : ""}>${isEquipped ? "현재 장착 중" : "이 세레모니 장착"}</button>` : ""}<p class="gacha-preview-note">세레모니는 모든 게임의 결과 화면 1위에게 공통으로 적용됩니다.</p>`;
+    gachaPreview.innerHTML = `${getCeremonySceneMarkup(ceremony.animation, "preview")}<span class="eyebrow">${isEquipped ? "장착 중" : ceremony.isUnlocked ? "획득함" : "미획득"} · ${ceremony.rarity.toUpperCase()}</span><h3>${getCeremonyDisplayName(ceremony.animation)}</h3><p>게임 종료 시 1위 플레이어 공 뒤에 이 배경이 표시됩니다.</p><div class="skill-slot"><b>승리 배경</b><br>${getCeremonyBackgroundDescription(ceremony.animation)}</div>${ceremony.isUnlocked ? `<button id="equip-victory-ceremony" class="btn btn-primary" type="button" ${isEquipped ? "disabled" : ""}>${isEquipped ? "현재 장착 중" : "이 배경 장착"}</button>` : ""}<p class="gacha-preview-note">승리 배경은 모든 게임의 결과 화면 1위에게 공통으로 적용됩니다.</p>`;
     document.getElementById("equip-victory-ceremony")?.addEventListener("click", () => void equipVictoryCeremony(ceremony));
     return;
   }
@@ -400,9 +400,9 @@ function updateGachaUI() {
   const catalogReady = cosmeticCatalog.length + victoryCeremonyCatalog.length > 0;
   gachaTitle.textContent = "통합 가챠";
   gachaTypeHelp.innerHTML = isCeremony
-    ? `현재 탭은 세레모니 도감 필터입니다. 뽑기는 스킨과 세레모니 <b>전체 풀</b>에서 진행됩니다. 중복 세레모니는 경험치 포인트 아이템으로 바뀌며, 획득한 세레모니는 여기서 장착합니다.`
-    : `현재 탭은 스킨 도감 필터입니다. 뽑기는 스킨과 세레모니 <b>전체 풀</b>에서 진행됩니다. 중복 획득 시 경험치 포인트가 적립되며, 도감 탭에서 원하는 캐릭터에게 나누어 사용할 수 있습니다.`;
-  gachaDrawStatus.textContent = `보유 경험치 포인트 아이템 ${experiencePointItems.length}개 · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 스킨·승리 세레모니 전체 풀에서 뽑습니다.`;
+    ? `현재 탭은 승리 배경 도감 필터입니다. 뽑기는 스킨과 승리 배경 <b>전체 풀</b>에서 진행됩니다. 중복 배경은 경험치 포인트 아이템으로 바뀌며, 획득한 배경은 여기서 장착합니다.`
+    : `현재 탭은 스킨 도감 필터입니다. 뽑기는 스킨과 승리 배경 <b>전체 풀</b>에서 진행됩니다. 중복 획득 시 경험치 포인트가 적립되며, 도감 탭에서 원하는 캐릭터에게 나누어 사용할 수 있습니다.`;
+  gachaDrawStatus.textContent = `보유 경험치 포인트 아이템 ${experiencePointItems.length}개 · 도감 탭에서 사용 가능 · 오늘 무료 ${gachaProgress.dailyDrawsRemaining}/5회 · 던전 클리어 보상 ${gachaProgress.bonusDrawsAvailable}회 · 던전 3회 클리어마다 1회 (${dungeonClearProgress}/3) · 스킨·승리 배경 전체 풀에서 뽑습니다.`;
   gachaDrawBtn.disabled = !catalogReady || (gachaProgress.dailyDrawsRemaining + gachaProgress.bonusDrawsAvailable <= 0);
   gachaDrawBtn.textContent = "통합 뽑기";
   renderGachaCatalog();
@@ -417,7 +417,7 @@ function closeGachaReveal() {
 }
 
 function showGachaRevealRolling() {
-  gachaRevealContent.innerHTML = `<div class="gacha-reveal rolling"><span class="eyebrow">UNIFIED GACHA SIGNAL</span><div class="gacha-reveal-orb"><i></i><i></i><i></i><b>?</b></div><h2>보상을 해석하는 중…</h2><p>스킨과 승리 세레모니 전체 풀에서 결과를 불러옵니다.</p></div>`;
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal rolling"><span class="eyebrow">UNIFIED GACHA SIGNAL</span><div class="gacha-reveal-orb"><i></i><i></i><i></i><b>?</b></div><h2>보상을 해석하는 중…</h2><p>스킨과 승리 배경 전체 풀에서 결과를 불러옵니다.</p></div>`;
   gachaRevealModal.classList.remove("hidden");
 }
 
@@ -436,18 +436,22 @@ function showGachaRevealResult(result: { result: string; cosmetic: GachaRevealCo
   document.getElementById("gacha-reveal-close")?.addEventListener("click", closeGachaReveal);
 }
 
-function getCeremonyEmoji(animation: VictoryCeremony["animation"]): string {
-  return ({ wave: "👋", jump: "🙌", clap: "👏", dance: "🕺", trophy: "🏆", fireworks: "🎆" })[animation];
+function getCeremonyDisplayName(animation: VictoryCeremony["animation"]): string {
+  return ({ wave: "별빛 무대", jump: "맑은 하늘", clap: "골드 스포트라이트", dance: "네온 리듬", trophy: "챔피언 골드", fireworks: "불꽃 축제" })[animation];
 }
 
-function getCeremonyDescription(animation: VictoryCeremony["animation"]): string {
-  return ({ wave: "관객에게 여유롭게 손을 흔듭니다.", jump: "두 팔을 들고 힘껏 뛰어오릅니다.", clap: "스스로에게 박수를 보내며 승리를 만끽합니다.", dance: "리듬에 맞춰 신나게 춤을 춥니다.", trophy: "트로피를 높이 들어 올립니다.", fireworks: "불꽃과 함께 화려하게 피날레를 장식합니다." })[animation];
+function getCeremonyBackgroundDescription(animation: VictoryCeremony["animation"]): string {
+  return ({ wave: "푸른 별빛과 잔잔한 링이 플레이어 공을 감쌉니다.", jump: "밝은 하늘빛과 상승하는 광선이 뒤를 채웁니다.", clap: "따뜻한 골드 조명이 사각 무대를 비춥니다.", dance: "네온 그라데이션과 리듬 파티클이 흐릅니다.", trophy: "황금빛 챔피언 광채가 공 주변에 퍼집니다.", fireworks: "여러 색의 불꽃 파티클이 무대를 장식합니다." })[animation];
+}
+
+function getCeremonySceneMarkup(animation: VictoryCeremony["animation"], size: "catalog" | "preview" | "reveal", playerMarkup = "<b>PLAYER</b>"): string {
+  return `<div class="ceremony-scene ceremony-scene-${size} ceremony-scene-${animation}" aria-hidden="true"><i></i><i></i><i></i><span class="ceremony-scene-ball">${playerMarkup}</span></div>`;
 }
 
 function showVictoryCeremonyRevealResult(result: VictoryCeremonyDrawResult) {
   const isDuplicate = result.result === "duplicateExperience";
   const specialClass = result.ceremony.rarity === "legendary" || result.ceremony.rarity === "unique" ? "is-special" : "";
-  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ceremony-reveal ${specialClass}"><span class="eyebrow rarity-${result.ceremony.rarity}">${result.ceremony.rarity.toUpperCase()} CEREMONY</span><div class="ceremony-reveal-icon ceremony-${result.ceremony.animation}">${getCeremonyEmoji(result.ceremony.animation)}</div><h2>${result.ceremony.name}</h2><p>${isDuplicate ? `중복 세레모니 · +${result.experienceGranted} 경험치 포인트 적립` : "새 승리 세레모니를 획득했습니다!"}</p><div class="gacha-reveal-effect">${getCeremonyDescription(result.ceremony.animation)}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
+  gachaRevealContent.innerHTML = `<div class="gacha-reveal revealed ceremony-reveal ${specialClass}"><span class="eyebrow rarity-${result.ceremony.rarity}">VICTORY BACKGROUND</span>${getCeremonySceneMarkup(result.ceremony.animation, "reveal")}<h2>${getCeremonyDisplayName(result.ceremony.animation)}</h2><p>${isDuplicate ? `중복 승리 배경 · +${result.experienceGranted} 경험치 포인트 적립` : "새 승리 배경을 획득했습니다!"}</p><div class="gacha-reveal-effect">${getCeremonyBackgroundDescription(result.ceremony.animation)}</div><button id="gacha-reveal-close" class="btn btn-primary" type="button">확인</button></div>`;
   document.getElementById("gacha-reveal-close")?.addEventListener("click", closeGachaReveal);
 }
 
@@ -511,8 +515,8 @@ async function drawGacha() {
     if (result.itemType === "ceremony") {
       showVictoryCeremonyRevealResult(result);
       gachaResult.textContent = result.result === "unlocked"
-        ? `획득! ${result.ceremony.name} (${result.ceremony.rarity.toUpperCase()}) — 장착하면 게임 결과 1위가 이 세레모니를 보여줍니다.`
-        : `중복! ${result.ceremony.name} · 경험치 포인트 ${result.experienceGranted}P를 적립했습니다. 원하는 캐릭터에게 나누어 사용하세요.`;
+        ? `획득! ${getCeremonyDisplayName(result.ceremony.animation)} (${result.ceremony.rarity.toUpperCase()}) — 장착하면 게임 결과 1위 플레이어 공 뒤에 적용됩니다.`
+        : `중복! ${getCeremonyDisplayName(result.ceremony.animation)} · 경험치 포인트 ${result.experienceGranted}P를 적립했습니다. 원하는 캐릭터에게 나누어 사용하세요.`;
     } else {
       showGachaRevealResult(result);
       gachaResult.textContent = result.result === "unlocked"
@@ -533,9 +537,9 @@ type UnifiedGachaDrawResult =
 async function equipVictoryCeremony(ceremony: VictoryCeremony) {
   try {
     await convexClient.mutation(api.cosmetics.equipVictoryCeremony, { clientId: anonymousClientId, ceremonyId: ceremony.ceremonyId });
-    gachaResult.textContent = `${ceremony.name}을(를) 장착했습니다. 다음 게임 결과의 1위 캐릭터에게 적용됩니다.`;
+    gachaResult.textContent = `${getCeremonyDisplayName(ceremony.animation)} 배경을 장착했습니다. 다음 게임 결과의 1위 플레이어 공 뒤에 적용됩니다.`;
   } catch (error) {
-    gachaResult.textContent = error instanceof Error ? error.message : "승리 세레모니 장착에 실패했습니다.";
+    gachaResult.textContent = error instanceof Error ? error.message : "승리 배경 장착에 실패했습니다.";
   }
 }
 
@@ -2164,16 +2168,14 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
 
   let html = `
     ${modeWinnerBanner}
-    <!-- First-place result / equipped victory ceremony -->
+    <!-- First-place result / equipped victory background -->
     <div class="winner-ceremony-card ${hasVictoryCeremony ? `has-ceremony ceremony-${ceremonyAnimation}` : "no-ceremony"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
-      <div class="winner-ceremony-rank">🥇 1위 ${hasVictoryCeremony ? "· VICTORY CEREMONY" : "결과"}</div>
+      <div class="winner-ceremony-rank">🥇 1위 ${hasVictoryCeremony ? "· VICTORY BACKGROUND" : "결과"}</div>
       <div class="winner-ceremony-main">
-        <div class="winner-ceremony-stage">
-          ${hasVictoryCeremony ? "<i></i><i></i><i></i>" : ""}
-          ${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}
-        </div>
-        <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong>${equippedCeremony ? `<span>${equippedCeremony.name}</span>` : ""}</div>
-        ${equippedCeremony ? `<div class="winner-ceremony-action" aria-label="${equippedCeremony.name}">${getCeremonyEmoji(equippedCeremony.animation)}</div>` : ""}
+        ${equippedCeremony
+          ? getCeremonySceneMarkup(equippedCeremony.animation, "preview", getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar"))
+          : `<div class="winner-ceremony-stage">${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}</div>`}
+        <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong>${equippedCeremony ? `<span>${getCeremonyDisplayName(equippedCeremony.animation)}</span>` : ""}</div>
       </div>
       <div class="mvp-stats-grid">
         <div class="mvp-stat-box">
