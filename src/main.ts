@@ -479,6 +479,19 @@ function getCeremonyBackgroundPreviewMarkup(animation: VictoryAnimation): string
   return `<div class="ceremony-background-preview ceremony-scene ceremony-scene-${animation}" aria-hidden="true"><i></i><i></i><i></i></div>`;
 }
 
+function getSuCeremonyModalOverlayMarkup(): string {
+  return `<div class="su-sniper-modal-overlay" aria-hidden="true"><i></i><i></i><i></i><b>+</b></div>`;
+}
+
+function openSuCeremonyPreview(): void {
+  const winnerTitle = winnerModal.querySelector(".winner-title") as HTMLElement | null;
+  winnerModal.classList.add("su-sniper-ceremony-active");
+  if (winnerTitle) winnerTitle.textContent = "SU · ONE SHOT";
+  winnerInfo.innerHTML = `${getSuCeremonyModalOverlayMarkup()}<div class="winner-ceremony-card has-ceremony ceremony-sniper" style="width:100%; border:1px solid #e2e8f940;"><div class="winner-ceremony-rank">🥇 수 전용 세레모니 테스트</div><div class="winner-ceremony-main">${getCeremonySceneMarkup(null, "sniper", "preview", getVictoryPlayerMarkup({ id: "su", name: "수" }))}<div class="winner-ceremony-identity"><strong style="color:#e2e8f0">수</strong><span>원 샷 · 검은 조준선</span></div></div></div><p class="win-desc">약 1.3초 후 조준선이 격발되고, 승리 모달 전체에 검은 균열 유리가 나타났다가 사라집니다.</p>`;
+  modalCloseBtn.textContent = "미리보기 닫기";
+  winnerModal.classList.remove("hidden");
+}
+
 function showVictoryPartRevealResult(itemType: "action" | "background", item: Omit<VictoryAction, "isUnlocked"> | Omit<VictoryBackground, "isUnlocked">, result: { result: string; experienceGranted: number }) {
   const isDuplicate = result.result === "duplicateExperience";
   const specialClass = item.rarity === "legendary" || item.rarity === "unique" ? "is-special" : "";
@@ -1983,6 +1996,7 @@ function recordPveStageExperience(run: PveRun, stageNumber: number) {
 // Game End & Show Winner
 function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   gameStatusText.textContent = "게임 종료";
+  winnerModal.classList.remove("su-sniper-ceremony-active");
   const winnerTitle = winnerModal.querySelector(".winner-title") as HTMLElement | null;
 
   if (currentMode === "pve" && pveRun) {
@@ -2141,6 +2155,8 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     : undefined;
   const hasVictoryCeremony = Boolean(activeVictoryAction || activeVictoryBackground);
   const ceremonyAnimation = activeVictoryBackground?.animation ?? activeVictoryAction?.animation ?? "";
+  const hasSuSniperModalOverlay = activeVictoryBackground?.animation === "sniper" && firstPlace.id === "su";
+  winnerModal.classList.toggle("su-sniper-ceremony-active", hasSuSniperModalOverlay);
 
   // 모드별 팀 승리 배너 정의
   let modeWinnerBanner = "";
@@ -2214,13 +2230,14 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
   ].filter(Boolean).map((item) => `<div class="battle-highlight">${item}</div>`).join('');
 
   let html = `
+    ${hasSuSniperModalOverlay ? getSuCeremonyModalOverlayMarkup() : ""}
     ${modeWinnerBanner}
     <!-- First-place result / equipped victory background -->
     <div class="winner-ceremony-card ${hasVictoryCeremony ? `has-ceremony ceremony-${ceremonyAnimation}` : "no-ceremony"}" style="width: 100%; border: 1px solid ${firstPlace.color}40; box-shadow: 0 0 15px ${firstPlace.color}20;">
       <div class="winner-ceremony-rank">🥇 1위 ${hasVictoryCeremony ? "· VICTORY CEREMONY" : "결과"}</div>
       <div class="winner-ceremony-main">
         ${hasVictoryCeremony
-          ? getCeremonySceneMarkup(activeVictoryBackground?.animation ?? null, activeVictoryAction?.animation ?? null, "preview", getVictoryPlayerMarkup(firstPlace))
+          ? getCeremonySceneMarkup(activeVictoryBackground?.animation === "sniper" ? null : activeVictoryBackground?.animation ?? null, activeVictoryAction?.animation ?? null, "preview", getVictoryPlayerMarkup(firstPlace))
           : `<div class="winner-ceremony-stage">${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}</div>`}
         <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong>${hasVictoryCeremony ? `<span>${[activeVictoryAction?.name, activeVictoryBackground?.name].filter(Boolean).join(" · ")}</span>` : ""}</div>
       </div>
@@ -3026,8 +3043,8 @@ function renderManagedCharacter() {
   const progress = getPveProgress(character.id);
   const skins = cosmeticCatalog.filter((cosmetic) => cosmetic.isUnlocked);
   const equippedCeremony = undefined as { animation: VictoryAnimation } | undefined;
-  const unlockedActions = victoryActionCatalog.filter((action) => action.isUnlocked);
-  const unlockedBackgrounds = victoryBackgroundCatalog.filter((background) => background.isUnlocked);
+  const actions = [...victoryActionCatalog].sort((a, b) => Number(Boolean(b.characterId)) - Number(Boolean(a.characterId)));
+  const backgrounds = [...victoryBackgroundCatalog].sort((a, b) => Number(Boolean(b.characterId)) - Number(Boolean(a.characterId)));
   const equippedAction = victoryActionCatalog.find((action) => action.actionId === equippedVictoryActionId);
   const equippedBackground = victoryBackgroundCatalog.find((background) => background.backgroundId === equippedVictoryBackgroundId);
   const canSpendExperiencePoints = false;
@@ -3051,26 +3068,28 @@ function renderManagedCharacter() {
   ceremonySection.innerHTML = `<div><span class="eyebrow">VICTORY LOADOUT</span><strong>승리 행동 · 배경 장착</strong><p>행동과 배경은 따로 뽑고 따로 장착합니다. 현재: <b>${equippedAction?.name ?? "행동 없음"}</b> · <b>${equippedBackground?.name ?? "배경 없음"}</b></p></div><div class="collection-ceremony-part"><b>플레이어 행동</b><div id="collection-victory-action-grid" class="collection-victory-ceremony-grid"></div></div><div class="collection-ceremony-part"><b>배경 효과</b><div id="collection-victory-background-grid" class="collection-victory-ceremony-grid"></div></div><small id="collection-victory-ceremony-result" aria-live="polite">각 항목을 선택하면 즉시 장착됩니다.</small>`;
   const actionGrid = document.getElementById("collection-victory-action-grid") as HTMLElement;
   const backgroundGrid = document.getElementById("collection-victory-background-grid") as HTMLElement;
-  if (unlockedActions.length === 0) actionGrid.innerHTML = `<p class="collection-ceremony-empty">획득한 승리 행동이 없습니다.</p>`;
-  if (unlockedBackgrounds.length === 0) backgroundGrid.innerHTML = `<p class="collection-ceremony-empty">획득한 승리 배경이 없습니다.</p>`;
-  unlockedActions.forEach((action) => {
+  if (actions.length === 0) actionGrid.innerHTML = `<p class="collection-ceremony-empty">승리 행동 도감을 불러오는 중입니다.</p>`;
+  if (backgrounds.length === 0) backgroundGrid.innerHTML = `<p class="collection-ceremony-empty">승리 배경 도감을 불러오는 중입니다.</p>`;
+  actions.forEach((action) => {
     const button = document.createElement("button");
     button.type = "button";
     const isEquipped = action.actionId === equippedVictoryActionId;
-    button.className = `collection-ceremony ${isEquipped ? "equipped" : ""}`;
-    button.disabled = isEquipped;
-    button.innerHTML = `${getCeremonyActionPreviewMarkup(action.animation)}<strong class="rarity-${action.rarity}">${action.name}</strong><small>${isEquipped ? "현재 장착 중" : "클릭하여 장착"}</small>`;
-    button.addEventListener("click", () => void equipVictoryPart("action", action));
+    button.className = `collection-ceremony ${isEquipped ? "equipped" : ""} ${action.isUnlocked ? "" : "locked"}`;
+    button.disabled = isEquipped || (!action.isUnlocked && action.characterId !== "su");
+    button.innerHTML = `${getCeremonyActionPreviewMarkup(action.animation)}<strong class="rarity-${action.rarity}">${action.characterId === "su" ? "수 전용 · " : ""}${action.name}</strong><small>${isEquipped ? "현재 장착 중" : action.isUnlocked ? "클릭하여 장착" : action.characterId === "su" ? "미획득 · 테스트 미리보기" : "미획득 · 가챠에서 획득"}</small>`;
+    if (action.isUnlocked) button.addEventListener("click", () => void equipVictoryPart("action", action));
+    else if (action.characterId === "su") button.addEventListener("click", openSuCeremonyPreview);
     actionGrid.appendChild(button);
   });
-  unlockedBackgrounds.forEach((background) => {
+  backgrounds.forEach((background) => {
     const button = document.createElement("button");
     button.type = "button";
     const isEquipped = background.backgroundId === equippedVictoryBackgroundId;
-    button.className = `collection-ceremony ${isEquipped ? "equipped" : ""}`;
-    button.disabled = isEquipped;
-    button.innerHTML = `${getCeremonyBackgroundPreviewMarkup(background.animation)}<strong class="rarity-${background.rarity}">${background.name}</strong><small>${isEquipped ? "현재 장착 중" : "클릭하여 장착"}</small>`;
-    button.addEventListener("click", () => void equipVictoryPart("background", background));
+    button.className = `collection-ceremony ${isEquipped ? "equipped" : ""} ${background.isUnlocked ? "" : "locked"}`;
+    button.disabled = isEquipped || (!background.isUnlocked && background.characterId !== "su");
+    button.innerHTML = `${getCeremonyBackgroundPreviewMarkup(background.animation)}<strong class="rarity-${background.rarity}">${background.characterId === "su" ? "수 전용 · " : ""}${background.name}</strong><small>${isEquipped ? "현재 장착 중" : background.isUnlocked ? "클릭하여 장착" : background.characterId === "su" ? "미획득 · 테스트 미리보기" : "미획득 · 가챠에서 획득"}</small>`;
+    if (background.isUnlocked) button.addEventListener("click", () => void equipVictoryPart("background", background));
+    else if (background.characterId === "su") button.addEventListener("click", openSuCeremonyPreview);
     backgroundGrid.appendChild(button);
   });
   const skinGrid = document.getElementById("management-skin-grid") as HTMLElement;
