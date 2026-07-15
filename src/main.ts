@@ -354,6 +354,13 @@ function getSkinVisualMarkup(
   return `<span class="skin-visual skin-visual-${size}${contextClass} anim-${style.borderAnimation} trail-${style.trail}" aria-hidden="true"><i></i><i></i><i></i><b>${label}</b></span>`;
 }
 
+function getVictoryPlayerMarkup(player: { id: string; name: string; image?: string }): string {
+  const cosmetic = cosmeticCatalog.find((entry) => entry.cosmeticId === cosmeticLoadouts.get(player.id) && entry.isUnlocked);
+  if (!cosmetic) return getAvatarHTML(player.name, player.image, "mvp-avatar");
+  const { style } = cosmetic;
+  return `<span class="skin-visual skin-visual-victory anim-${style.borderAnimation} trail-${style.trail}" style="--skin-border:${style.borderColor};--skin-fill:${style.fillColor};--skin-text:${style.textColor};--skin-glow:${style.glowColor}" aria-label="${cosmetic.name} 스킨"><i></i><i></i><i></i>${getAvatarHTML(player.name, player.image, "victory-skin-avatar")}</span>`;
+}
+
 function renderGachaCatalog() {
   if (!gachaCatalog) return;
   gachaCatalog.innerHTML = "";
@@ -2215,7 +2222,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       <div class="winner-ceremony-rank">🥇 1위 ${hasVictoryCeremony ? "· VICTORY CEREMONY" : "결과"}</div>
       <div class="winner-ceremony-main">
         ${hasVictoryCeremony
-          ? getCeremonySceneMarkup(equippedVictoryBackground?.animation ?? null, equippedVictoryAction?.animation ?? null, "preview", getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar"))
+          ? getCeremonySceneMarkup(equippedVictoryBackground?.animation ?? null, equippedVictoryAction?.animation ?? null, "preview", getVictoryPlayerMarkup(firstPlace))
           : `<div class="winner-ceremony-stage">${getAvatarHTML(firstPlace.name, firstPlace.image, "mvp-avatar")}</div>`}
         <div class="winner-ceremony-identity"><strong style="color: ${firstPlace.color}">${firstPlace.name}</strong>${hasVictoryCeremony ? `<span>${[equippedVictoryAction?.name, equippedVictoryBackground?.name].filter(Boolean).join(" · ")}</span>` : ""}</div>
       </div>
