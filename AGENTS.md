@@ -36,3 +36,4 @@ Convex agent skills for common tasks can be installed by running
    - `RENDER`
 4. All balance parameters and skill tuning magic numbers must be grouped under `SKILL_CONSTANTS` in `#region CONSTANTS`. Do NOT use inline magic numbers.
 5. 테스트 및 밸런스 패치 완료 후 패치노트 추가 시, 로컬 마크다운 문서(`PATCH_NOTES.md`)에 상세 내역을 기록해야 하며, 추가로 Git 버전 관리 반영 및 Convex DB 백엔드 연동/배포(`npx convex dev` 또는 `deploy` 등을 통한 스키마 및 실시간 데이터 갱신) 프로세스를 수행하여 변경 사항이 데이터베이스 및 백엔드 서비스와 실시간 동기화되도록 조치해야 합니다.
+6. When working on Season 4 (v4.0.0) upgrade tasks, always read `docs/SEASON_4_UPGRADE_GUIDE.md` first to understand current status, sequence, and specific rules. Update the guide's status checklists as you progress through each task.
