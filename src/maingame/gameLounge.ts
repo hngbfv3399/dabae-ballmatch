@@ -1109,6 +1109,11 @@ export class GameLounge {
       // 스킬 게이지 충전 및 100% 도달 시 즉시 발동 검사 (기절 중에는 게이지 충전 불가, 지배당한 적도 충전 불가)
       const ccBlocksSkill = (char.isStunned || char.isConfused) && !char.canUseSkillWhileCc;
       if (!char.skillActive && !ccBlocksSkill && !char.nayutaControlled) {
+        if ((char.pendingSkillEchoes ?? 0) > 0) {
+          char.pendingSkillEchoes! -= 1;
+          this.triggerSkill(char, true);
+          return;
+        }
         let canCharge = true;
         if (char.id === "nayuta") {
           const hasControlled = this.characters.some(
@@ -1520,7 +1525,7 @@ export class GameLounge {
   /**
    * 고유 스킬 발동
    */
-  private triggerSkill(char: CharacterState) {
+  private triggerSkill(char: CharacterState, isEcho = false) {
     char.skillGauge = 0;
     char.skillActive = true;
     console.log(
@@ -1544,6 +1549,12 @@ export class GameLounge {
     // 행동 전용 훅 위임 호출
     const context = this.getBehaviorContext();
     char.onSkillTrigger?.(char, context);
+    if (char.skillDurationLeft > 0) {
+      char.skillDurationLeft *= char.permanentSkillDurationMultiplier ?? 1;
+    }
+    if (!isEcho && (char.permanentSkillEchoCount ?? 0) > 0) {
+      char.pendingSkillEchoes = char.permanentSkillEchoCount;
+    }
   }
 
   /* ==================== 이펙트 도우미 메서드 ==================== */

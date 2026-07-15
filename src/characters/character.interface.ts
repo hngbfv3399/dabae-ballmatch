@@ -149,6 +149,9 @@ export interface CharacterState extends CharacterConfig {
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
   runShield?: number; // PvE 런 아이템으로 얻는 보호막
   levelDamageTakenMultiplier?: number; // 영구 레벨 성장 방어력 보정
+  permanentSkillDurationMultiplier?: number; // 영구 성장 스킬 지속시간 보정
+  permanentSkillEchoCount?: number; // 영구 성장 추가 시전 횟수
+  pendingSkillEchoes?: number; // 현재 스킬 종료 뒤 예약된 추가 시전 횟수
   isSuInvisible?: boolean; // 수 정밀 저격 은신 및 무적 여부
   totalDamageDealt?: number; // 한 게임 내 가한 총 피해량
   totalDamageTaken?: number; // 한 게임 내 받은 총 피해량
