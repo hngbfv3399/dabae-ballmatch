@@ -22,6 +22,15 @@ interface Particle {
   maxLife: number;
 }
 
+interface Shockwave {
+  x: number;
+  y: number;
+  maxRadius: number;
+  elapsed: number;
+  duration: number;
+  color: string;
+}
+
 interface FloatingText {
   x: number;
   y: number;
@@ -86,6 +95,7 @@ export class GameLounge {
   private ctx: CanvasRenderingContext2D;
   private characters: CharacterState[] = [];
   private particles: Particle[] = [];
+  private shockwaves: Shockwave[] = [];
   private floatingTexts: FloatingText[] = [];
   private projectiles: Projectile[] = [];
   private activeCinematic: ActiveCinematic | null = null;
@@ -557,6 +567,7 @@ export class GameLounge {
     this.characters = JSON.parse(JSON.stringify(selectedCharacters)); // 딥카피로 초기 상태 보존
     this.simulationSpeed = simulationSpeed;
     this.particles = [];
+    this.shockwaves = [];
     this.floatingTexts = [];
     this.projectiles = [];
     this.activeCinematic = null;
@@ -1288,6 +1299,12 @@ export class GameLounge {
       }
     }
 
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const shockwave = this.shockwaves[i];
+      shockwave.elapsed += dt;
+      if (shockwave.elapsed >= shockwave.duration) this.shockwaves.splice(i, 1);
+    }
+
     // 5. 데미지 텍스트 팝업 업데이트
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const ft = this.floatingTexts[i];
@@ -1618,6 +1635,7 @@ export class GameLounge {
       if (char.persistentItemPulseTimer <= 0) {
         const targets = enemies.filter((target) => Math.hypot(target.x - char.x, target.y - char.y) <= char.persistentItemPulseRadius! + target.radius);
         targets.forEach((target) => context.dealDamage(char, target, char.persistentItemPulseDamage!, "충격파"));
+        this.createShockwave(char.x, char.y, char.persistentItemPulseRadius, "#fbbf24");
         context.createExplosion(char.x, char.y, "#fbbf24", 10);
         char.persistentItemPulseTimer = char.persistentItemPulseInterval;
       }
@@ -1752,6 +1770,11 @@ export class GameLounge {
         maxLife: 35,
       });
     }
+  }
+
+  /** 공명 방출기·특이점 엔진의 실제 피해 반경을 읽을 수 있는 확산형 충격파 연출. */
+  private createShockwave(x: number, y: number, maxRadius: number, color: string) {
+    this.shockwaves.push({ x, y, maxRadius, elapsed: 0, duration: 0.46, color });
   }
 
   private renderStatusEffects(char: CharacterState, currentRadius: number) {
@@ -2316,7 +2339,29 @@ export class GameLounge {
       this.ctx.restore();
     });
 
-    // 5. 파티클 렌더링
+    // 5. 아이템 충격파 렌더링: 실제 판정 반경까지 빠르게 퍼져나간다.
+    this.shockwaves.forEach((shockwave) => {
+      const progress = Math.min(1, shockwave.elapsed / shockwave.duration);
+      const radius = shockwave.maxRadius * (0.16 + progress * 0.84);
+      const alpha = (1 - progress) * 0.82;
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.strokeStyle = shockwave.color;
+      this.ctx.shadowColor = shockwave.color;
+      this.ctx.shadowBlur = 18 * (1 - progress);
+      this.ctx.lineWidth = Math.max(1.5, 5 * (1 - progress));
+      this.ctx.beginPath();
+      this.ctx.arc(shockwave.x, shockwave.y, radius, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.globalAlpha = alpha * 0.2;
+      this.ctx.fillStyle = shockwave.color;
+      this.ctx.beginPath();
+      this.ctx.arc(shockwave.x, shockwave.y, radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    });
+
+    // 6. 파티클 렌더링
     this.particles.forEach((p) => {
       this.ctx.save();
       const alpha = p.life / p.maxLife;
@@ -2328,7 +2373,7 @@ export class GameLounge {
       this.ctx.restore();
     });
 
-    // 6. 캐릭터 전용 전체화면 오버레이 훅 실행 (예: 찬휘 신라천정 암전/자막/화면흔들림)
+    // 7. 캐릭터 전용 전체화면 오버레이 훅 실행 (예: 찬휘 신라천정 암전/자막/화면흔들림)
     this.characters.forEach((char) => {
       char.onRenderOverlay?.(
         char,
