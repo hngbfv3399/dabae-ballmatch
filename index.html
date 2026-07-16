@@ -219,14 +219,7 @@
           <p class="subtitle">담빵 볼게임 시뮬레이터 · 시즌 4</p>
         </header>
 
-        <!-- 메인 네비게이션 바 -->
-        <nav class="hub-tabs" aria-label="메인 메뉴">
-          <button class="hub-tab" data-hub="store" type="button">✨ 상점</button>
-          <button class="hub-tab" data-hub="skin" type="button">🎨 스킨</button>
-          <button class="hub-tab active" data-hub="play" type="button">🎮 플레이</button>
-          <button class="hub-tab" data-hub="growth" type="button">🌱 성장</button>
-          <button class="hub-tab" data-hub="book" type="button">📚 도감</button>
-        </nav>
+        <!-- 메인 네비게이션 바 (하단 고정) — 실제 DOM 위치는 lobby-view 내에 있되 CSS로 고정 -->
 
         <!-- 1. 플레이 탭 (플레이어 상태 및 전투 진입) -->
         <section id="play-hub-panel" class="hub-panel">
@@ -255,6 +248,20 @@
               <div>🏆 PvP 기록: <strong id="play-pvp-stat" style="color: #fff;">-</strong></div>
               <div>🧪 던전 기록: <strong id="play-pve-stat" style="color: #fff;">-</strong></div>
               <button id="logout-btn" class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.78rem; padding: 0.3rem 0.6rem; height: auto;">계정 로그아웃</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 1.1rem 1.25rem; margin-bottom: 1.5rem; text-align: left;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.8rem;">
+              <div>
+                <span class="eyebrow">BATTLE LOADOUT</span>
+                <h3 style="font-family:'Orbit', sans-serif; font-size:1rem; margin:0.2rem 0 0;">전투 장착 정보</h3>
+              </div>
+              <span style="font-size:0.7rem; color:var(--text-secondary);">PvP · PvE 공통 적용</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.9rem;">
+              <div id="play-equipped-skills" style="min-height:82px; padding:0.8rem; border:1px solid rgba(0,242,254,0.13); border-radius:10px; background:rgba(0,242,254,0.025);"></div>
+              <div id="play-equipped-items" style="min-height:82px; padding:0.8rem; border:1px solid rgba(255,255,255,0.06); border-radius:10px; background:rgba(255,255,255,0.015);"></div>
             </div>
           </div>
 
@@ -367,7 +374,8 @@
         <section id="growth-hub-panel" class="hub-panel hidden">
           <div class="growth-tabs">
             <button class="growth-tab-btn active" data-growth-sub="equipment">⚙️ 능력 관리 (장비)</button>
-            <button class="growth-tab-btn" data-growth-sub="skills">✨ 스킬 강화 (특성)</button>
+            <button class="growth-tab-btn" data-growth-sub="enhance" type="button">⬆️ 장비 강화</button>
+            <button class="growth-tab-btn" data-growth-sub="skills" type="button">⚡ 기본 스킬</button>
           </div>
 
           <!-- 4-1. 능력 관리 (장비 및 인벤토리) -->
@@ -406,7 +414,8 @@
             <div class="card" id="equipment-inspector-panel" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 400px; text-align: left;">
               <div id="inspector-placeholder" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; gap: 0.5rem;">
                 <span style="font-size: 2.5rem;">⚙️</span>
-                <span>장착 슬롯이나 인벤토리의 장비를 선택하면 상세 정보 및 강화/판매를 진행할 수 있습니다.</span>
+                <strong style="color:#fff; font-size:0.95rem;">장비를 선택하세요</strong>
+                <span>장착 슬롯을 누르면 해제·강화를, 가방의 장비를 누르면 장착할 빈 슬롯을 안내합니다.</span>
               </div>
               <div id="inspector-content" class="hidden" style="display: flex; flex-direction: column; gap: 1.2rem; height: 100%; width: 100%;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
@@ -420,7 +429,8 @@
                 </div>
 
                 <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 0.8rem; font-size: 0.82rem; line-height: 1.45; width: 100%; box-sizing: border-box;">
-                  <div style="color: var(--text-secondary); margin-bottom: 0.3rem;">아이템 효과</div>
+                  <div id="inspector-item-desc" style="color: var(--text-secondary); margin-bottom: 0.45rem;"></div>
+                  <div style="color: var(--text-secondary); margin-bottom: 0.3rem;">현재 레벨 효과</div>
                   <div id="inspector-item-effects" style="color: #fff; font-weight: 600;"></div>
                 </div>
 
@@ -436,10 +446,11 @@
                 </div>
 
                 <!-- 제물 합성 UI 영역 -->
-                <div id="feed-composite-area" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem; width: 100%;">
+                <div id="feed-composite-area" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem; display: none; flex-direction: column; gap: 0.6rem; width: 100%;">
                   <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">🧪 제물 합성 (강화 재료 선택)</span>
                   <p style="font-size: 0.7rem; color: var(--text-secondary); margin: 0;">가방에서 합성 재료로 쓸 장비들을 다중 선택하세요. (장착된 장비는 제외)</p>
                   <div id="feed-materials-summary" style="font-size: 0.78rem; color: var(--neon-yellow); font-weight: 700;">선택된 제물: 없음</div>
+                  <button id="btn-toggle-feed-materials" class="btn btn-secondary" type="button" style="height: 34px; font-size: 0.8rem; width: 100%;">강화 재료 선택 시작</button>
                   <button id="btn-execute-feed" class="btn btn-secondary" style="height: 36px; font-size: 0.85rem; width: 100%;" disabled>제물 합성 실행 (경험치 흡수)</button>
                 </div>
 
@@ -453,83 +464,59 @@
             </div>
           </div>
 
-          <!-- 4-2. 스킬 강화 (레벨 스킬 포인트 기반 스킬 트리) -->
-          <div id="growth-skills-panel" class="growth-layout hidden" style="grid-template-columns: 1.2fr 1fr;">
-            <!-- 스킬 강화 구조 -->
+          <div id="growth-enhance-panel" class="hidden" style="display:flex; flex-direction:column; gap:1rem;">
+            <div class="card" style="padding:1.5rem; text-align:left;">
+              <span class="eyebrow">ITEM ENHANCEMENT</span>
+              <h3 style="font-family:'Orbit',sans-serif; margin:.25rem 0 .5rem;">장비 강화</h3>
+              <p style="margin:0; font-size:.8rem; color:var(--text-secondary);">강화할 장비를 고른 뒤, 장착하지 않은 장비를 제물로 선택하세요. 제물은 소모되며 경험치가 이전됩니다.</p>
+              <div id="enhancement-content" style="margin-top:1rem;"></div>
+            </div>
+          </div>
+
+          <!-- 4-2. 기본 스킬 (특성 트리는 캐릭터별 설계 후 추가) -->
+          <div id="growth-skills-panel" class="growth-layout hidden" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- 스킬 체인 트리 영역 -->
             <div class="card" style="padding: 1.8rem; display: flex; flex-direction: column; gap: 1.5rem; text-align: left;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                  <span class="eyebrow">SKILL TRAINING</span>
-                  <h3 style="margin: 0.25rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.25rem;">특성 능력치 강화</h3>
+                  <span class="eyebrow">DEFAULT SKILL</span>
+                  <h3 style="margin: 0.25rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.25rem;">기본 스킬</h3>
                 </div>
                 <div style="background: rgba(0,242,254,0.1); border: 1px solid rgba(0,242,254,0.25); color: #00f2fe; padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; font-family: 'Orbit', sans-serif; font-size: 0.9rem;">
-                  사용 가능 스킬포인트: <span id="skill-points-avail">0</span> P
+                  기본 스킬
                 </div>
               </div>
-              <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">레벨이 상승할 때마다 1 스킬 포인트가 제공됩니다. 포인트를 투자해 캐릭터 고유 스탯을 영구 강화하세요.</p>
-
-              <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem;">
-                <!-- ATK 스킬 노드 -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
-                  <div>
-                    <strong style="font-size: 0.95rem; color:#fff;">🔥 공격력 강화 (ATK)</strong>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 공격 스케일러 +7% 누적 증가</div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span id="skill-lv-atk" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
-                    <button id="skill-add-atk" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
-                  </div>
-                </div>
-
-                <!-- HP 스킬 노드 -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
-                  <div>
-                    <strong style="font-size: 0.95rem; color:#fff;">💖 최대 체력 강화 (HP)</strong>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 최대 체력 배율 +8% 누적 증가</div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span id="skill-lv-hp" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
-                    <button id="skill-add-hp" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
-                  </div>
-                </div>
-
-                <!-- COOLDOWN 스킬 노드 -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
-                  <div>
-                    <strong style="font-size: 0.95rem; color:#fff;">🌀 스킬 쿨타임 속도 강화 (CDR)</strong>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 쿨다운 속도 +10% 누적 증가</div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span id="skill-lv-cd" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
-                    <button id="skill-add-cd" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
-                  </div>
-                </div>
-              </div>
+              <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                캐릭터 고유 스킬은 기본 장착되어 전투에 적용됩니다. 특성 강화 트리는 캐릭터별 설계가 완료된 뒤 추가됩니다.
+              </p>
+              <!-- JS가 렌더링하는 체인 트리 컨테이너 -->
+              <div id="skill-tree-container" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
             </div>
 
-            <!-- 오른쪽: 스킬 포인트 초기화 -->
-            <div class="card" style="padding: 1.8rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; text-align: left;">
+            <!-- 포인트 초기화 -->
+            <div class="card" style="padding: 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
               <div>
                 <span class="eyebrow">RESET POINTS</span>
-                <h3 style="margin: 0.25rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.2rem;">특성 포인트 리셋</h3>
-                <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.6rem;">언제든지 <strong>100 코인</strong>을 지불하여 투자한 모든 스킬 포인트를 전량 회수하고 초기화하여 다시 세팅할 수 있습니다.</p>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.3rem 0 0; line-height: 1.5;">
+                  <strong>100 코인</strong> 소모 — 모든 스킬 포인트를 전량 회수합니다.
+                </p>
               </div>
-              <button id="skill-reset-btn" class="btn btn-danger" style="width: 100%; height: 42px; font-weight: 700; background: #ff3b30; border: none; color: #fff;">포인트 전원 회수 (100 코인)</button>
+              <button id="skill-reset-btn" class="btn btn-danger" style="min-width: 160px; font-weight: 700; background: #ff3b30; border: none; color: #fff;">포인트 초기화 (100 코인)</button>
             </div>
           </div>
         </section>
 
         <!-- 5. 도감 탭 (플레이어 상세 스탯 계산기 & 캐릭터 20명 전체 로스터 브라우저) -->
         <section id="book-hub-panel" class="hub-panel hidden">
-          <span class="eyebrow">CHARACTER ARCHIVE</span>
-          <h2>시뮬레이션 캐릭터 아카이브</h2>
-          <p class="collection-note" style="margin-bottom: 1.5rem;">내 캐릭터의 장비 및 성장 특성이 모두 합산된 최종 종합 스탯 스펙 계산기와 전체 20인 캐릭터 고유 성능을 열람합니다.</p>
+          <span class="eyebrow">CHARACTER BOOK</span>
+          <h2>캐릭터 도감</h2>
+          <p class="collection-note" style="margin-bottom: 1.5rem;">오른쪽 목록에서 캐릭터를 선택하면 해당 캐릭터의 기본 정보를 확인합니다. 로그인한 내 캐릭터만 성장·장비 수치가 함께 반영됩니다.</p>
 
           <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 1.5rem;">
             <!-- 스탯 종합 연산서 -->
             <div class="stat-sheet-card">
-              <span class="eyebrow" style="color: #00f2fe;">FINAL STAT SHEET</span>
-              <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; color:#fff;">내 종합 전투 스펙 시트</h3>
+              <span class="eyebrow" style="color: #00f2fe;">SELECTED CHARACTER</span>
+              <h3 id="book-selected-name" style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; color:#fff;">캐릭터 정보</h3>
 
               <div style="display: flex; flex-direction: column; gap: 0.1rem;">
                 <div class="stat-row">
@@ -556,6 +543,14 @@
                   <span>스킬 쿨다운 충전속도</span>
                   <strong id="stat-final-cd">-</strong>
                 </div>
+                <div class="stat-row" style="border-top: 1px solid rgba(255,255,255,0.06); margin-top: 0.4rem; padding-top: 0.4rem;">
+                  <span>🍀 운 (Luck / 크리티컬 가중)</span>
+                  <strong id="stat-final-luck" style="color: #a78bfa;">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>⚡ 공격속도 (AtkSpd)</span>
+                  <strong id="stat-final-atk-spd" style="color: #fbbf24;">-</strong>
+                </div>
               </div>
               <div style="margin-top: 1rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; text-align: left; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 8px;">
                 * 최종 수치 = (기본 스탯) * (1 + 특성 스킬 %보너스) * (장비 합산 배율 보너스) + (장비 합산 플랫 보너스). 게임 내부 구동 시 실시간 대입 적용됩니다.
@@ -565,7 +560,7 @@
             <!-- 전체 캐릭터 열람 로스터 -->
             <div class="card" style="padding: 1.5rem; text-align: left; display: flex; flex-direction: column;">
               <span class="eyebrow">ROSTER DIRECTORY</span>
-              <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; color:#fff;">전체 캐릭터 명단 (20종)</h3>
+              <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; color:#fff;">캐릭터 선택 (20종)</h3>
               <div id="book-character-list" class="character-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; overflow-y: auto; max-height: 280px; padding: 0.2rem;">
                 <!-- JS에서 채움 -->
               </div>
@@ -584,6 +579,9 @@
               <button id="finder-btn-pve" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
                 <span>🧪 던전 모드 (PvE 보스 챌린지)</span>
                 <small style="opacity: 0.7;">1-1 ~ 1-5 돌파</small>
+              </button>
+              <button id="finder-btn-survival" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center; border-color:rgba(251,191,36,.45);">
+                <span>♾️ 무한 생존 (웨이브 코인런)</span><small style="opacity:.7;">5웨이브마다 회복·증강</small>
               </button>
               <button id="finder-btn-solo" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
                 <span>⚔️ PvP 개인전 (서바이벌 프리폴)</span>
@@ -618,6 +616,7 @@
                 <select id="pve-dungeon-select" style="width:100%; height:38px; border-radius:6px; background:#000; color:#fff; border:1px solid rgba(255,255,255,0.1); padding:0 0.5rem;">
                   <option value="slime-meadow">던전 01 · 초원의 슬라임 소굴</option>
                   <option value="collapsed-laboratory">던전 02 · 붕괴한 연구소</option>
+                  <option value="survival" hidden>무한 생존</option>
                 </select>
               </label>
               <div class="pve-reward-card" style="margin: 1rem 0; padding:1rem; border-radius:10px; background:rgba(255,255,255,0.015); border:1px solid rgba(255,255,255,0.04); text-align:center;">
@@ -702,6 +701,14 @@
           </div>
         </div>
 
+        <!-- 하단 고정 아이콘형 내비게이션 바 -->
+        <nav id="bottom-nav" class="hub-tabs" aria-label="메인 메뉴" role="tablist">
+          <button class="hub-tab" data-hub="store" type="button" role="tab" aria-selected="false"><span class="hub-tab-icon">🛍️</span><span class="hub-tab-label">상점</span></button>
+          <button class="hub-tab" data-hub="skin" type="button" role="tab" aria-selected="false"><span class="hub-tab-icon">👕</span><span class="hub-tab-label">스킨</span></button>
+          <button class="hub-tab active" data-hub="play" type="button" role="tab" aria-selected="true"><span class="hub-tab-icon">🎮</span><span class="hub-tab-label">플레이</span></button>
+          <button class="hub-tab" data-hub="growth" type="button" role="tab" aria-selected="false"><span class="hub-tab-icon">🌱</span><span class="hub-tab-label">성장</span></button>
+          <button class="hub-tab" data-hub="book" type="button" role="tab" aria-selected="false"><span class="hub-tab-icon">📖</span><span class="hub-tab-label">도감</span></button>
+        </nav>
       </section>
 
       <!-- --------------------- 매치 캐릭터 선택 모달 --------------------- -->
@@ -803,6 +810,11 @@
           <!-- 렌더링 영역 (maingame) -->
           <div id="maingame" class="game-lounge-wrapper">
             <canvas id="game-canvas" width="800" height="600"></canvas>
+            <div id="survival-hud" class="survival-hud hidden" aria-live="polite">
+              <span id="survival-hud-time">00:00</span>
+              <span id="survival-hud-wave">WAVE 1</span>
+              <span id="survival-hud-coins">🪙 0</span>
+            </div>
             <!-- 3초 카운트다운 오버레이 -->
             <div id="countdown-overlay" class="countdown-overlay hidden">
               <span id="countdown-number">3</span>

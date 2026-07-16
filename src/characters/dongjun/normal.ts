@@ -47,6 +47,8 @@ export const dongjunConfig: CharacterConfig = {
   tier: 'B',
   role: 'Specialist',
   detailedDescription: `동준은 무작위 군대 계급 변동과 [만기 전역]이라는 역전 기믹을 가진 변수형 캐릭터입니다. 매 ${SKILL_CONSTANTS.PROMOTION_COOLDOWN}초(혹은 스킬 발동)마다 계급이 무작위 추첨되어 스탯이 실시간 변동하며, 전역할 시 강력한 광역 피해(${SKILL_CONSTANTS.DISCHARGE_AOE_DMG})를 주변에 방출하고 ${SKILL_CONSTANTS.DISCHARGE_BUFF_DURATION}초 동안 이속과 공격력이 극대화되어 시뮬레이션을 장악합니다.`,
+  luck: 18,
+  attackSpeed: 1.1,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

@@ -75,6 +75,9 @@ export function createCharacterState(
 
   return {
     ...config,
+    baseAttackRange: config.attackRangeRatio
+      ? Math.round(Math.min(canvasWidth, canvasHeight) * config.attackRangeRatio)
+      : config.baseAttackRange,
     x,
     y,
     vx: 0,

@@ -58,6 +58,8 @@ export const seojunConfig: CharacterConfig = {
   skillDescription: `첫 사용 시 시간 표식을 남기고 ${SKILL_CONSTANTS.RECAST_COOLDOWN}초 후 재사용할 수 있습니다. 재사용 시 기록한 위치와 체력을 ${SKILL_CONSTANTS.REWIND_DURATION}초간 역행하며 무적·CC 면역을 얻고 적에게 ${SKILL_CONSTANTS.REWIND_DAMAGE} 피해를 줍니다. 복귀 지점에서는 반경 ${SKILL_CONSTANTS.RETURN_SHOCKWAVE_RADIUS} 충격파로 ${SKILL_CONSTANTS.RETURN_SHOCKWAVE_DAMAGE} 피해와 넉백을 줍니다. 기절·혼란 중에도 스킬을 사용할 수 있습니다.`,
   color: '#5de2e7', skillChargeRate: 100 / SKILL_CONSTANTS.FIRST_CAST_COOLDOWN, tier: 'A', role: 'Speedster',
   detailedDescription: '서준은 시간을 기록했다가 역행하며 적진을 가로지르는 근거리 딜러입니다. 역행 중에는 피해와 군중 제어를 무시하지만, 경로를 잘 설계해야 최대 보상을 얻습니다.',
+  luck: 22,
+  attackSpeed: 1.8,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

@@ -26,6 +26,12 @@ export interface RunModifierEffects {
   skillChargeMultiplier?: number;
   instantHealPercent?: number;
   shieldPercent?: number;
+  orbitDamage?: number;
+  orbitRadius?: number;
+  orbitInterval?: number;
+  companionDamage?: number;
+  companionRange?: number;
+  companionInterval?: number;
 }
 
 export interface PveAugmentRequirements {
@@ -47,14 +53,17 @@ const PVE_AUGMENTS: readonly AugmentDefinition[] = [
   { id: "silver-vital", rarity: "silver", name: "생명 증폭", description: "최대 체력이 30% 증가하고 체력을 모두 회복합니다.", icon: "✚", effects: { maxHpMultiplier: 1.3 } },
   { id: "silver-charge", rarity: "silver", name: "급속 충전", description: "스킬 게이지 충전 속도가 35% 증가합니다.", icon: "ϟ", effects: { skillChargeMultiplier: 1.35 } },
   { id: "silver-step", rarity: "silver", name: "경량 프레임", description: "이동 속도가 15% 증가합니다.", icon: "➤", effects: { speedMultiplier: 1.15 } },
+  { id: "silver-scout-pet", rarity: "silver", name: "정찰 드론", description: "동행 드론이 가까운 적에게 1.2초마다 9 피해를 줍니다.", icon: "🐾", effects: { companionDamage: 9, companionRange: 170, companionInterval: 1.2 }, dungeonIds: ["survival"] },
   { id: "gold-overdrive", rarity: "gold", name: "과부하", description: "공격력이 40%, 이동 속도가 12% 증가합니다.", icon: "✹", effects: { attackMultiplier: 1.4, speedMultiplier: 1.12 } },
   { id: "gold-bulwark", rarity: "gold", name: "강철 심장", description: "최대 체력이 45% 증가하고 체력을 모두 회복합니다.", icon: "⬟", effects: { maxHpMultiplier: 1.45 } },
   { id: "gold-reactor", rarity: "gold", name: "고출력 반응로", description: "스킬 충전 속도가 60%, 이동 속도가 15% 증가합니다.", icon: "◉", effects: { skillChargeMultiplier: 1.6, speedMultiplier: 1.15 } },
   { id: "gold-hunter", rarity: "gold", name: "사냥 본능", description: "공격력이 30%, 스킬 충전 속도가 20% 증가합니다.", icon: "⚔", effects: { attackMultiplier: 1.3, skillChargeMultiplier: 1.2 } },
+  { id: "gold-orbit-blade", rarity: "gold", name: "회전 절단기", description: "주변 96px의 적에게 0.85초마다 13 피해를 줍니다.", icon: "🌀", effects: { orbitDamage: 13, orbitRadius: 96, orbitInterval: .85 }, dungeonIds: ["survival"] },
   { id: "platinum-titan", rarity: "platinum", name: "거인의 심장", description: "최대 체력이 60%, 공격력이 25% 증가하고 체력을 모두 회복합니다.", icon: "♛", effects: { maxHpMultiplier: 1.6, attackMultiplier: 1.25 } },
   { id: "platinum-apex", rarity: "platinum", name: "극한의 각성", description: "공격력이 65% 증가합니다.", icon: "✦", effects: { attackMultiplier: 1.65 } },
   { id: "platinum-time", rarity: "platinum", name: "시간 가속", description: "스킬 충전 속도가 90%, 이동 속도가 25% 증가합니다.", icon: "⌛", effects: { skillChargeMultiplier: 1.9, speedMultiplier: 1.25 } },
   { id: "platinum-perfect", rarity: "platinum", name: "완전한 조율", description: "최대 체력 35%, 공격력 40%가 증가하고 체력을 모두 회복합니다.", icon: "☼", effects: { maxHpMultiplier: 1.35, attackMultiplier: 1.4 } },
+  { id: "platinum-sentry-pack", rarity: "platinum", name: "쌍둥이 수호 펫", description: "수호 펫이 0.7초마다 24 피해를 주고, 최대 체력이 20% 증가합니다.", icon: "🦾", effects: { companionDamage: 24, companionRange: 245, companionInterval: .7, maxHpMultiplier: 1.2 }, dungeonIds: ["survival"] },
   { id: "doyun-slam-silver", rarity: "silver", name: "슬램 예열", description: "불꽃 덩크슛 슬램의 충전 속도가 45% 증가합니다.", icon: "🏀", effects: { skillChargeMultiplier: 1.45 }, requirements: { characterId: "doyun", equippedSkillName: "불꽃 덩크슛 슬램" } },
   { id: "doyun-slam-gold", rarity: "gold", name: "불꽃 부스터", description: "불꽃 덩크슛 슬램의 충전 속도가 70%, 이동 속도가 10% 증가합니다.", icon: "🔥", effects: { skillChargeMultiplier: 1.7, speedMultiplier: 1.1 }, requirements: { characterId: "doyun", equippedSkillName: "불꽃 덩크슛 슬램" } },
   { id: "doyun-slam-platinum", rarity: "platinum", name: "코트의 지배자", description: "불꽃 덩크슛 슬램의 충전 속도가 100%, 최대 체력이 20% 증가하고 체력을 모두 회복합니다.", icon: "👑", effects: { skillChargeMultiplier: 2, maxHpMultiplier: 1.2 }, requirements: { characterId: "doyun", equippedSkillName: "불꽃 덩크슛 슬램" } },
@@ -156,6 +165,18 @@ export function applyPveRunModifierStats(state: CharacterState, modifiers: PveRu
     state.attackPower *= effects.attackMultiplier ?? 1;
     state.speed *= effects.speedMultiplier ?? 1;
     state.skillChargeRate *= effects.skillChargeMultiplier ?? 1;
+    if (effects.orbitDamage && effects.orbitRadius && effects.orbitInterval) {
+      state.persistentItemOrbitDamage = Math.max(state.persistentItemOrbitDamage ?? 0, effects.orbitDamage);
+      state.persistentItemOrbitRadius = Math.max(state.persistentItemOrbitRadius ?? 0, effects.orbitRadius);
+      state.persistentItemOrbitInterval = Math.min(state.persistentItemOrbitInterval ?? Infinity, effects.orbitInterval);
+      state.persistentItemOrbitTimer = 0;
+    }
+    if (effects.companionDamage && effects.companionRange && effects.companionInterval) {
+      state.runCompanionDamage = Math.max(state.runCompanionDamage ?? 0, effects.companionDamage);
+      state.runCompanionRange = Math.max(state.runCompanionRange ?? 0, effects.companionRange);
+      state.runCompanionInterval = Math.min(state.runCompanionInterval ?? Infinity, effects.companionInterval);
+      state.runCompanionTimer = 0;
+    }
   }
   state.maxHp = Math.round(state.maxHp);
   state.attackPower = Math.round(state.attackPower);

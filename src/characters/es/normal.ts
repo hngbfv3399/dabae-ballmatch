@@ -120,6 +120,8 @@ export const esConfig: CharacterConfig = {
   tier: 'A',
   role: 'Nuker',
   detailedDescription: '에스는 죽기 직전 폭발하는 폭탄의 악마다. 부착형 수류탄을 적이나 벽에 고정해 이동 경로를 봉쇄하고, 마지막 체력에서는 주변을 통째로 폭파한다.',
+  luck: 30,
+  attackSpeed: 1.6,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

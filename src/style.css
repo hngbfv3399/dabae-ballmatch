@@ -156,11 +156,17 @@ body {
 
 .tournament-match.complete b { color: #39ff14; }
 
-/* ==================== LOBBY VIEW ==================== */
+/* 하단 고정 내비게이션 바 높이(64px) + 여유 공간 확보 */
+#lobby-view {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 1.5rem);
+}
+
+/* ==================== LOBBY HEADER ==================== */
 .lobby-header {
   text-align: center;
   margin-bottom: 2.5rem;
 }
+
 
 .lobby-header h1 {
   font-size: 4rem;
@@ -522,6 +528,37 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
+
+.game-lounge-wrapper { position: relative; }
+
+.survival-hud {
+  position: absolute;
+  z-index: 12;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.66rem;
+  border: 1px solid rgba(167, 139, 250, 0.72);
+  border-radius: 999px;
+  background: rgba(10, 7, 25, 0.84);
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.25);
+  color: #f5f3ff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.survival-hud span + span {
+  padding-left: 0.45rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.survival-hud #survival-hud-wave { color: #c4b5fd; }
+.survival-hud #survival-hud-coins { color: #facc15; }
 
 .hud-sidebar h3 {
   font-size: 1.2rem;
@@ -2030,9 +2067,75 @@ body {
 }
 
 .mode-deck-heading { justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.hub-tabs { display: flex; justify-content: center; gap: 0.45rem; max-width: 1120px; margin: 0 auto 1rem; padding: 0.45rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(5,8,20,0.68); }
-.hub-tab { flex: 1; min-height: 38px; border: 1px solid transparent; background: transparent; color: #9da5c5; font: 800 0.74rem 'Orbit', sans-serif; cursor: pointer; }
-.hub-tab:hover { color: #fff; }.hub-tab.active { border-color: rgba(0,242,254,0.6); background: linear-gradient(135deg, rgba(0,242,254,0.16), rgba(127,0,255,0.18)); color: #fff; }
+/* ===========================
+   하단 고정 아이콘형 내비게이션 바
+   =========================== */
+.hub-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(6, 8, 22, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(0, 242, 254, 0.18);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5), 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+.hub-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: rgba(155, 165, 200, 0.7);
+  cursor: pointer;
+  padding: 6px 4px;
+  transition: color 0.2s ease, background 0.2s ease;
+  position: relative;
+  min-width: 0;
+}
+.hub-tab-icon {
+  font-size: 1.45rem;
+  line-height: 1;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: block;
+}
+.hub-tab-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: 'Orbit', sans-serif;
+  letter-spacing: 0.03em;
+  transition: color 0.2s ease;
+}
+.hub-tab:hover { color: rgba(255, 255, 255, 0.85); }
+.hub-tab:hover .hub-tab-icon { transform: translateY(-2px) scale(1.1); }
+.hub-tab.active {
+  color: #00f2fe;
+}
+.hub-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, #00f2fe, #4facfe);
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.6);
+}
+.hub-tab.active .hub-tab-icon {
+  transform: translateY(-3px) scale(1.15);
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.7));
+}
+.hub-tab.active .hub-tab-label { color: #00f2fe; }
 .hub-panel { max-width: 1120px; margin: 0 auto 1.25rem; padding: 1.35rem; border: 1px solid rgba(0,242,254,0.2); background: rgba(6,8,20,0.52); }
 .hub-panel h2 { margin: 0.35rem 0 0.6rem; font-family: 'Orbit', sans-serif; }.hub-panel p { color: #b8bed7; font-size: 0.82rem; line-height: 1.5; }
 .collection-note { border-left: 3px solid #facc15; padding-left: 0.75rem; }.character-management-layout { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr); gap:1rem; margin-top:1rem; }.collection-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.5rem; align-content:start; }
@@ -2048,9 +2151,13 @@ body {
 .game-mode-setup-host #pvp-setup-panel .roster-panel > div:first-child,.game-mode-setup-host #pvp-setup-panel .role-filter-bar,.game-mode-setup-host #pvp-setup-panel #character-list,.game-mode-setup-host #pvp-setup-panel #empty-role-notice,.game-mode-setup-host #pvp-setup-panel .random-match-button,.game-mode-setup-host #pvp-setup-panel .practice-tools { display:none !important; }.game-mode-setup-host #pvp-setup-panel .roster-panel { padding:0; border:0; background:transparent; overflow:visible; }.game-mode-setup-host #pvp-setup-panel .match-selection-slots { margin:0; }.game-mode-setup-host #pvp-setup-panel .lobby-controls { align-self:start; }
 .gacha-modal-content { max-width:1100px; }.gacha-catalog { grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }.cosmetic-card { min-height:142px; }
 @media (max-width: 700px) { .character-management-layout { grid-template-columns:1fr; }.game-mode-tabs { grid-template-columns:repeat(2,1fr); }.game-mode-setup-host .lobby-main { grid-template-columns:1fr; }.game-mode-setup-host .roster-panel { max-height:none; }.gacha-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media (max-width: 560px) { .hub-tabs { gap: 0.2rem; }.hub-tab { font-size:0.58rem; }.gacha-catalog { grid-template-columns:1fr 1fr; } }
-.eyebrow { color: var(--neon-cyan); font-family: 'Orbit', sans-serif; font-size: 0.67rem; font-weight: 800; letter-spacing: 0.14em; }
-.mode-deck-heading h2 { margin-top: 0.25rem; font-size: clamp(1.15rem, 2.4vw, 1.55rem); }
+@media (max-width: 560px) {
+  .hub-tab-icon { font-size: 1.25rem; }
+  .hub-tab-label { font-size: 0.52rem; }
+  .gacha-catalog { grid-template-columns: 1fr 1fr; }
+}
+.hub-panel { max-width: 1120px; margin: 0 auto 1.25rem; padding: 1.35rem; border: 1px solid rgba(0,242,254,0.2); background: rgba(6,8,20,0.52); }
+
 .stats-shortcut { border: 1px solid rgba(255,215,0,0.45); background: transparent; color: var(--neon-yellow); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer; font-weight: 800; }
 
 .mode-command-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.55rem; }
@@ -2479,4 +2586,271 @@ body {
   .item-catalog-grid { grid-template-columns: 1fr; }
   .persistent-item-draw-actions { width:100%; }.persistent-item-draw-actions .btn { flex:1; }
   .persistent-item-rate-modal-content { width:calc(100% - 1rem); max-height:94dvh; padding:1rem .75rem; }.persistent-item-rate-grid { grid-template-columns:1fr; }
+}
+
+/* ==========================================================================
+   스킬 체인 트리 (Skill Chain Tree) 스타일
+   ========================================================================== */
+.skill-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.skill-tier-label {
+  font-family: 'Orbit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+.skill-tier-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+.skill-tier-connector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.2rem 0;
+  color: rgba(0, 242, 254, 0.4);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.skill-chain-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.skill-chain-card.locked {
+  opacity: 0.45;
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.02);
+}
+.skill-chain-card.in-progress {
+  border-color: rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.02);
+}
+.skill-chain-card.mastered {
+  border-color: rgba(57, 255, 20, 0.45);
+  background: rgba(57, 255, 20, 0.03);
+}
+.skill-chain-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.skill-chain-card.mastered .skill-chain-icon {
+  background: rgba(57, 255, 20, 0.1);
+  border-color: rgba(57, 255, 20, 0.4);
+  color: #39ff14;
+}
+.skill-chain-card.locked .skill-chain-icon {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: transparent;
+}
+.skill-chain-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.skill-chain-info strong {
+  font-size: 0.85rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.skill-chain-info small {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+.skill-pip-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.skill-pip {
+  width: 14px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+.skill-pip.filled {
+  background: #facc15;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.6);
+}
+.skill-chain-card.mastered .skill-pip.filled {
+  background: #39ff14;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.6);
+}
+.skill-lv-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.8rem;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+}
+.skill-chain-card.mastered .skill-lv-badge {
+  color: #39ff14;
+}
+.skill-chain-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: #00f2fe;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+.skill-chain-add-btn:hover:not(:disabled) {
+  background: #00f2fe;
+  color: #000;
+  transform: scale(1.08);
+}
+.skill-chain-add-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* 성장 탭 장착 유도 상태 */
+.eq-slot,
+.bag-item-card.equipment-card {
+  min-height: 122px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.42rem;
+  border-radius: 12px;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.eq-slot.equipped,
+.bag-item-card.equipment-card {
+  background: rgba(255, 255, 255, 0.025);
+}
+.eq-slot.empty {
+  border-style: dashed;
+}
+.equipment-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.64rem;
+  font-family: 'Orbit', sans-serif;
+  color: var(--text-secondary);
+}
+.equipment-card-level { color: var(--neon-yellow); font-weight: 800; }
+.equipment-card-location { font-size: 0.58rem; opacity: 0.8; }
+.equipment-card-name { color: #fff; font-size: 0.9rem; line-height: 1.3; }
+.equipment-card-state { color: var(--text-secondary); font-size: 0.68rem; }
+.eq-slot.equipped .equipment-card-state { color: #a7f3d0; }
+.eq-slot.selected,
+.bag-item-card.equipment-card.inspected {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.52), 0 0 20px rgba(0, 242, 254, 0.2);
+}
+.bag-item-card.equipment-card:hover,
+.eq-slot.equipped:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.enhancement-item-card.material-selected {
+  transform: translateY(-2px);
+  border-color: var(--neon-yellow);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45), 0 0 18px rgba(250, 204, 21, 0.16);
+}
+.enhancement-item-card.material-selected .equipment-card-state {
+  color: var(--neon-yellow);
+}
+
+/* 도감 로스터: 캐릭터 색을 사용한 원형 아이콘 */
+.roster-character-card {
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  background: #11131f !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+}
+.roster-character-card:hover { background: #191c2a !important; }
+.book-character-icon {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--character-color);
+  border-radius: 50%;
+  color: #fff;
+  font-family: 'Orbit', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 900;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--character-color) 42%, transparent);
+}
+.roster-character-card.main-character .book-character-icon {
+  background: color-mix(in srgb, var(--character-color) 15%, transparent);
+  box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.18), 0 0 19px color-mix(in srgb, var(--character-color) 70%, transparent);
+}
+.roster-character-card.main-character { background: #151b2a !important; box-shadow: 0 0 0 1px rgba(0,242,254,.45), 0 0 18px rgba(0,242,254,.15) !important; }
+.book-character-name { color: #e8edf7 !important; font-size: 0.76rem; }
+.augment-choice-modal { z-index: 1200; }
+.eq-slot.equip-target {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.12);
+  box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.35), 0 0 18px rgba(0, 242, 254, 0.2);
+  animation: equipment-slot-pulse 1.15s ease-in-out infinite;
+  cursor: pointer;
+}
+.eq-slot.equip-target:hover {
+  background: rgba(0, 242, 254, 0.22);
+  transform: translateY(-2px) scale(1.02);
+}
+@keyframes equipment-slot-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.28), 0 0 10px rgba(0, 242, 254, 0.12); }
+  50% { box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.7), 0 0 25px rgba(0, 242, 254, 0.34); }
+}
+.inspector-attention { animation: inspector-attention-flash 0.45s ease-out; }
+@keyframes inspector-attention-flash {
+  0% { box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.8), 0 0 30px rgba(0, 242, 254, 0.35); }
+  100% { box-shadow: none; }
 }

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as combatCatalog from "../combatCatalog.js";
 import type * as cosmetics from "../cosmetics.js";
 import type * as patchNotes from "../patchNotes.js";
 import type * as persistentItems from "../persistentItems.js";
@@ -23,6 +24,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  combatCatalog: typeof combatCatalog;
   cosmetics: typeof cosmetics;
   patchNotes: typeof patchNotes;
   persistentItems: typeof persistentItems;

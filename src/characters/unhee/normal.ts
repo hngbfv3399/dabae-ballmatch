@@ -38,6 +38,8 @@ export const unheeConfig: CharacterConfig = {
   tier: 'D',
   role: 'Juggernaut',
   detailedDescription: `운희는 '쇠질(웨이트 트레이닝)'과 적 접촉 시 발동되는 강제 쇠질 패시브를 활용하여 적의 기동력을 억제하고 생존력을 높이는 전투 지속형 돌격형 전사 캐릭터입니다. 스킬 완료 시 대량의 체력 회복과 함께 덩치 및 공격력이 대폭 상승하고 받는 피해를 50% 줄인 채 적을 압박할 수 있습니다.`,
+  luck: 8,         // 운 스탯 — 크리티컬 확률과 가챠 가중치에 영향
+  attackSpeed: 0.9,   // 공격속도 배율
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

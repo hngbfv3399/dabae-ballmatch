@@ -34,6 +34,43 @@ export default defineSchema({
     .index("by_characterId", ["characterId"])
     .index("by_characterId_and_skillId", ["characterId", "skillId"]),
 
+  // 전투 수치의 서버 기준 카탈로그. 캐릭터 파일은 행동 훅만 보관하고,
+  // HP/공격 방식/사거리/공격 간격 등의 밸런스 원본은 이 테이블에서 관리한다.
+  characterCombatCatalog: defineTable({
+    characterId: v.string(),
+    archetype: v.union(
+      v.literal("contact"),
+      v.literal("projectile"),
+      v.literal("hybrid"),
+      v.literal("control"),
+      v.literal("summoner"),
+    ),
+    basicAttackType: v.union(v.literal("contact"), v.literal("projectile"), v.literal("hybrid")),
+    maxHp: v.number(),
+    attackPower: v.number(),
+    speed: v.number(),
+    defense: v.number(),
+    luck: v.number(),
+    attackInterval: v.number(),
+    // 실제 사거리는 현재 맵의 min(width, height) × 이 비율로 계산한다.
+    attackRangeRatio: v.number(),
+    projectileSpeed: v.optional(v.number()),
+    traits: v.array(v.object({ label: v.string(), value: v.string() })),
+    isActive: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_characterId", ["characterId"]),
+
+  // 맵의 크기 역시 서버 기준 카탈로그로 관리한다. 모드 선택 로직은 프론트에
+  // 남기되, 실제 캔버스 크기와 배경색은 이 카탈로그 값으로 덮어쓴다.
+  arenaCombatCatalog: defineTable({
+    arenaId: v.string(),
+    width: v.number(),
+    height: v.number(),
+    backgroundColor: v.string(),
+    isActive: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_arenaId", ["arenaId"]),
+
   // 던전 해금 상태도 서버 공용이다. 개별 클리어 기록은 dungeonCharacterRecords에서 관리한다.
   dungeonProgress: defineTable({
     dungeonId: v.string(),
@@ -61,6 +98,20 @@ export default defineSchema({
     clearCount: v.number(),
     updatedAt: v.number(),
   }).index("by_dungeonId_and_characterId_and_stageNumber", ["dungeonId", "characterId", "stageNumber"]),
+
+  // 무한 생존전의 개인 최고 기록과 누적 보상. 매 런의 증강 목록처럼 커질 수 있는
+  // 데이터는 이 문서에 보관하지 않고, 결과 화면에만 해당 런의 메모리를 사용한다.
+  survivalCharacterRecords: defineTable({
+    characterId: v.string(),
+    bestWave: v.number(),
+    bestSurvivalSeconds: v.number(),
+    bestKills: v.number(),
+    bestDamageDealt: v.number(),
+    bestDamageTaken: v.number(),
+    totalRuns: v.number(),
+    totalCoinsEarned: v.number(),
+    updatedAt: v.number(),
+  }).index("by_characterId", ["characterId"]),
 
   // 시즌별 개인전·팀전·토너먼트 캐릭터 랭킹. 한 시즌은 8주다.
   pvpSeasons: defineTable({

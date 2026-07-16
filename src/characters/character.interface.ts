@@ -63,6 +63,7 @@ export interface ProjectileDefinition {
   color: string;
   life: number;
   label?: string;
+  basicAttack?: boolean;
 }
 
 export interface CharacterBehaviorContext {
@@ -103,6 +104,11 @@ export interface CharacterConfig {
   tier?: 'S' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'; // 캐릭터 밸런스 등급
   role: 'Nuker' | 'Sniper' | 'Speedster' | 'Guardian' | 'Juggernaut' | 'Disabler' | 'Summoner' | 'Specialist' | 'Supporter'; // 캐릭터 역할군
   detailedDescription: string; // 상세 플레이 스타일 설명
+  luck?: number;         // 운 스탯 (기본 5~35, Luck 1당 크리티컬 확률 +0.5%)
+  attackSpeed?: number;  // 기본 공격 간격(초). 값이 낮을수록 빠름 (0.6~1.8초)
+  attackRangeRatio?: number; // 현재 맵의 짧은 변을 기준으로 한 기본 공격 사거리 비율
+  basicAttackType?: 'contact' | 'projectile' | 'hybrid';
+  projectileSpeed?: number; // 원거리 기본 공격의 투사체 속도(px/s)
 
   // === Lifecycle Hooks (character-specific logic) ===
   onSkillTrigger?: (char: CharacterState, ctx: CharacterBehaviorContext) => void;
@@ -205,6 +211,11 @@ export interface CharacterState extends CharacterConfig {
   persistentItemPulseRadius?: number;
   persistentItemPulseInterval?: number;
   persistentItemPulseTimer?: number;
+  // 생존전 런 증강: 동행 펫 자동 공격. 영구 아이템 효과와 별개로 런 종료 시 초기화된다.
+  runCompanionDamage?: number;
+  runCompanionRange?: number;
+  runCompanionInterval?: number;
+  runCompanionTimer?: number;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

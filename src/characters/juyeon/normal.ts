@@ -64,6 +64,8 @@ export const juyeonConfig: CharacterConfig = {
   tier: 'A',
   role: 'Specialist',
   detailedDescription: '주연은 자가 유틸리티 충전(치유/이속 증가)과 광역 적 속박 제어를 넘나드는 1대1 특화 피부미용사 캐릭터입니다. 적의 속도를 빼앗는 경락 마사지와 보호막을 즉시 떼어내는 압출 패시브를 통해 주도적인 플레이가 가능하며, 특수 모델링 마스크 팩을 날려 적을 돌처럼 굳혀 넉백 위기에서 전장을 통제하는 다재다능한 스페셜리스트입니다.',
+  luck: 20,
+  attackSpeed: 1.2,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

@@ -48,6 +48,8 @@ export const nayutaConfig: CharacterConfig = {
   tier: 'B',
   role: 'Speedster',
   detailedDescription: '나유타는 텔레포트와 스킬 충전 봉쇄를 통해 특정 타겟을 집중 견제하고 마킹하는 기동형 공격수 캐릭터입니다. 적 타격 시 일정 확률로 대상을 지배하여 10초간 적의 스킬 게이지 충전을 완벽하게 틀어막고, 순간적인 텔레포트로 지배 대상을 추적해 차원 도약 피해와 디버프를 퍼부으며 상대 핵심 전력을 사전에 격살합니다.',
+  luck: 20,
+  attackSpeed: 1.6,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

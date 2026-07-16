@@ -28,6 +28,9 @@ const LABORATORY_STAGE_REPEAT_CLEAR_EXPERIENCE = LABORATORY_REPEAT_CLEAR_EXPERIE
 // 코인 지급 상수 정의
 const STAGE_CLEAR_COIN_REWARD = 20;
 const DUNGEON_CLEAR_COIN_REWARD = 100;
+const SURVIVAL_COIN_PER_CLEARED_WAVE = 5;
+const MAX_SURVIVAL_WAVES_PER_RUN = 10_000;
+const MAX_SURVIVAL_SECONDS_PER_RUN = 24 * 60 * 60;
 
 function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) throw new Error("Unknown character ID");
@@ -210,6 +213,59 @@ export const rewardCoins = mutation({
   },
 });
 
+// 생존전 보상은 프론트가 전달한 코인을 신뢰하지 않는다. 완료 웨이브만 받아
+// 서버가 보상 합계를 계산하고 개인 최고 기록을 같은 트랜잭션에서 갱신한다.
+export const recordSurvivalRun = mutation({
+  args: {
+    characterId: v.string(),
+    clearedWaves: v.number(),
+    survivalSeconds: v.number(),
+    kills: v.number(),
+    damageDealt: v.number(),
+    damageTaken: v.number(),
+  },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    const numericValues = [args.clearedWaves, args.survivalSeconds, args.kills, args.damageDealt, args.damageTaken];
+    if (numericValues.some((value) => !Number.isFinite(value) || value < 0)) {
+      throw new Error("생존전 결과 수치가 올바르지 않습니다.");
+    }
+    const clearedWaves = Math.min(MAX_SURVIVAL_WAVES_PER_RUN, Math.floor(args.clearedWaves));
+    const survivalSeconds = Math.min(MAX_SURVIVAL_SECONDS_PER_RUN, Math.floor(args.survivalSeconds));
+    const kills = Math.floor(args.kills);
+    const damageDealt = Math.floor(args.damageDealt);
+    const damageTaken = Math.floor(args.damageTaken);
+    // 1웨이브 5코인, 2웨이브 10코인 … 완료 웨이브의 합계.
+    const coinsGranted = SURVIVAL_COIN_PER_CLEARED_WAVE * clearedWaves * (clearedWaves + 1) / 2;
+    const progress = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (!progress) throw new Error("Character not found");
+
+    const now = Date.now();
+    await ctx.db.patch(progress._id, { coins: progress.coins + coinsGranted, updatedAt: now });
+    const record = await ctx.db
+      .query("survivalCharacterRecords")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    const nextRecord = {
+      characterId: args.characterId,
+      bestWave: Math.max(record?.bestWave ?? 0, clearedWaves),
+      bestSurvivalSeconds: Math.max(record?.bestSurvivalSeconds ?? 0, survivalSeconds),
+      bestKills: Math.max(record?.bestKills ?? 0, kills),
+      bestDamageDealt: Math.max(record?.bestDamageDealt ?? 0, damageDealt),
+      bestDamageTaken: Math.max(record?.bestDamageTaken ?? 0, damageTaken),
+      totalRuns: (record?.totalRuns ?? 0) + 1,
+      totalCoinsEarned: (record?.totalCoinsEarned ?? 0) + coinsGranted,
+      updatedAt: now,
+    };
+    if (record) await ctx.db.patch(record._id, nextRecord);
+    else await ctx.db.insert("survivalCharacterRecords", nextRecord);
+    return { coinsGranted, newCoins: progress.coins + coinsGranted, record: nextRecord };
+  },
+});
+
 // 캐릭터 스킬 투자 현황 조회 API
 export const getCharacterSkills = query({
   args: { characterId: v.string() },
@@ -222,18 +278,59 @@ export const getCharacterSkills = query({
   },
 });
 
-// 스킬 포인트 투자 뮤테이션
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  스킬 체인 트리 구조 (Tier 1 → 2 → 3)
+//  Tier 1: atk / hp / cd          (각 최대 3레벨)
+//  Tier 2: pwr / tank              (각 최대 3레벨, Tier 1 전체 마스터 조건)
+//  Tier 3: lucky                   (최대 3레벨, Tier 2 전체 마스터 조건)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SKILL_CHAIN_TIERS: Record<string, { tier: number; requires: string[] }> = {
+  atk:   { tier: 1, requires: [] },
+  hp:    { tier: 1, requires: [] },
+  cd:    { tier: 1, requires: [] },
+  pwr:   { tier: 2, requires: ["atk", "hp", "cd"] },
+  tank:  { tier: 2, requires: ["atk", "hp", "cd"] },
+  lucky: { tier: 3, requires: ["pwr", "tank"] },
+};
+
+const SKILL_MAX_LEVEL = 3;
+
+// 스킬 포인트 투자 뮤테이션 (체인 트리 잠금 검증 포함)
 export const investSkillPoint = mutation({
   args: { characterId: v.string(), skillId: v.string() },
   handler: async (ctx, args) => {
     assertCharacterId(args.characterId);
+
+    const chainInfo = SKILL_CHAIN_TIERS[args.skillId];
+    if (!chainInfo) throw new Error(`Unknown skill: ${args.skillId}`);
+
     const progress = await ctx.db
       .query("characterProgress")
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
       .unique();
     if (!progress) throw new Error("Character progress not found");
-    if (progress.skillPoints < 1) throw new Error("Not enough skill points");
+    if (progress.skillPoints < 1) throw new Error("스킬 포인트가 부족합니다.");
 
+    // ── 선행 스킬 조건 확인 ──
+    if (chainInfo.requires.length > 0) {
+      const allSkills = await ctx.db
+        .query("characterSkills")
+        .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+        .collect();
+      const skillMap = new Map(allSkills.map((s) => [s.skillId, s.investedPoints]));
+
+      for (const requiredId of chainInfo.requires) {
+        const invested = skillMap.get(requiredId) ?? 0;
+        if (invested < SKILL_MAX_LEVEL) {
+          const tierLabel = chainInfo.tier === 2 ? "Tier 1 (ATK·HP·CD)" : "Tier 2 (PWR·TANK)";
+          throw new Error(
+            `${tierLabel} 스킬을 모두 최대 레벨(${SKILL_MAX_LEVEL})로 마스터해야 이 스킬을 해금할 수 있습니다.`
+          );
+        }
+      }
+    }
+
+    // ── 현재 스킬 레벨 확인 및 투자 ──
     const existingSkill = await ctx.db
       .query("characterSkills")
       .withIndex("by_characterId_and_skillId", (q) =>
@@ -243,8 +340,8 @@ export const investSkillPoint = mutation({
 
     const now = Date.now();
     if (existingSkill) {
-      if (existingSkill.investedPoints >= 3) {
-        throw new Error("Skill is already at max level (3)");
+      if (existingSkill.investedPoints >= SKILL_MAX_LEVEL) {
+        throw new Error(`스킬이 이미 최대 레벨(${SKILL_MAX_LEVEL})에 도달했습니다.`);
       }
       await ctx.db.patch(existingSkill._id, {
         investedPoints: existingSkill.investedPoints + 1,

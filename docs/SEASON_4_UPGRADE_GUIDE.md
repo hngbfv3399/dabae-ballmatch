@@ -59,3 +59,16 @@
 - [x] `src/main.ts` 내 볼 생성/충돌 로직에 캐릭터의 7대 종합 스탯 적용
 - [x] 빌드 에러 전수 조사 및 해결 (`npm run build` 통과)
 - [x] 실서버 배포 및 `PATCH_NOTES.md` 작성
+
+### 🚧 v4.1.0. 스킬 체인 · 7대 스탯 확장 · 로비 모듈화
+- [x] 하단 고정 아이콘형 내비게이션 바: 로비 DOM 내부 이동, 접근성 상태(`aria-selected`)와 모바일 안전영역 CSS 적용
+- [x] 캐릭터 인터페이스 및 20개 기본 설정에 `luck`, `attackSpeed` 추가
+- [x] 전투 엔진에 Luck 기반 크리티컬(운 1당 0.5%, 피해 1.5배)과 캐릭터별 기본 공격 간격 적용
+- [x] `investSkillPoint`에 Tier 1 전체 Lv.3 → Tier 2, Tier 2 전체 Lv.3 → Tier 3 서버 검증 적용
+- [x] 성장 탭을 3단계 스킬 체인 UI로 교체하고, 구독 필드를 `investedPoints`로 정정
+- [x] 도감에 Luck 및 AtkSpd(공격 간격) 최종 수치 표시 추가
+- [x] `gachaManager.ts`, `cosmeticCloset.ts`, `growthManager.ts`, `rosterManager.ts` 추출 파일의 TypeScript 오류 복구
+- [ ] 추출 매니저를 기존 `main.ts` 런타임 상태와 완전히 연결하고 엔트리 전용으로 축소
+- [x] 최종 UI 수동 검증 및 `PATCH_NOTES.md` 기록
+- [x] Convex 프로덕션 배포 및 전투 카탈로그(캐릭터 20종·경기장 6종) 시딩
+- [ ] Git 커밋/푸시

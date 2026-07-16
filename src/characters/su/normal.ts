@@ -97,6 +97,8 @@ export const suConfig: CharacterConfig = {
   tier: 'C',
   role: 'Sniper',
   detailedDescription: '수는 평타 공격력을 완전히 배제한 채 치명적인 은신 한 방 공격에 몰두하는 극단적인 저격수 캐릭터입니다. 스킬 발동 시 1.5초간 은신 및 무적 상태로 돌입해 적들의 시야에서 완전히 사라지며, 10%의 초필살 확률로 상대방의 최대 체력 80%를 날려버리는 파멸적인 헤드샷을 꽂아 전장을 폭발시키는 치명적인 스나이퍼입니다.',
+  luck: 35,
+  attackSpeed: 0.6,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

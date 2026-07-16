@@ -115,8 +115,6 @@ export class GameLounge {
   private readonly knockbackInertiaDuration = 0.45;
   private readonly knockbackInertiaSpeedMultiplier = 1.75;
   private readonly combatReengageSeconds = 3;
-  private readonly pveBasicAttackTargetKnockback = 4.2;
-  private readonly pveBasicAttackRecoil = 1.6;
 
   // 초기 발사 각도 (3초 준비시간 동안 표시)
   private initialAngles: Map<string, number> = new Map();
@@ -1199,7 +1197,7 @@ export class GameLounge {
         if (
           closestEnemy &&
           minDist <=
-            char.baseAttackRange + (closestEnemy as CharacterState).radius
+            char.radius * char.scaleMultiplier + char.baseAttackRange + (closestEnemy as CharacterState).radius
         ) {
           this.performBasicAttack(char, closestEnemy);
         }
@@ -1290,6 +1288,7 @@ export class GameLounge {
       );
       if (source && target) {
         this.dealDamage(source, target, projectile.damage, projectile.label ?? "투사체");
+        if (projectile.basicAttack) source.onBasicAttack?.(source, target, this.getBehaviorContext());
         this.createExplosion(projectile.x, projectile.y, projectile.color, 8);
         this.projectiles.splice(index, 1);
       } else if (projectile.life <= 0 || projectile.x < -projectile.radius || projectile.x > this.canvas.width + projectile.radius || projectile.y < -projectile.radius || projectile.y > this.canvas.height + projectile.radius) {
@@ -1302,10 +1301,31 @@ export class GameLounge {
    * 기본 공격 수행
    */
   private performBasicAttack(attacker: CharacterState, target: CharacterState) {
-    attacker.baseAttackCooldown = 1.2; // 1.2초 공격 쿨타임
+    attacker.baseAttackCooldown = attacker.attackSpeed ?? 1.2;
+
+    if (attacker.basicAttackType === "projectile") {
+      const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+      const projectileSpeed = attacker.projectileSpeed ?? 440;
+      const travelDistance = Math.max(1, attacker.baseAttackRange + attacker.radius + target.radius + 20);
+      this.projectiles.push({
+        sourceId: attacker.id,
+        x: attacker.x,
+        y: attacker.y,
+        vx: Math.cos(angle) * projectileSpeed,
+        vy: Math.sin(angle) * projectileSpeed,
+        radius: Math.max(6, attacker.radius * 0.23),
+        damage: attacker.attackPower,
+        color: attacker.color,
+        life: Math.max(.45, travelDistance / projectileSpeed + .3),
+        label: "기본 투사체",
+        basicAttack: true,
+      });
+      this.createExplosion(attacker.x, attacker.y, attacker.color, 4);
+      if (!attacker.skillActive && !attacker.nayutaControlled) attacker.skillGauge = Math.min(100, attacker.skillGauge + 10);
+      return;
+    }
 
     this.dealDamage(attacker, target, attacker.attackPower);
-    if (this.isPveMode && !target.isDead) this.applyPveBasicAttackSpacing(attacker, target);
     attacker.onBasicAttack?.(attacker, target, this.getBehaviorContext());
 
     // 나유타 지배 판정은 충돌(resolveCollision)에서만 수행 — 기본 공격 중복 판정 제거
@@ -1333,22 +1353,6 @@ export class GameLounge {
     if (!attacker.skillActive && !attacker.nayutaControlled) {
       attacker.skillGauge = Math.min(100, attacker.skillGauge + 10);
     }
-  }
-
-  /** PvE 기본 공격은 짧은 반동을 줘서 근접 캐릭터가 겹친 채 공격만 반복하지 않게 한다. */
-  private applyPveBasicAttackSpacing(attacker: CharacterState, target: CharacterState) {
-    const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
-    target.vx += Math.cos(angle) * this.pveBasicAttackTargetKnockback;
-    target.vy += Math.sin(angle) * this.pveBasicAttackTargetKnockback;
-    attacker.vx -= Math.cos(angle) * this.pveBasicAttackRecoil;
-    attacker.vy -= Math.sin(angle) * this.pveBasicAttackRecoil;
-    this.floatingTexts.push({
-      x: (attacker.x + target.x) / 2,
-      y: (attacker.y + target.y) - 28,
-      text: "↔",
-      color: "#a5f3fc",
-      life: 0.45,
-    });
   }
 
   /**
@@ -1381,7 +1385,12 @@ export class GameLounge {
       return;
     }
 
-    let finalDamage = amount;
+    const criticalChance = Math.min(0.75, Math.max(0, (attacker.luck ?? 0) * 0.005));
+    const isCriticalHit = amount > 0 && Math.random() < criticalChance;
+    let finalDamage = amount * (isCriticalHit ? 1.5 : 1);
+    const resolvedDamageText = isCriticalHit
+      ? `${customText ? `${customText} · ` : ""}CRITICAL!`
+      : customText;
 
     // 공격자가 보스이거나 대미지 배율이 설정되어 있을 경우 보정 적용 (2배 대미지)
     if (attacker && attacker.damageMultiplier !== undefined) {
@@ -1455,15 +1464,15 @@ export class GameLounge {
     if (target && target.totalDamageTaken !== undefined) {
       target.totalDamageTaken += statDamage;
     }
-    if (this.isCombatHit(attacker, target, statDamage, customText)) this.noCombatHitTimer = 0;
+    if (this.isCombatHit(attacker, target, statDamage, resolvedDamageText)) this.noCombatHitTimer = 0;
 
     target.hp -= finalDamage;
     target.onDamageApplied?.(target, attacker, finalDamage, context);
 
     // 상세 전투 로그 콘솔 출력
-    if (customText) {
+    if (resolvedDamageText) {
       console.log(
-        `🔥 [스킬 피해] ${attacker.name} ➡️ ${target.name} | 피해량: ${finalDamage} (${customText}) | 대상 HP: ${target.hp}/${target.maxHp}`,
+        `🔥 [스킬 피해] ${attacker.name} ➡️ ${target.name} | 피해량: ${finalDamage} (${resolvedDamageText}) | 대상 HP: ${target.hp}/${target.maxHp}`,
       );
     } else {
       console.log(
@@ -1471,15 +1480,15 @@ export class GameLounge {
       );
     }
     this.onLogMessage?.(
-      `⚔️ [${customText || "기본공격"}] ${attacker.name} ➡️ ${target.name} | ${finalDamage} 피해 (HP: ${target.hp}/${target.maxHp})`,
+      `⚔️ [${resolvedDamageText || "기본공격"}] ${attacker.name} ➡️ ${target.name} | ${finalDamage} 피해 (HP: ${target.hp}/${target.maxHp})`,
       "damage",
     );
 
     this.floatingTexts.push({
       x: target.x + (Math.random() - 0.5) * 20,
       y: target.y - 20,
-      text: customText ? `${customText} -${finalDamage}` : `-${finalDamage}`,
-      color: customText ? "#ffcc00" : "#ff3366",
+      text: resolvedDamageText ? `${resolvedDamageText} -${finalDamage}` : `-${finalDamage}`,
+      color: resolvedDamageText ? "#ffcc00" : "#ff3366",
       life: 1.0,
     });
 
@@ -1582,6 +1591,20 @@ export class GameLounge {
         targets.forEach((target) => context.dealDamage(char, target, char.persistentItemPulseDamage!, "충격파"));
         context.createExplosion(char.x, char.y, "#fbbf24", 10);
         char.persistentItemPulseTimer = char.persistentItemPulseInterval;
+      }
+    }
+
+    if (char.runCompanionDamage && char.runCompanionRange && char.runCompanionInterval) {
+      char.runCompanionTimer = (char.runCompanionTimer ?? 0) - dt;
+      if (char.runCompanionTimer <= 0) {
+        const target = enemies
+          .filter((enemy) => Math.hypot(enemy.x - char.x, enemy.y - char.y) <= char.runCompanionRange! + enemy.radius)
+          .sort((a, b) => Math.hypot(a.x - char.x, a.y - char.y) - Math.hypot(b.x - char.x, b.y - char.y))[0];
+        if (target) {
+          context.dealDamage(char, target, char.runCompanionDamage, "수호 펫");
+          context.createExplosion(target.x, target.y, "#67e8f9", 5);
+        }
+        char.runCompanionTimer = char.runCompanionInterval;
       }
     }
   }
@@ -2007,6 +2030,20 @@ export class GameLounge {
       // 스케일 반영된 반경
       const currentRadius = char.radius * char.scaleMultiplier;
 
+      // 캐릭터별 실제 기본 공격 사거리. 과도한 화면 혼잡을 막기 위해 옅은 점선으로 표시한다.
+      if (char.baseAttackRange > 0) {
+        this.ctx.save();
+        this.ctx.strokeStyle = `${char.color}55`;
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([4, 7]);
+        this.ctx.lineDashOffset = -performance.now() / 90;
+        this.ctx.beginPath();
+        this.ctx.arc(char.x, char.y, currentRadius + char.baseAttackRange, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        this.ctx.restore();
+      }
+
       // 원형 클리핑 영역 및 배경
       this.ctx.save();
       this.ctx.beginPath();
@@ -2323,6 +2360,25 @@ export class GameLounge {
       this.ctx.beginPath();
       this.ctx.arc(char.x, char.y, pulseRadius, 0, Math.PI * 2);
       this.ctx.stroke();
+      this.ctx.restore();
+    }
+    if (char.runCompanionRange) {
+      const angle = performance.now() / 430;
+      const distance = Math.min(44, char.runCompanionRange * 0.35);
+      const x = char.x + Math.cos(angle) * distance;
+      const y = char.y + Math.sin(angle) * distance;
+      this.ctx.save();
+      this.ctx.fillStyle = "#67e8f9";
+      this.ctx.shadowColor = "#67e8f9";
+      this.ctx.shadowBlur = 14;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 8, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.fillStyle = "#082f49";
+      this.ctx.font = "bold 10px Orbit";
+      this.ctx.textAlign = "center";
+      this.ctx.textBaseline = "middle";
+      this.ctx.fillText("✦", x, y + 1);
       this.ctx.restore();
     }
   }

@@ -44,6 +44,8 @@ export const jihoConfig: CharacterConfig = {
   tier: 'A',
   role: 'Specialist',
   detailedDescription: `지호는 확률적 디버프와 컴파일 연쇄 효과를 이용하는 테크니컬한 변수형 캐릭터입니다. 기본 공격 시 일정 확률로 상대방에게 치명적인 [버그] 디버프(이동 속도 저하)를 걸고, 디버프가 적용된 적을 재타격해 ${SKILL_CONSTANTS.CRASH_STUN_DURATION}초 기절과 광역 스플래시 피해를 동반하는 [런타임 에러]를 컴파일하여 예기치 못한 전술적 혼란을 야기합니다.`,
+  luck: 12,
+  attackSpeed: 0.8,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

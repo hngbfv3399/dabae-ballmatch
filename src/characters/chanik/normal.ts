@@ -49,6 +49,8 @@ export const chanikConfig: CharacterConfig = {
   tier: 'A',
   role: 'Nuker',
   detailedDescription: '찬익은 광역 전탄 포격을 요청하여 맵 전체에 무차별 폭격을 쏟아붓는 포격형 누커 캐릭터입니다. 스킬이 켜지면 공습경보와 함께 전장에 있는 모든 적의 이동 속도를 감소시키며, 연속으로 무차별 낙하하는 포탄을 투하해 대량의 넉백과 누적 대미지를 가해 전장 전체를 초토화시킵니다.',
+  luck: 15,
+  attackSpeed: 1.2,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

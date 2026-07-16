@@ -69,6 +69,8 @@ export const mongshilConfig: CharacterConfig = {
   tier: 'B',
   role: 'Specialist',
   detailedDescription: '몽실은 근거리에서 매직기의 열기를 누적시키고, 독성 잔상으로 전장의 길목을 장악하는 미용인 마법사입니다. 팀전에서는 아군의 이동 경로에 회복 잔상을 남길 수 있습니다.',
+  luck: 18,
+  attackSpeed: 1.1,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

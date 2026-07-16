@@ -8,6 +8,7 @@ import type { CharacterCosmeticStyle, CharacterState } from "./characters/charac
 import {
   defaultArena,
   getArenaForMatch,
+  applyRemoteArenaCatalog,
   type ArenaConfig,
   type TeamGameType,
 } from "./maps";
@@ -18,6 +19,7 @@ import { initPatchNotesSubscription, convexClient } from "./convexClient";
 import { api } from "../convex/_generated/api";
 import { createSlimeMeadowStage, SLIME_MEADOW_DUNGEON_ID, SLIME_MEADOW_STAGE_COUNT } from "./pve/slimeDungeon";
 import { createCollapsedLaboratoryStage, LABORATORY_DUNGEON_ID, LABORATORY_STAGE_COUNT } from "./pve/labDungeon";
+import { createSurvivalWave } from "./pve/survivalDungeon";
 import {
   type CatalogItem,
   type PlayerItem,
@@ -94,6 +96,10 @@ const totalCountEl = document.getElementById("total-count") as HTMLElement;
 const hudSidebar = document.getElementById("hud") as HTMLElement;
 const hudList = document.getElementById("hud-list") as HTMLElement;
 const pveRunModifiersPanel = document.getElementById("pve-run-modifiers") as HTMLElement;
+const survivalHud = document.getElementById("survival-hud") as HTMLElement;
+const survivalHudTime = document.getElementById("survival-hud-time") as HTMLElement;
+const survivalHudWave = document.getElementById("survival-hud-wave") as HTMLElement;
+const survivalHudCoins = document.getElementById("survival-hud-coins") as HTMLElement;
 const augmentChoiceModal = document.getElementById("augment-choice-modal") as HTMLElement;
 const augmentChoiceTier = document.getElementById("augment-choice-tier") as HTMLElement;
 const augmentChoiceTitle = document.getElementById("augment-choice-title") as HTMLElement;
@@ -221,7 +227,7 @@ const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
 type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; defenseShieldBonus: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number; unlockedDungeonIds?: string[] };
 type PveDungeonReward = { dungeonId: string; firstClearExperience: number; repeatClearExperience: number };
-type PveRun = { characterId: string; dungeonId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; modifiers: PveRunModifiers };
+type PveRun = { characterId: string; dungeonId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; survivalCoins: number; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -230,6 +236,7 @@ let pveAdvancePending = false;
 let pveDungeonRewards = new Map<string, PveDungeonReward>();
 
 const PVE_DUNGEONS = {
+  survival: { number: "∞", name: "균열 생존전", description: "근거리·원거리·빠른 몬스터 물량을 버티며 코인을 모으는 무한 웨이브입니다.", requiresFirstDungeonClear: false, stageCount: Number.MAX_SAFE_INTEGER, createStage: createSurvivalWave },
   [SLIME_MEADOW_DUNGEON_ID]: {
     number: "01",
     name: "초원의 슬라임 소굴",
@@ -290,7 +297,10 @@ let victoryActionCatalogUnsubscribe: (() => void) | null = null;
 let victoryBackgroundCatalogUnsubscribe: (() => void) | null = null;
 let victorySpecialEventCatalogUnsubscribe: (() => void) | null = null;
 let characterSkillsInvested = new Map<string, number>(); // skillId -> investedPoints
+let bookSelectedCharacterId: string | null = null;
 let skillsUnsubscribe: (() => void) | null = null;
+let combatCatalogUnsubscribe: (() => void) | null = null;
+let arenaCatalogUnsubscribe: (() => void) | null = null;
 
 // 영구 플레이어 아이템 관련 전역 상태
 let persistentItemCatalog: CatalogItem[] = [];
@@ -303,9 +313,10 @@ let playerItemsUnsubscribe: (() => void) | null = null;
 let currentCharacterId: string | null = localStorage.getItem("dambae-v4-character-id");
 let currentCharacterProgress: any = null;
 let progressUnsubscribe: (() => void) | null = null;
-let selectedGrowthSubTab: "equipment" | "skills" = "equipment";
+let selectedGrowthSubTab: "equipment" | "enhance" | "skills" = "equipment";
 let selectedItemId: string | null = null;
 let selectedFeedMaterialIds = new Set<string>();
+let isSelectingFeedMaterials = false;
 let activeSkinTabType: "skin" | "action" | "background" | "specialEvent" = "skin";
 
 
@@ -326,6 +337,15 @@ let currentRankingEntries: RankingEntry[] = [];
 let currentRankingSeason: RankingSeason | null = null;
 let rankingUnsubscribe: (() => void) | null = null;
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] ?? character);
+}
 
 
 
@@ -371,6 +391,28 @@ function applyCharacterLevel(state: CharacterState) {
   state.attackPower = getLeveledAttack(state.attackPower, progress);
   state.maxDefenseShield = getLeveledDefenseShield(state, progress);
   state.defenseShield = state.maxDefenseShield;
+  return state;
+}
+
+/** 로그인한 캐릭터의 영구 스킬 트리 효과를 전투 상태에 한 번만 반영한다. */
+function applySkillTreeStats(state: CharacterState) {
+  if (state.id !== currentCharacterId) return state;
+
+  const atkLevel = characterSkillsInvested.get("atk") ?? 0;
+  const hpLevel = characterSkillsInvested.get("hp") ?? 0;
+  const cooldownLevel = characterSkillsInvested.get("cd") ?? 0;
+  const powerLevel = characterSkillsInvested.get("pwr") ?? 0;
+  const tankLevel = characterSkillsInvested.get("tank") ?? 0;
+  const luckyLevel = characterSkillsInvested.get("lucky") ?? 0;
+
+  state.maxHp = Math.round(state.maxHp * (1 + hpLevel * 0.08));
+  state.hp = state.maxHp;
+  state.attackPower = Math.round(state.attackPower * (1 + atkLevel * 0.07 + powerLevel * 0.05));
+  state.skillChargeRate *= 1 + cooldownLevel * 0.1;
+  state.persistentItemDamageReductionMultiplier =
+    (state.persistentItemDamageReductionMultiplier ?? 1) * Math.max(0.5, 1 - tankLevel * 0.04);
+  state.luck = (state.luck ?? 10) + luckyLevel * 10;
+  state.attackSpeed = (state.attackSpeed ?? 1.2) * Math.max(0.5, 1 - luckyLevel * 0.06);
   return state;
 }
 
@@ -1843,6 +1885,7 @@ function startGame() {
     );
     if (isLargeSoloMatch) state.radius = LARGE_SOLO_CHARACTER_RADIUS;
     applyCharacterLevel(state);
+    applySkillTreeStats(state);
     applyEquippedCosmetic(state);
 
     // 모드별 스탯 및 팀 세팅
@@ -2003,8 +2046,23 @@ function formatHp(hp: number): string {
   return Math.max(0, Math.round(hp)).toString();
 }
 
+function formatSurvivalTime(milliseconds: number): string {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function updateSurvivalHud() {
+  const visible = currentMode === "pve" && pveRun?.dungeonId === "survival";
+  survivalHud.classList.toggle("hidden", !visible);
+  if (!visible || !pveRun) return;
+  survivalHudTime.textContent = formatSurvivalTime(Date.now() - pveRun.startedAt);
+  survivalHudWave.textContent = `WAVE ${pveRun.stage}`;
+  survivalHudCoins.textContent = `🪙 ${pveRun.survivalCoins}`;
+}
+
 // Update HUD lists
 function updateHUD(characters: CharacterState[]) {
+  updateSurvivalHud();
   renderPveRunModifiers();
   // 분신(eunsu_clone)은 플레이어가 아니므로 생존자 수 카운트에서 제외
   const aliveCount = characters.filter(
@@ -2319,6 +2377,37 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     const player = allChars.find((character) => character.id === run.characterId);
     const clearedStage = winner?.teamId === 1 && player && !player.isDead;
     if (!clearedStage || !player) {
+      if (run.dungeonId === "survival") {
+        const survivalSeconds = Math.floor((Date.now() - run.startedAt) / 1000);
+        const clearedWaves = Math.max(0, run.stage - 1);
+        const result = {
+          survivalSeconds,
+          clearedWaves,
+          kills: player?.kills ?? 0,
+          damageDealt: Math.round(player?.totalDamageDealt ?? 0),
+          damageTaken: Math.round(player?.totalDamageTaken ?? 0),
+        };
+        const runSummary = getPveRunSummaryMarkup(run);
+        clearPveRunModifiers(run.modifiers);
+        pveRun = null;
+        renderPveRunModifiers();
+        updateSurvivalHud();
+        pveAdvancePending = false;
+        if (winnerTitle) winnerTitle.textContent = "SURVIVAL RESULT";
+        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player?.color ?? "#a78bfa"}">균열 생존전 종료</div><div class="win-desc">서버가 완료 웨이브 기준 코인을 정산하고 있습니다.</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>생존 시간</span><strong>${formatSurvivalTime(result.survivalSeconds * 1000)}</strong></div><div class="stat-row"><span>도달 웨이브</span><strong>${result.clearedWaves}</strong></div><div class="stat-row"><span>처치 수</span><strong>${result.kills}</strong></div><div class="stat-row"><span>가한 피해</span><strong>${result.damageDealt}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${result.damageTaken}</strong></div><div class="stat-row"><span>총 획득 코인</span><strong id="survival-result-coins" class="text-neon-yellow">정산 중…</strong></div></div>${runSummary}`;
+        modalCloseBtn.textContent = "로비로 돌아가기";
+        winnerModal.classList.remove("hidden");
+        void convexClient.mutation(api.progression.recordSurvivalRun, { characterId: run.characterId, ...result })
+          .then((settlement) => {
+            const coinResult = document.getElementById("survival-result-coins");
+            if (coinResult) coinResult.textContent = `+${settlement.coinsGranted} 코인`;
+          })
+          .catch(() => {
+            const coinResult = document.getElementById("survival-result-coins");
+            if (coinResult) coinResult.textContent = "정산 실패 (재시도 필요)";
+          });
+        return;
+      }
       clearPveRunModifiers(run.modifiers);
       pveRun = null;
       renderPveRunModifiers();
@@ -2333,6 +2422,25 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     run.currentHp = Math.min(player.maxHp, player.hp + player.maxHp * 0.25);
     run.currentDefenseShield = player.defenseShield ?? 0;
     run.currentShield = player.runShield ?? 0;
+    if (run.dungeonId === "survival") {
+      const clearedWave = run.stage;
+      const coins = clearedWave * 5;
+      run.survivalCoins += coins;
+      if (clearedWave % 5 === 0) {
+        run.currentHp = player.maxHp;
+        run.currentDefenseShield = player.maxDefenseShield ?? 0;
+      }
+      run.stage += 1;
+      pveAdvancePending = true;
+      const continueWave = () => {
+        if (winnerTitle) winnerTitle.textContent = "WAVE CLEARED";
+        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player.color}">웨이브 ${clearedWave} 생존!</div><div class="win-desc">+${coins} 코인${clearedWave % 5 === 0 ? " · 5웨이브 회복 완료" : ""}</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>다음 웨이브</span><strong>${run.stage}</strong></div><div class="stat-row"><span>누적 코인</span><strong class="text-neon-yellow">${run.survivalCoins}</strong></div><div class="stat-row"><span>가한 피해</span><strong>${Math.round(player.totalDamageDealt ?? 0)}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${Math.round(player.totalDamageTaken ?? 0)}</strong></div></div>`;
+        modalCloseBtn.textContent = "다음 웨이브";
+        winnerModal.classList.remove("hidden");
+      };
+      if (clearedWave % 3 === 0) showAugmentChoice(run, clearedWave, continueWave); else continueWave();
+      return;
+    }
     if (run.stage < getPveDungeon(run.dungeonId).stageCount) {
       const clearedStageNumber = run.stage;
       run.stage += 1;
@@ -3272,7 +3380,7 @@ function startPveDungeon() {
     baseMaxDefenseShield += effects.defenseShieldBonus;
   }
 
-  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: baseMaxHp, currentHp: baseMaxHp, currentDefenseShield: baseMaxDefenseShield, currentShield: 0, rewardEligible: true, modifiers: createPveRunModifiers() };
+  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: baseMaxHp, currentHp: baseMaxHp, currentDefenseShield: baseMaxDefenseShield, currentShield: 0, rewardEligible: true, survivalCoins: 0, modifiers: createPveRunModifiers() };
   showAugmentChoice(pveRun, 0, startPveStage);
 }
 
@@ -3295,6 +3403,7 @@ function startPveStage() {
   player.maxHp = getLeveledHp(character.maxHp, progress);
   player.attackPower = getLeveledAttack(character.attackPower, progress);
   player.maxDefenseShield = getLeveledDefenseShield(character, progress);
+  applySkillTreeStats(player);
 
   // Apply persistent items to player state
   const stageItems = characterPlayerItems.get(character.id) ?? [];
@@ -3317,7 +3426,10 @@ function startPveStage() {
   });
   totalCountEl.textContent = String(enemyStates.length + 1);
   aliveCountEl.textContent = String(enemyStates.length + 1);
-  gameStatusText.textContent = `${dungeon.name} · ${pveRun.stage}/${dungeon.stageCount} 스테이지`;
+  gameStatusText.textContent = pveRun.dungeonId === "survival"
+    ? `${dungeon.name} · WAVE ${pveRun.stage}`
+    : `${dungeon.name} · ${pveRun.stage}/${dungeon.stageCount} 스테이지`;
+  updateSurvivalHud();
   if (!gameLounge) gameLounge = new GameLounge(gameCanvas, updateHUD, showWinner, updateCountdown, recordCharacterDeath);
   gameLounge.init([player, ...enemyStates], gameSpeedMultiplier, "deathmatch", true);
 }
@@ -3549,7 +3661,7 @@ function startUserSession() {
     (skills) => {
       characterSkillsInvested.clear();
       (skills as any[]).forEach((skill) => {
-        characterSkillsInvested.set(skill.skillId, skill.level);
+        characterSkillsInvested.set(skill.skillId, skill.investedPoints);
       });
       renderGrowthTab();
       renderBookTab();
@@ -3559,7 +3671,43 @@ function startUserSession() {
   selectHubTab("play");
 }
 
+/** Convex가 전투 수치·맵 크기의 원본이다. 캐릭터 파일은 고유 행동 훅만 유지한다. */
+function initCombatCatalogSubscription(): void {
+  const combatApi = (api as any).combatCatalog;
+  void convexClient.mutation(combatApi.ensureInitialCombatCatalog, {});
+  combatCatalogUnsubscribe?.();
+  combatCatalogUnsubscribe = convexClient.onUpdate(
+    combatApi.listActiveCharacterCombatProfiles,
+    {},
+    (profiles: any[]) => {
+      profiles.filter((profile) => profile.isActive).forEach((profile) => {
+        const character = availableCharacters.find((entry) => entry.id === profile.characterId);
+        if (!character) return;
+        character.maxHp = profile.maxHp;
+        character.attackPower = profile.attackPower;
+        character.speed = profile.speed;
+        character.defense = profile.defense;
+        character.luck = profile.luck;
+        character.attackSpeed = profile.attackInterval;
+        character.attackRangeRatio = profile.attackRangeRatio;
+        character.basicAttackType = profile.basicAttackType;
+        character.projectileSpeed = profile.projectileSpeed;
+      });
+      renderBookTab();
+      renderPlayTab();
+    },
+  );
+  arenaCatalogUnsubscribe?.();
+  arenaCatalogUnsubscribe = convexClient.onUpdate(
+    combatApi.listActiveArenaCombatCatalog,
+    {},
+    (arenas: any[]) => applyRemoteArenaCatalog(arenas.filter((arena: any) => arena.isActive)),
+  );
+}
+
 function selectHubTab(hub: string) {
+  // 로비 메뉴를 이동하면 이전 화면의 일시적인 선택/강조 상태는 남기지 않는다.
+  resetLobbyTabSelections();
   document.querySelectorAll<HTMLElement>(".hub-panel").forEach((panel) => {
     panel.classList.toggle("hidden", panel.id !== `${hub}-hub-panel`);
   });
@@ -3574,6 +3722,16 @@ function selectHubTab(hub: string) {
   else if (hub === "growth") renderGrowthTab();
   else if (hub === "book") renderBookTab();
   else if (hub === "play") renderPlayTab();
+}
+
+/** 탭 전환 후 카드 선택, 제물 선택, 도감 캐릭터 선택을 기본 상태로 되돌린다. */
+function resetLobbyTabSelections(): void {
+  selectedItemId = null;
+  selectedFeedMaterialIds.clear();
+  isSelectingFeedMaterials = false;
+  selectedGrowthSubTab = "equipment";
+  bookSelectedCharacterId = null;
+  activeSkinTabType = "skin";
 }
 
 function renderPlayTab() {
@@ -3595,9 +3753,9 @@ function renderPlayTab() {
       avatar.innerHTML = `<span class="skin-visual skin-visual-management" aria-hidden="true" style="font-size: 1.8rem;"><b>${character.name.slice(0, 1)}</b></span>`;
     } else {
       avatar.style.borderColor = character.color;
-      avatar.style.background = "rgba(0,242,254,0.1)";
-      avatar.style.color = "#00f2fe";
-      avatar.style.boxShadow = `0 0 15px rgba(0,242,254,0.25)`;
+      avatar.style.background = `color-mix(in srgb, ${character.color} 14%, transparent)`;
+      avatar.style.color = character.color;
+      avatar.style.boxShadow = `0 0 15px color-mix(in srgb, ${character.color} 38%, transparent)`;
       avatar.innerHTML = `<span class="skin-visual skin-visual-management" aria-hidden="true" style="font-size: 1.8rem;"><b>${character.name.slice(0, 1)}</b></span>`;
     }
   }
@@ -3622,6 +3780,36 @@ function renderPlayTab() {
   if (pvpStat) pvpStat.textContent = `${progress.pvpWins ?? 0}승 ${progress.pvpLosses ?? 0}패`;
   const pveStat = document.getElementById("play-pve-stat");
   if (pveStat) pveStat.textContent = `${progress.dungeonClears ?? 0}회 클리어`;
+
+  const skillsPanel = document.getElementById("play-equipped-skills");
+  if (skillsPanel) {
+    const investedSkillCount = Array.from(characterSkillsInvested.values())
+      .filter((level) => level > 0)
+      .reduce((total, level) => total + level, 0);
+    skillsPanel.innerHTML = `
+      <div style="font-size:0.68rem; color:var(--neon-cyan); font-family:'Orbit'; font-weight:800; letter-spacing:.06em;">⚡ 고유 스킬 · 기본 장착</div>
+      <strong style="display:block; margin-top:.3rem; color:${character.color}; font-size:.9rem;">${escapeHtml(character.skillName)} <span style="font-size:.68rem; color:#39ff14;">● 장착됨</span></strong>
+      <small style="display:block; margin-top:.28rem; color:var(--text-secondary); line-height:1.35;">${escapeHtml(character.skillDescription)}</small>
+      <div style="margin-top:.45rem; font-size:.7rem; color:var(--text-secondary);">특성 강화: ${investedSkillCount > 0 ? `${investedSkillCount}P 적용` : "캐릭터별 트리 준비 중"}</div>
+    `;
+  }
+
+  const itemsPanel = document.getElementById("play-equipped-items");
+  if (itemsPanel) {
+    const equippedItems = (characterPlayerItems.get(currentCharacterId) ?? [])
+      .filter((item) => item.equippedSlot >= 1 && item.equippedSlot <= 8)
+      .sort((left, right) => left.equippedSlot - right.equippedSlot);
+    const itemMarkup = equippedItems.length > 0
+      ? equippedItems.map((item) => {
+          const catalogItem = persistentItemCatalog.find((entry) => entry.itemId === item.itemCatalogId);
+          return `<span class="rarity-${catalogItem?.rarity ?? "common"}" style="display:inline-flex; align-items:center; gap:.25rem; padding:.23rem .4rem; border:1px solid currentColor; border-radius:5px; font-size:.7rem; font-weight:700;">S${item.equippedSlot} · ${escapeHtml(catalogItem?.name ?? item.name)} <small>Lv.${item.level}</small></span>`;
+        }).join("")
+      : `<span style="font-size:.78rem; color:var(--text-secondary);">장착한 영구 아이템이 없습니다.</span>`;
+    itemsPanel.innerHTML = `
+      <div style="font-size:.68rem; color:var(--neon-yellow); font-family:'Orbit'; font-weight:800; letter-spacing:.06em; margin-bottom:.45rem;">⚙️ 장착 아이템 · ${equippedItems.length}/8</div>
+      <div style="display:flex; flex-wrap:wrap; gap:.38rem;">${itemMarkup}</div>
+    `;
+  }
 }
 
 function renderStoreTab() {
@@ -3769,9 +3957,11 @@ function renderGrowthTab() {
   if (!currentCharacterId) return;
 
   const eqPanel = document.getElementById("growth-equipment-panel") as HTMLElement;
+  const enhancePanel = document.getElementById("growth-enhance-panel") as HTMLElement;
   const skPanel = document.getElementById("growth-skills-panel") as HTMLElement;
-  if (eqPanel && skPanel) {
+  if (eqPanel && enhancePanel && skPanel) {
     eqPanel.classList.toggle("hidden", selectedGrowthSubTab !== "equipment");
+    enhancePanel.classList.toggle("hidden", selectedGrowthSubTab !== "enhance");
     skPanel.classList.toggle("hidden", selectedGrowthSubTab !== "skills");
   }
 
@@ -3780,16 +3970,17 @@ function renderGrowthTab() {
     btn.classList.toggle("active", isMatched);
   });
 
-  if (selectedGrowthSubTab === "equipment") {
-    renderEquipmentSubTab();
-  } else {
-    renderSkillsSubTab();
-  }
+  if (selectedGrowthSubTab === "equipment") renderEquipmentSubTab();
+  else if (selectedGrowthSubTab === "enhance") renderEnhancementSubTab();
+  else renderSkillsSubTab();
 }
 
 function renderEquipmentSubTab() {
   if (!currentCharacterId) return;
   const items = characterPlayerItems.get(currentCharacterId) ?? [];
+  const selectedInventoryItem = items.find(
+    (item) => item.itemId === selectedItemId && item.equippedSlot <= 0,
+  );
 
   const bagCountLabel = document.getElementById("bag-count-label");
   if (bagCountLabel) bagCountLabel.textContent = `${items.length} / 20`;
@@ -3802,21 +3993,24 @@ function renderEquipmentSubTab() {
     if (equipped) {
       const catalogItem = persistentItemCatalog.find((c) => c.itemId === equipped.itemCatalogId);
       slotEl.className = `eq-slot rarity-${catalogItem?.rarity ?? "common"} equipped ${selectedItemId === equipped.itemId ? "selected" : ""}`;
-      slotEl.innerHTML = `<span>Lv.${equipped.level} ${catalogItem?.name ?? "아이템"}</span><small style="font-size:0.65rem; color:#fff;">Slot ${slotNum}</small>`;
-      slotEl.onclick = () => {
-        selectedItemId = equipped.itemId;
-        selectedFeedMaterialIds.clear();
-        renderEquipmentSubTab();
-      };
+      slotEl.innerHTML = `
+        <div class="equipment-card-top"><span class="equipment-card-level">Lv.${equipped.level}</span><span class="equipment-card-location">SLOT ${slotNum}</span></div>
+        <strong class="equipment-card-name">${escapeHtml(catalogItem?.name ?? "아이템")}</strong>
+        <small class="equipment-card-state">● 장착됨</small>
+      `;
+      slotEl.title = `${catalogItem?.name ?? "아이템"} 상세 보기`;
+      slotEl.onclick = () => selectEquipmentItem(equipped.itemId);
     } else {
-      slotEl.className = `eq-slot empty ${selectedItemId === `slot-${slotNum}` ? "selected" : ""}`;
-      slotEl.innerHTML = `<span>Slot ${slotNum}</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small>`;
+      slotEl.className = `eq-slot empty ${selectedInventoryItem ? "equip-target" : ""}`;
+      slotEl.innerHTML = selectedInventoryItem
+        ? `<div class="equipment-card-top"><span class="equipment-card-level">EMPTY</span><span class="equipment-card-location">SLOT ${slotNum}</span></div><strong class="equipment-card-name">여기에 장착</strong><small class="equipment-card-state">선택한 아이템을 장착합니다</small>`
+        : `<div class="equipment-card-top"><span class="equipment-card-level">EMPTY</span><span class="equipment-card-location">SLOT ${slotNum}</span></div><strong class="equipment-card-name">빈 장착 슬롯</strong><small class="equipment-card-state">가방에서 장비를 선택하세요</small>`;
       slotEl.onclick = () => {
-        const selectedItem = items.find((item) => item.itemId === selectedItemId);
-        if (selectedItem && selectedItem.equippedSlot <= 0) {
-          void equipPersistentItemAction(selectedItem.itemId, slotNum);
+        if (selectedInventoryItem) {
+          void equipPersistentItemAction(selectedInventoryItem.itemId, slotNum);
         } else {
           selectedItemId = null;
+          isSelectingFeedMaterials = false;
           renderEquipmentSubTab();
         }
       };
@@ -3835,25 +4029,26 @@ function renderEquipmentSubTab() {
       const catalogItem = persistentItemCatalog.find((c) => c.itemId === item.itemCatalogId);
       const card = document.createElement("button");
       card.type = "button";
-      
+
       const isInspected = selectedItemId === item.itemId;
       const isMaterial = selectedFeedMaterialIds.has(item.itemId);
-      
-      card.className = `bag-item-card rarity-${catalogItem?.rarity ?? "common"} ${isInspected ? "inspected" : ""} ${isMaterial ? "material-selected" : ""}`;
+
+      card.className = `bag-item-card equipment-card rarity-${catalogItem?.rarity ?? "common"} ${isInspected ? "inspected" : ""} ${isMaterial ? "material-selected" : ""}`;
       card.innerHTML = `
-        <strong>Lv.${item.level} ${catalogItem?.name ?? "기어"}</strong>
-        <small>${catalogItem?.rarity.toUpperCase()}</small>
+        <div class="equipment-card-top"><span class="equipment-card-level">Lv.${item.level}</span><span class="equipment-card-location">BAG</span></div>
+        <strong class="equipment-card-name">${escapeHtml(catalogItem?.name ?? "기어")}</strong>
+        <small class="equipment-card-state">${catalogItem?.rarity.toUpperCase() ?? "COMMON"} · 미장착</small>
       `;
       card.onclick = () => {
-        if (selectedItemId && selectedItemId !== item.itemId) {
+        if (isSelectingFeedMaterials && selectedItemId && selectedItemId !== item.itemId) {
           if (selectedFeedMaterialIds.has(item.itemId)) {
             selectedFeedMaterialIds.delete(item.itemId);
           } else {
             selectedFeedMaterialIds.add(item.itemId);
           }
         } else {
-          selectedItemId = item.itemId;
-          selectedFeedMaterialIds.clear();
+          selectEquipmentItem(item.itemId);
+          return;
         }
         renderEquipmentSubTab();
       };
@@ -3864,6 +4059,110 @@ function renderEquipmentSubTab() {
   renderInspectorPanel();
 }
 
+/** 슬롯과 가방에서 공통으로 사용하는 장비 상세 선택 흐름. */
+function selectEquipmentItem(itemId: string): void {
+  selectedItemId = itemId;
+  selectedFeedMaterialIds.clear();
+  isSelectingFeedMaterials = false;
+  renderEquipmentSubTab();
+
+  const inspector = document.getElementById("equipment-inspector-panel");
+  inspector?.classList.remove("inspector-attention");
+  requestAnimationFrame(() => inspector?.classList.add("inspector-attention"));
+}
+
+function formatPersistentItemEffects(effects: PlayerItem["effects"]): string[] {
+  const lines: string[] = [];
+  if (effects.maxHpMultiplier && effects.maxHpMultiplier !== 1) lines.push(`최대 체력 +${Math.round((effects.maxHpMultiplier - 1) * 100)}%`);
+  if (effects.attackMultiplier && effects.attackMultiplier !== 1) lines.push(`공격력 +${Math.round((effects.attackMultiplier - 1) * 100)}%`);
+  if (effects.speedMultiplier && effects.speedMultiplier !== 1) lines.push(`이동 속도 +${Math.round((effects.speedMultiplier - 1) * 100)}%`);
+  if (effects.skillChargeRateMultiplier && effects.skillChargeRateMultiplier !== 1) lines.push(`스킬 충전 속도 +${Math.round((effects.skillChargeRateMultiplier - 1) * 100)}%`);
+  if (effects.baseAttackRangeBonus) lines.push(`기본 공격 사거리 +${effects.baseAttackRangeBonus}px`);
+  if (effects.defenseShieldBonus) lines.push(`최대 DEF 보호막 +${effects.defenseShieldBonus}`);
+  if (effects.damageReductionMultiplier && effects.damageReductionMultiplier !== 1) lines.push(`받는 피해 ${Math.round((1 - effects.damageReductionMultiplier) * 100)}% 감소`);
+  if (effects.orbitDamage && effects.orbitRadius && effects.orbitInterval) lines.push(`반경 ${effects.orbitRadius}px 궤도 공격 · ${effects.orbitInterval}초마다 ${effects.orbitDamage} 피해`);
+  if (effects.pulseDamage && effects.pulseRadius && effects.pulseInterval) lines.push(`반경 ${effects.pulseRadius}px 충격파 · ${effects.pulseInterval}초마다 ${effects.pulseDamage} 피해`);
+  return lines.length > 0 ? lines : ["적용 가능한 효과 정보가 없습니다."];
+}
+
+const ITEM_SELL_VALUES: Record<string, number> = { common: 20, rare: 50, epic: 120, legendary: 300, unique: 650 };
+const ITEM_MATERIAL_XP: Record<string, number> = { common: 50, rare: 120, epic: 300, legendary: 800, unique: 2000 };
+
+function renderEnhancementSubTab(): void {
+  if (!currentCharacterId) return;
+  const content = document.getElementById("enhancement-content");
+  if (!content) return;
+  const items = characterPlayerItems.get(currentCharacterId) ?? [];
+  const target = items.find((item) => item.itemId === selectedItemId);
+
+  const targets = items.map((item) => {
+    const catalog = persistentItemCatalog.find((entry) => entry.itemId === item.itemCatalogId);
+    const selected = target?.itemId === item.itemId;
+    const location = item.equippedSlot > 0 ? `SLOT ${item.equippedSlot}` : "BAG";
+    const state = item.equippedSlot > 0 ? "● 장착 중" : `${catalog?.rarity.toUpperCase() ?? "COMMON"} · 미장착`;
+    return `<button type="button" class="bag-item-card equipment-card enhancement-item-card rarity-${catalog?.rarity ?? "common"} ${selected ? "inspected" : ""}" data-enhance-target="${item.itemId}">
+      <span class="equipment-card-top"><span class="equipment-card-level">Lv.${item.level}</span><span class="equipment-card-location">${location}</span></span>
+      <strong class="equipment-card-name">${escapeHtml(catalog?.name ?? item.name)}</strong>
+      <small class="equipment-card-state">${state}</small>
+    </button>`;
+  }).join("");
+
+  if (!target) {
+    content.innerHTML = `<div style="margin-bottom:.6rem; font-size:.78rem; color:var(--text-secondary);">강화 대상 장비 선택</div><div class="bag-grid">${targets || "<p>강화할 장비가 없습니다.</p>"}</div>`;
+  } else {
+    const catalog = persistentItemCatalog.find((entry) => entry.itemId === target.itemCatalogId);
+    const materials = items.filter((item) => item.itemId !== target.itemId && item.equippedSlot <= 0);
+    const selectedMaterials = materials.filter((item) => selectedFeedMaterialIds.has(item.itemId));
+    const gainedXp = selectedMaterials.reduce((total, item) => total + (ITEM_MATERIAL_XP[item.rarity] ?? 0) * item.level, 0);
+    const requiredXp = 100 + (target.level - 1) * 50;
+    const materialMarkup = materials.length > 0
+      ? materials.map((item) => {
+          const materialCatalog = persistentItemCatalog.find((entry) => entry.itemId === item.itemCatalogId);
+          const selected = selectedFeedMaterialIds.has(item.itemId);
+          const xp = (ITEM_MATERIAL_XP[item.rarity] ?? 0) * item.level;
+          return `<button type="button" class="bag-item-card equipment-card enhancement-item-card rarity-${materialCatalog?.rarity ?? "common"} ${selected ? "material-selected" : ""}" data-enhance-material="${item.itemId}">
+            <span class="equipment-card-top"><span class="equipment-card-level">Lv.${item.level}</span><span class="equipment-card-location">BAG</span></span>
+            <strong class="equipment-card-name">${escapeHtml(materialCatalog?.name ?? item.name)}</strong>
+            <small class="equipment-card-state">제물 XP +${xp}</small>
+          </button>`;
+        }).join("")
+      : `<p style="color:var(--text-secondary);">장착 해제된 제물 장비가 없습니다.</p>`;
+    content.innerHTML = `
+      <div style="font-size:.78rem; color:var(--text-secondary); margin-bottom:.6rem;">강화 대상 장비 선택</div>
+      <div class="bag-grid" style="margin-bottom:1rem;">${targets}</div>
+      <div style="padding:1rem; border:1px solid rgba(0,242,254,.18); border-radius:10px; background:rgba(0,242,254,.025);">
+        <strong class="rarity-${catalog?.rarity ?? "common"}">Lv.${target.level} ${escapeHtml(catalog?.name ?? target.name)}</strong>
+        <div style="margin-top:.45rem; font-size:.78rem; color:var(--text-secondary);">${escapeHtml(catalog?.description ?? "")}</div>
+        <div style="margin-top:.45rem; font-size:.8rem; line-height:1.5;">${formatPersistentItemEffects(target.effects).map((effect) => `• ${effect}`).join("<br>")}</div>
+        <div style="margin-top:.7rem; font-size:.78rem; color:var(--neon-yellow);">다음 레벨까지 ${target.experience} / ${requiredXp} XP · 선택 제물 +${gainedXp} XP</div>
+      </div>
+      <div style="margin-top:1rem; font-size:.78rem; color:var(--text-secondary);">제물 장비 선택 (장착 중인 장비는 제물로 사용할 수 없습니다)</div>
+      <div class="bag-grid" style="margin-top:.6rem;">${materialMarkup}</div>
+      <button id="enhancement-execute-btn" class="btn btn-primary" type="button" ${selectedMaterials.length === 0 ? "disabled" : ""} style="width:100%; margin-top:1rem;">강화 실행 · 제물 ${selectedMaterials.length}개 소모 / +${gainedXp} XP</button>
+    `;
+  }
+
+  content.querySelectorAll<HTMLButtonElement>("[data-enhance-target]").forEach((button) => {
+    button.onclick = () => {
+      selectedItemId = button.dataset.enhanceTarget ?? null;
+      selectedFeedMaterialIds.clear();
+      renderEnhancementSubTab();
+    };
+  });
+  content.querySelectorAll<HTMLButtonElement>("[data-enhance-material]").forEach((button) => {
+    button.onclick = () => {
+      const itemId = button.dataset.enhanceMaterial;
+      if (!itemId) return;
+      if (selectedFeedMaterialIds.has(itemId)) selectedFeedMaterialIds.delete(itemId);
+      else selectedFeedMaterialIds.add(itemId);
+      renderEnhancementSubTab();
+    };
+  });
+  content.querySelector<HTMLButtonElement>("#enhancement-execute-btn")?.addEventListener("click", () => {
+    if (target) void executeFeedAction(target.itemId);
+  });
+}
+
 function renderInspectorPanel() {
   const inspector = document.getElementById("equipment-inspector-panel");
   if (!inspector) return;
@@ -3872,18 +4171,39 @@ function renderInspectorPanel() {
   const selectedItem = items.find((item) => item.itemId === selectedItemId);
 
   const placeholder = document.getElementById("inspector-placeholder");
-  const detailPanel = document.getElementById("inspector-detail-panel");
+  const detailPanel = document.getElementById("inspector-content");
 
   if (!selectedItem) {
-    if (placeholder) placeholder.style.display = "flex";
-    if (detailPanel) detailPanel.style.display = "none";
+    if (placeholder) {
+      placeholder.classList.remove("hidden");
+      placeholder.style.display = "flex";
+    }
+    if (detailPanel) {
+      detailPanel.classList.add("hidden");
+      detailPanel.style.display = "none";
+    }
     return;
   }
 
-  if (placeholder) placeholder.style.display = "none";
-  if (detailPanel) detailPanel.style.display = "flex";
+  if (placeholder) {
+    placeholder.classList.add("hidden");
+    placeholder.style.display = "none";
+  }
+  if (detailPanel) {
+    detailPanel.classList.remove("hidden");
+    detailPanel.style.display = "flex";
+  }
 
   const catalogItem = persistentItemCatalog.find((c) => c.itemId === selectedItem.itemCatalogId);
+
+  const rarityEl = document.getElementById("inspector-item-rarity");
+  if (rarityEl) {
+    const rarity = catalogItem?.rarity ?? "common";
+    rarityEl.textContent = rarity.toUpperCase();
+    rarityEl.className = `rarity-${rarity}`;
+  }
+  const levelEl = document.getElementById("inspector-item-level");
+  if (levelEl) levelEl.textContent = `LV. ${selectedItem.level}`;
   
   const nameEl = document.getElementById("inspector-item-name");
   if (nameEl) {
@@ -3895,10 +4215,9 @@ function renderInspectorPanel() {
   
   const effectsEl = document.getElementById("inspector-item-effects");
   if (effectsEl) {
-    const lvl = selectedItem.level;
-    const baseMult = catalogItem?.effects?.maxHpMultiplier ? `체력 배율: +${Math.round((catalogItem.effects.maxHpMultiplier ** lvl - 1.0)*100)}%` : "";
-    const baseDef = catalogItem?.effects?.defenseShieldBonus ? `보호막 증가: +${catalogItem.effects.defenseShieldBonus * lvl}` : "";
-    effectsEl.innerHTML = [baseMult, baseDef].filter(Boolean).join("<br>");
+    effectsEl.innerHTML = formatPersistentItemEffects(selectedItem.effects)
+      .map((effect) => `<div>• ${effect}</div>`)
+      .join("");
   }
 
   const expLabel = document.getElementById("inspector-item-exp");
@@ -3911,21 +4230,30 @@ function renderInspectorPanel() {
   const feedArea = document.getElementById("feed-composite-area") as HTMLElement;
   const feedSummary = document.getElementById("feed-materials-summary");
   const feedBtn = document.getElementById("btn-execute-feed") as HTMLButtonElement;
+  const toggleFeedBtn = document.getElementById("btn-toggle-feed-materials") as HTMLButtonElement;
 
-  if (feedArea) {
-    if (selectedItem.equippedSlot > 0) {
-      feedArea.style.display = "none";
-    } else {
-      feedArea.style.display = "flex";
-      if (feedSummary) {
-        feedSummary.textContent = selectedFeedMaterialIds.size > 0 
+  if (feedArea && selectedGrowthSubTab === "enhance") {
+    feedArea.style.display = "flex";
+    if (feedSummary) {
+      feedSummary.textContent = isSelectingFeedMaterials
+        ? `재료 선택 중 · ${selectedFeedMaterialIds.size}개 선택됨`
+        : selectedFeedMaterialIds.size > 0
           ? `선택된 제물: ${selectedFeedMaterialIds.size}개`
-          : "선택된 제물: 없음";
-      }
-      if (feedBtn) {
-        feedBtn.disabled = selectedFeedMaterialIds.size === 0;
-        feedBtn.onclick = () => { void executeFeedAction(selectedItem.itemId); };
-      }
+          : "강화 재료를 선택하세요.";
+    }
+    if (toggleFeedBtn) {
+      toggleFeedBtn.textContent = isSelectingFeedMaterials ? "재료 선택 완료" : "강화 재료 선택 시작";
+      toggleFeedBtn.onclick = () => {
+        isSelectingFeedMaterials = !isSelectingFeedMaterials;
+        renderEquipmentSubTab();
+      };
+    }
+    if (feedBtn) {
+      feedBtn.disabled = selectedFeedMaterialIds.size === 0;
+      feedBtn.textContent = selectedFeedMaterialIds.size > 0
+        ? `강화 실행 · 제물 ${selectedFeedMaterialIds.size}개 흡수`
+        : "강화 실행 (재료를 먼저 선택하세요)";
+      feedBtn.onclick = () => { void executeFeedAction(selectedItem.itemId); };
     }
   }
 
@@ -3937,12 +4265,14 @@ function renderInspectorPanel() {
     if (equipBtn) equipBtn.style.display = "none";
     if (unequipBtn) {
       unequipBtn.style.display = "block";
+      unequipBtn.textContent = "장착 해제";
       unequipBtn.onclick = () => { void unequipPersistentItemAction(selectedItem.itemId); };
     }
   } else {
     if (unequipBtn) unequipBtn.style.display = "none";
     if (equipBtn) {
       equipBtn.style.display = "block";
+      equipBtn.textContent = "첫 빈 슬롯에 장착";
       equipBtn.onclick = () => {
         const usedSlots = new Set(items.filter((item) => item.equippedSlot > 0).map((item) => item.equippedSlot));
         const emptySlot = [1,2,3,4,5,6,7,8].find((slot) => !usedSlots.has(slot));
@@ -3957,6 +4287,10 @@ function renderInspectorPanel() {
 
   if (sellBtn) {
     sellBtn.disabled = selectedItem.equippedSlot > 0;
+    const sellValue = (ITEM_SELL_VALUES[selectedItem.rarity] ?? 0) * selectedItem.level;
+    sellBtn.textContent = selectedItem.equippedSlot > 0
+      ? "장착 해제 후 판매"
+      : `판매 · +${sellValue.toLocaleString()} 코인`;
     sellBtn.onclick = () => { void sellPersistentItemAction(selectedItem.itemId); };
   }
 }
@@ -3981,6 +4315,7 @@ async function equipPersistentItemAction(itemId: string, slotNum: number) {
     });
     selectedItemId = null;
     selectedFeedMaterialIds.clear();
+    isSelectingFeedMaterials = false;
     renderGrowthTab();
   } catch (err) {
     alert(err instanceof Error ? err.message : "장착에 실패했습니다.");
@@ -3990,13 +4325,15 @@ async function equipPersistentItemAction(itemId: string, slotNum: number) {
 async function unequipPersistentItemAction(itemId: string) {
   if (!currentCharacterId) return;
   try {
-    await convexClient.mutation(api.persistentItems.equipPersistentItem, {
+    const item = (characterPlayerItems.get(currentCharacterId) ?? []).find((entry) => entry.itemId === itemId);
+    if (!item || item.equippedSlot < 1) return;
+    await convexClient.mutation(api.persistentItems.clearPersistentItemSlot, {
       characterId: currentCharacterId,
-      itemId: itemId as any,
-      slot: 0,
+      slot: item.equippedSlot,
     });
     selectedItemId = null;
     selectedFeedMaterialIds.clear();
+    isSelectingFeedMaterials = false;
     renderGrowthTab();
   } catch (err) {
     alert(err instanceof Error ? err.message : "해제에 실패했습니다.");
@@ -4013,6 +4350,7 @@ async function sellPersistentItemAction(itemId: string) {
     });
     selectedItemId = null;
     selectedFeedMaterialIds.clear();
+    isSelectingFeedMaterials = false;
     renderGrowthTab();
   } catch (err) {
     alert(err instanceof Error ? err.message : "판매에 실패했습니다.");
@@ -4028,128 +4366,74 @@ async function executeFeedAction(itemId: string) {
       materialItemIds: Array.from(selectedFeedMaterialIds) as any,
     });
     selectedFeedMaterialIds.clear();
+    isSelectingFeedMaterials = false;
     renderGrowthTab();
   } catch (err) {
     alert(err instanceof Error ? err.message : "제물 합성에 실패했습니다.");
   }
 }
 
-function renderSkillsSubTab() {
+export function renderSkillsSubTab() {
   if (!currentCharacterId || !currentCharacterProgress) return;
-  const progress = currentCharacterProgress;
+  const character = availableCharacters.find((entry) => entry.id === currentCharacterId);
+  const equippedSkillsContainer = document.getElementById("skill-tree-container");
+  if (!character || !equippedSkillsContainer) return;
 
-  let spent = 0;
-  characterSkillsInvested.forEach((lvl) => {
-    spent += lvl;
-  });
-
-  const avail = Math.max(0, progress.level - 1 - spent);
-  const availEl = document.getElementById("skill-points-avail");
-  if (availEl) availEl.textContent = avail.toString();
-
-  const atkLvl = characterSkillsInvested.get("atk") ?? 0;
-  const hpLvl = characterSkillsInvested.get("hp") ?? 0;
-  const cdLvl = characterSkillsInvested.get("cd") ?? 0;
-
-  const atkLabel = document.getElementById("skill-lv-atk");
-  if (atkLabel) atkLabel.textContent = `${atkLvl} / 20`;
-  const atkAddBtn = document.getElementById("skill-add-atk") as HTMLButtonElement;
-  if (atkAddBtn) {
-    atkAddBtn.disabled = avail <= 0 || atkLvl >= 20;
-    atkAddBtn.onclick = () => { void investSkillPointAction("atk"); };
-  }
-
-  const hpLabel = document.getElementById("skill-lv-hp");
-  if (hpLabel) hpLabel.textContent = `${hpLvl} / 20`;
-  const hpAddBtn = document.getElementById("skill-add-hp") as HTMLButtonElement;
-  if (hpAddBtn) {
-    hpAddBtn.disabled = avail <= 0 || hpLvl >= 20;
-    hpAddBtn.onclick = () => { void investSkillPointAction("hp"); };
-  }
-
-  const cdLabel = document.getElementById("skill-lv-cd");
-  if (cdLabel) cdLabel.textContent = `${cdLvl} / 20`;
-  const cdAddBtn = document.getElementById("skill-add-cd") as HTMLButtonElement;
-  if (cdAddBtn) {
-    cdAddBtn.disabled = avail <= 0 || cdLvl >= 20;
-    cdAddBtn.onclick = () => { void investSkillPointAction("cd"); };
-  }
-
-  const resetBtn = document.getElementById("skill-reset-btn") as HTMLButtonElement;
-  if (resetBtn) {
-    resetBtn.disabled = progress.coins < 100 || spent === 0;
-    resetBtn.onclick = () => { void resetSkillsAction(); };
-  }
-}
-
-async function investSkillPointAction(skillId: "atk" | "hp" | "cd") {
-  if (!currentCharacterId) return;
-  try {
-    await convexClient.mutation(api.progression.investSkillPoint, {
-      characterId: currentCharacterId,
-      skillId,
-    });
-  } catch (err) {
-    alert(err instanceof Error ? err.message : "스킬 투자에 실패했습니다.");
-  }
-}
-
-async function resetSkillsAction() {
-  if (!currentCharacterId) return;
-  if (!confirm("100 코인을 소모하여 스킬 특성을 초기화하시겠습니까?")) return;
-  try {
-    await convexClient.mutation(api.progression.resetSkills, {
-      characterId: currentCharacterId,
-    });
-  } catch (err) {
-    alert(err instanceof Error ? err.message : "스킬 초기화에 실패했습니다.");
-  }
+  document.getElementById("skill-reset-btn")?.closest(".card")?.classList.add("hidden");
+  equippedSkillsContainer.innerHTML = `
+    <article class="skill-chain-card mastered" style="max-width:680px;">
+      <div class="skill-chain-icon">⚡</div>
+      <div class="skill-chain-info">
+        <strong style="color:${character.color};">${escapeHtml(character.skillName)} <span style="font-size:.68rem; color:#39ff14;">● 장착됨</span></strong>
+        <small>${escapeHtml(character.skillDescription)}</small>
+        <div style="margin-top:.35rem; font-size:.72rem; color:var(--text-secondary);">${escapeHtml(character.detailedDescription)}</div>
+      </div>
+    </article>
+  `;
 }
 
 function renderBookTab() {
   if (!currentCharacterId || !currentCharacterProgress) return;
-  const character = availableCharacters.find((c) => c.id === currentCharacterId);
-  if (!character) return;
+  const mine = availableCharacters.find((c) => c.id === currentCharacterId);
+  const defaultComparedId = availableCharacters.find((c) => c.id !== currentCharacterId)?.id;
+  const compared = availableCharacters.find((c) => c.id === (bookSelectedCharacterId ?? defaultComparedId));
+  if (!mine || !compared) return;
+  const stats = (character: typeof mine, isMine: boolean) => {
+    const progress = isMine ? currentCharacterProgress : { level: 1 };
+    const effects = isMine ? resolvePersistentItemEffects(characterPlayerItems.get(currentCharacterId!) ?? []) : {};
+    const hpLevel = isMine ? (characterSkillsInvested.get("hp") ?? 0) : 0;
+    const atkLevel = isMine ? (characterSkillsInvested.get("atk") ?? 0) : 0;
+    const cdLevel = isMine ? (characterSkillsInvested.get("cd") ?? 0) : 0;
+    const luckyLevel = isMine ? (characterSkillsInvested.get("lucky") ?? 0) : 0;
+    return {
+      hp: Math.round(getLeveledHp(character.maxHp, progress) * (1 + hpLevel * .08) * ((effects as any).maxHpMultiplier ?? 1)),
+      atk: Math.round(getLeveledAttack(character.attackPower, progress) * (1 + atkLevel * .07)),
+      spd: character.speed,
+      def: getLeveledDefenseShield(character, progress) + ((effects as any).defenseShieldBonus ?? 0),
+      range: character.attackRangeRatio ? Math.round(600 * character.attackRangeRatio) : character.baseAttackRange,
+      cd: cdLevel * 10,
+      luck: (character.luck ?? 10) + luckyLevel * 10,
+      interval: (character.attackSpeed ?? 1) * Math.max(.5, 1 - luckyLevel * .06),
+    };
+  };
+  const mineStats = stats(mine, true); const compareStats = stats(compared, false);
+  const renderValue = (id: string, mineValue: number, otherValue: number, mineText: string, otherText: string, lowerIsBetter = false) => {
+    const result = lowerIsBetter ? otherValue - mineValue : mineValue - otherValue;
+    const color = result > 0 ? "#39ff14" : result < 0 ? "#ff5577" : "#cbd5e1";
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `${mineText}<small style="display:block;margin-top:.2rem;color:${color};font-size:.65rem;">vs ${escapeHtml(compared.name)} ${otherText}</small>`;
+  };
+  renderValue("stat-final-hp", mineStats.hp, compareStats.hp, mineStats.hp.toLocaleString(), compareStats.hp.toLocaleString());
+  renderValue("stat-final-atk", mineStats.atk, compareStats.atk, mineStats.atk.toLocaleString(), compareStats.atk.toLocaleString());
+  renderValue("stat-final-spd", mineStats.spd, compareStats.spd, mineStats.spd.toFixed(2), compareStats.spd.toFixed(2));
+  renderValue("stat-final-def", mineStats.def, compareStats.def, mineStats.def.toLocaleString(), compareStats.def.toLocaleString());
+  renderValue("stat-final-range", mineStats.range, compareStats.range, `${mineStats.range}px`, `${compareStats.range}px`);
+  renderValue("stat-final-cd", mineStats.cd, compareStats.cd, `+${mineStats.cd}%`, `+${compareStats.cd}%`);
+  renderValue("stat-final-luck", mineStats.luck, compareStats.luck, `${mineStats.luck}`, `${compareStats.luck}`);
+  renderValue("stat-final-atk-spd", mineStats.interval, compareStats.interval, `${mineStats.interval.toFixed(2)}초`, `${compareStats.interval.toFixed(2)}초`, true);
+  const selectedNameEl = document.getElementById("book-selected-name");
+  if (selectedNameEl) selectedNameEl.textContent = `${mine.name} · 성장/장비 반영 정보  |  비교: ${compared.name} · 기본 전투 데이터`;
 
-  const progress = currentCharacterProgress;
-  const items = characterPlayerItems.get(currentCharacterId) ?? [];
-  const effects = resolvePersistentItemEffects(items);
-
-  const atkLvl = characterSkillsInvested.get("atk") ?? 0;
-  const hpLvl = characterSkillsInvested.get("hp") ?? 0;
-  const cdLvl = characterSkillsInvested.get("cd") ?? 0;
-
-  let finalHp = getLeveledHp(character.maxHp, progress.level);
-  finalHp = Math.round(finalHp * (1.0 + hpLvl * 0.08));
-  if (effects.maxHpMultiplier) {
-    finalHp = Math.round(finalHp * effects.maxHpMultiplier);
-  }
-  const hpEl = document.getElementById("stat-final-hp");
-  if (hpEl) hpEl.textContent = finalHp.toLocaleString();
-
-  let finalAtk = getLeveledAttack(character.attackPower, progress.level);
-  finalAtk = Math.round(finalAtk * (1.0 + atkLvl * 0.07));
-  const atkEl = document.getElementById("stat-final-atk");
-  if (atkEl) atkEl.textContent = finalAtk.toLocaleString();
-
-  let finalSpd = character.speed;
-  const spdEl = document.getElementById("stat-final-spd");
-  if (spdEl) spdEl.textContent = finalSpd.toFixed(1);
-
-  let finalDef = getLeveledDefenseShield(character, progress.level);
-  if (effects.defenseShieldBonus) {
-    finalDef += effects.defenseShieldBonus;
-  }
-  const defEl = document.getElementById("stat-final-def");
-  if (defEl) defEl.textContent = finalDef.toLocaleString();
-
-  const finalRange = character.radius;
-  const rangeEl = document.getElementById("stat-final-range");
-  if (rangeEl) rangeEl.textContent = `${finalRange}px`;
-
-  const cdBonus = cdLvl * 0.10;
-  const cdEl = document.getElementById("stat-final-cd");
-  if (cdEl) cdEl.textContent = `+${Math.round(cdBonus * 100)}%`;
 
   const listEl = document.getElementById("book-character-list");
   if (!listEl) return;
@@ -4159,15 +4443,20 @@ function renderBookTab() {
     const card = document.createElement("button");
     card.type = "button";
     
-    const isMain = char.id === currentCharacterId;
-    card.className = `roster-character-card ${isMain ? "main-character" : ""}`;
+    const isSelected = char.id === compared.id;
+    const isMine = char.id === currentCharacterId;
+    card.className = `roster-character-card ${isSelected ? "main-character" : ""}`;
     card.style.borderColor = char.color;
     
     card.innerHTML = `
-      <div style="background:${char.color}; width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px;"></div>
-      <strong style="color:${isMain ? "#00f2fe" : "#fff"};">${char.name}</strong>
+      <span class="book-character-icon" style="--character-color:${char.color};">${escapeHtml(char.name.slice(0, 1))}</span>
+      <strong class="book-character-name">${isMine ? "내 캐릭터 · " : ""}${escapeHtml(char.name)}</strong>
     `;
-    card.onclick = () => { void openCharacterDetail(char.id); };
+    card.onclick = () => {
+      if (isMine) return;
+      bookSelectedCharacterId = char.id;
+      renderBookTab();
+    };
     listEl.appendChild(card);
   });
 }
@@ -4194,6 +4483,11 @@ function initHubNavigation() {
   // Growth sub tabs
   document.querySelectorAll<HTMLButtonElement>("[data-growth-sub]").forEach((tab) => {
     tab.addEventListener("click", () => {
+      if (tab.disabled) return;
+      // 장비 관리/강화/스킬 사이에서는 이전 카드 선택과 제물 선택을 유지하지 않는다.
+      selectedItemId = null;
+      selectedFeedMaterialIds.clear();
+      isSelectingFeedMaterials = false;
       selectedGrowthSubTab = tab.dataset.growthSub as any;
       renderGrowthTab();
     });
@@ -4246,6 +4540,14 @@ function initHubNavigation() {
       pveSetupOverlay.classList.remove("hidden");
     };
   }
+  const finderBtnSurvival = document.getElementById("finder-btn-survival");
+  if (finderBtnSurvival) finderBtnSurvival.onclick = () => {
+    gameModeModal.classList.add("hidden");
+    pveSetupOverlay.classList.add("hidden");
+    pveDungeonSelect.value = "survival";
+    selectedPveCharacterId = currentCharacterId;
+    startPveDungeon();
+  };
 
   const finderBtnSolo = document.getElementById("finder-btn-solo");
   if (finderBtnSolo) {
@@ -4393,6 +4695,7 @@ updateStatsModeControls(currentMode);
 updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
+initCombatCatalogSubscription();
 initPatchNotesSubscription();
 if (pveCharacterSelectBtn) {
   pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);

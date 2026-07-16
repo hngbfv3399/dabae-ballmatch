@@ -67,6 +67,8 @@ export const pumanConfig: CharacterConfig = {
   tier: 'B',
   role: 'Juggernaut',
   detailedDescription: `푸만은 필드에 자라나는 식물(🌱) 자원을 자가 섭취하며 스택을 무한히 쌓아올리는 성장형 돌격형 전사 캐릭터입니다. 뽀의 맹독 투사체를 날려 적에게 매초 ${SKILL_CONSTANTS.POISON_DPS}의 지속 독 대미지를 유발함과 동시에, 식물 섭취 시 ${SKILL_CONSTANTS.HEAL_ON_EAT} 회복 및 기본 공격 적중 시 소모한 스택x${SKILL_CONSTANTS.HEAL_ON_EAT} 체력 회복을 통해 초반 라인전 유지력을 보완합니다. 또한 식물이 상대방에게 밟힐 경우 스택x${SKILL_CONSTANTS.ATK_PER_STACK} 만큼의 트랩 피해를 선사합니다.`,
+  luck: 16,
+  attackSpeed: 1.0,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

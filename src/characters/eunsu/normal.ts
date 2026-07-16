@@ -18,6 +18,8 @@ export const eunsuConfig: CharacterConfig = {
   tier: 'A',
   role: 'Summoner',
   detailedDescription: '은수는 다수의 분신을 실시간으로 생산하여 전장을 대혼란에 빠뜨리는 소환형 포지션의 캐릭터입니다. 80% 확률로 본체 사양의 약화 버전인 도플갱어 분신을 연속으로 생성해 대전 상대들의 공격 표적을 어지럽히며, 본체는 안전하게 숨은 채 분신들의 누적 타격과 기절 유도를 통해 교란 전술을 펼칩니다.',
+  luck: 25,
+  attackSpeed: 1.5,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

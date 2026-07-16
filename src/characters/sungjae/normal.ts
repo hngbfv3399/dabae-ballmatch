@@ -104,6 +104,8 @@ export const sungjaeConfig: CharacterConfig = {
   tier: 'S',
   role: 'Juggernaut',
   detailedDescription: '성재는 강력한 2페이즈 전투 방식을 보유한 건담 탑승 파이터형 캐릭터입니다. 메카 상태의 우월한 피격 면역과 강력한 광역 레일건 폭발을 통해 진영을 무너뜨리며, 메카가 파괴되더라도 주위에 최후의 자폭 폭발을 먹이고 파일럿 성재가 튀어나와 원거리에서 기만적인 연사를 날려 최후의 역전을 만들어냅니다.',
+  luck: 12,
+  attackSpeed: 0.9,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

@@ -57,6 +57,8 @@ export const junseokConfig: CharacterConfig = {
   skillDescription: `가장 가까운 적의 예상 이동 경로에 차단 폭발을 설치합니다. 기본은 ${SKILL_CONSTANTS.BASE_BLOCK_COUNT}회 폭발(각 ${SKILL_CONSTANTS.BASE_DAMAGE} 피해)이며, 작전 자료 ${SKILL_CONSTANTS.MAX_OPERATION_DATA}스택이면 마지막 포위 폭발이 ${SKILL_CONSTANTS.ENHANCED_DAMAGE} 피해로 강화됩니다.`,
   color: '#7dd3fc', skillChargeRate: 100 / SKILL_CONSTANTS.COOLDOWN, tier: 'A', role: 'Specialist',
   detailedDescription: '해병대 작전병 출신 준석은 평타로 작전 자료를 축적한 뒤, 적의 진행 방향을 예측해 차단 폭발을 배치하는 준비형 전술가입니다.',
+  luck: 17,
+  attackSpeed: 1.0,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════

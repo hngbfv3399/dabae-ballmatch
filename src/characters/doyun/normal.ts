@@ -31,6 +31,8 @@ export const doyunConfig: CharacterConfig = {
   tier: 'C',
   role: 'Guardian',
   detailedDescription: `도윤은 뛰어난 군중 제어(CC)와 생존 장벽을 겸비한 수호형 캐릭터입니다. 스킬 사용 시 공중으로 도약한 뒤 적에게 내려꽂히는 유도 덩크슛 공격을 시전하여 주변 적들을 일시에 기절시키고 멀리 밀쳐냅니다. 돌진이 적에게 적중했을 때에만 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 피해를 막아주는 전용 보호막(Shield)을 생성해, 정확한 판단이 요구되는 리스크-리턴형 캐릭터입니다.`,
+  luck: 10,
+  attackSpeed: 1.0,
 // #endregion CONFIG
 
   // ═══════════════════════════════════════════
