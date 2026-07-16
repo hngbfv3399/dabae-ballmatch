@@ -170,6 +170,9 @@ export interface CharacterState extends CharacterConfig {
   lastContactDmgTime?: number; // 나유타 지배 인형 자폭 충돌 피해 간격 쿨타임 (ms)
   doyunShield?: number; // 도윤 덩크슛 실드 양
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
+  doyunComboHitsLeft?: number; // 도윤 적중 후 추가 덩크 횟수
+  doyunComboTimer?: number; // 도윤 추가 덩크까지 남은 시간 (초)
+  doyunDodgeFlashTimeLeft?: number; // 도윤 회피 연출 잔여 시간 (초)
   defenseShield?: number; // 기본 DEF에서 생성된 영구 보호막의 현재 값
   maxDefenseShield?: number; // 기본 DEF와 레벨 성장으로 계산한 보호막 최대값
   runShield?: number; // PvE 런 아이템으로 얻는 보호막
