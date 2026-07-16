@@ -228,7 +228,7 @@ const BOSS_CHALLENGER_COUNT = 4;
 let tournamentState: TournamentState | null = null;
 type PveProgress = { level: number; experience: number; experienceInCurrentLevel: number; experienceToNextLevel: number; isMaxLevel: boolean; healthMultiplier: number; attackMultiplier: number; defenseShieldBonus: number; unlockedSkillLevels?: number[]; nextSkillUnlockLevel?: number | null; totalDungeonClears: number; unlockedDungeonIds?: string[] };
 type PveDungeonReward = { dungeonId: string; firstClearExperience: number; repeatClearExperience: number };
-type PveRun = { characterId: string; dungeonId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; survivalCoins: number; modifiers: PveRunModifiers };
+type PveRun = { characterId: string; dungeonId: string; stage: number; startedAt: number; currentHp: number; currentDefenseShield: number; currentShield: number; maxHp: number; rewardEligible: boolean; survivalCoins: number; survivalExperience: number; modifiers: PveRunModifiers };
 let pveRun: PveRun | null = null;
 let selectedPveCharacterId: string | null = null;
 let pveProgressByCharacter = new Map<string, PveProgress>();
@@ -237,7 +237,7 @@ let pveAdvancePending = false;
 let pveDungeonRewards = new Map<string, PveDungeonReward>();
 
 const PVE_DUNGEONS = {
-  survival: { number: "∞", name: "균열 생존전", description: "근거리·원거리·빠른 몬스터 물량을 버티며 코인을 모으는 무한 웨이브입니다.", requiresFirstDungeonClear: false, stageCount: Number.MAX_SAFE_INTEGER, createStage: createSurvivalWave },
+  survival: { number: "∞", name: "균열 생존전", description: "근거리·원거리·빠른 몬스터 물량을 버티며 코인과 경험치를 모으는 무한 웨이브입니다.", requiresFirstDungeonClear: false, stageCount: Number.MAX_SAFE_INTEGER, createStage: createSurvivalWave },
   [SLIME_MEADOW_DUNGEON_ID]: {
     number: "01",
     name: "초원의 슬라임 소굴",
@@ -2414,17 +2414,21 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
         updateSurvivalHud();
         pveAdvancePending = false;
         if (winnerTitle) winnerTitle.textContent = "SURVIVAL RESULT";
-        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player?.color ?? "#a78bfa"}">균열 생존전 종료</div><div class="win-desc">서버가 완료 웨이브 기준 코인을 정산하고 있습니다.</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>생존 시간</span><strong>${formatSurvivalTime(result.survivalSeconds * 1000)}</strong></div><div class="stat-row"><span>도달 웨이브</span><strong>${result.clearedWaves}</strong></div><div class="stat-row"><span>처치 수</span><strong>${result.kills}</strong></div><div class="stat-row"><span>가한 피해</span><strong>${result.damageDealt}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${result.damageTaken}</strong></div><div class="stat-row"><span>총 획득 코인</span><strong id="survival-result-coins" class="text-neon-yellow">정산 중…</strong></div></div>${runSummary}`;
+        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player?.color ?? "#a78bfa"}">균열 생존전 종료</div><div class="win-desc">서버가 완료 웨이브 기준 코인과 경험치를 정산하고 있습니다.</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>생존 시간</span><strong>${formatSurvivalTime(result.survivalSeconds * 1000)}</strong></div><div class="stat-row"><span>도달 웨이브</span><strong>${result.clearedWaves}</strong></div><div class="stat-row"><span>처치 수</span><strong>${result.kills}</strong></div><div class="stat-row"><span>가한 피해</span><strong>${result.damageDealt}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${result.damageTaken}</strong></div><div class="stat-row"><span>총 획득 코인</span><strong id="survival-result-coins" class="text-neon-yellow">정산 중…</strong></div><div class="stat-row"><span>총 획득 경험치</span><strong id="survival-result-experience" style="color:var(--neon-cyan)">정산 중…</strong></div></div>${runSummary}`;
         modalCloseBtn.textContent = "로비로 돌아가기";
         winnerModal.classList.remove("hidden");
         void convexClient.mutation(api.progression.recordSurvivalRun, { characterId: run.characterId, ...result })
           .then((settlement) => {
             const coinResult = document.getElementById("survival-result-coins");
+            const experienceResult = document.getElementById("survival-result-experience");
             if (coinResult) coinResult.textContent = `+${settlement.coinsGranted} 코인`;
+            if (experienceResult) experienceResult.textContent = `+${settlement.experienceGranted} XP`;
           })
           .catch(() => {
             const coinResult = document.getElementById("survival-result-coins");
+            const experienceResult = document.getElementById("survival-result-experience");
             if (coinResult) coinResult.textContent = "정산 실패 (재시도 필요)";
+            if (experienceResult) experienceResult.textContent = "정산 실패 (재시도 필요)";
           });
         return;
       }
@@ -2445,7 +2449,9 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
     if (run.dungeonId === "survival") {
       const clearedWave = run.stage;
       const coins = clearedWave * 5;
+      const experience = clearedWave * 10;
       run.survivalCoins += coins;
+      run.survivalExperience += experience;
       if (clearedWave % 5 === 0) {
         run.currentHp = player.maxHp;
         run.currentDefenseShield = player.maxDefenseShield ?? 0;
@@ -2454,7 +2460,7 @@ function showWinner(winner: CharacterState | null, allChars: CharacterState[]) {
       pveAdvancePending = true;
       const continueWave = () => {
         if (winnerTitle) winnerTitle.textContent = "WAVE CLEARED";
-        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player.color}">웨이브 ${clearedWave} 생존!</div><div class="win-desc">+${coins} 코인${clearedWave % 5 === 0 ? " · 5웨이브 회복 완료" : ""}</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>다음 웨이브</span><strong>${run.stage}</strong></div><div class="stat-row"><span>누적 코인</span><strong class="text-neon-yellow">${run.survivalCoins}</strong></div><div class="stat-row"><span>가한 피해</span><strong>${Math.round(player.totalDamageDealt ?? 0)}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${Math.round(player.totalDamageTaken ?? 0)}</strong></div></div>`;
+        winnerInfo.innerHTML = `<div class="winner-trophy">♾️</div><div class="win-name" style="color:${player.color}">웨이브 ${clearedWave} 생존!</div><div class="win-desc">+${coins} 코인 · +${experience} XP${clearedWave % 5 === 0 ? " · 5웨이브 회복 완료" : ""}</div><div class="char-stats" style="margin-top:1rem"><div class="stat-row"><span>다음 웨이브</span><strong>${run.stage}</strong></div><div class="stat-row"><span>누적 코인</span><strong class="text-neon-yellow">${run.survivalCoins}</strong></div><div class="stat-row"><span>누적 경험치</span><strong style="color:var(--neon-cyan)">${run.survivalExperience} XP</strong></div><div class="stat-row"><span>가한 피해</span><strong>${Math.round(player.totalDamageDealt ?? 0)}</strong></div><div class="stat-row"><span>받은 피해</span><strong>${Math.round(player.totalDamageTaken ?? 0)}</strong></div></div>`;
         modalCloseBtn.textContent = "다음 웨이브";
         winnerModal.classList.remove("hidden");
       };
@@ -3401,7 +3407,7 @@ function startPveDungeon() {
     baseMaxDefenseShield += effects.defenseShieldBonus;
   }
 
-  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: baseMaxHp, currentHp: baseMaxHp, currentDefenseShield: baseMaxDefenseShield, currentShield: 0, rewardEligible: true, survivalCoins: 0, modifiers: createPveRunModifiers() };
+  pveRun = { characterId: character.id, dungeonId, stage, startedAt: Date.now(), maxHp: baseMaxHp, currentHp: baseMaxHp, currentDefenseShield: baseMaxDefenseShield, currentShield: 0, rewardEligible: true, survivalCoins: 0, survivalExperience: 0, modifiers: createPveRunModifiers() };
   showAugmentChoice(pveRun, 0, startPveStage);
 }
 

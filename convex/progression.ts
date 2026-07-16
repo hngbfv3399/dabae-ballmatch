@@ -29,6 +29,7 @@ const LABORATORY_STAGE_REPEAT_CLEAR_EXPERIENCE = LABORATORY_REPEAT_CLEAR_EXPERIE
 const STAGE_CLEAR_COIN_REWARD = 20;
 const DUNGEON_CLEAR_COIN_REWARD = 100;
 const SURVIVAL_COIN_PER_CLEARED_WAVE = 5;
+const SURVIVAL_EXPERIENCE_PER_CLEARED_WAVE = 10;
 const MAX_SURVIVAL_WAVES_PER_RUN = 10_000;
 const MAX_SURVIVAL_SECONDS_PER_RUN = 24 * 60 * 60;
 
@@ -213,8 +214,8 @@ export const rewardCoins = mutation({
   },
 });
 
-// 생존전 보상은 프론트가 전달한 코인을 신뢰하지 않는다. 완료 웨이브만 받아
-// 서버가 보상 합계를 계산하고 개인 최고 기록을 같은 트랜잭션에서 갱신한다.
+// 생존전 보상은 프론트가 전달한 보상 값을 신뢰하지 않는다. 완료 웨이브만 받아
+// 서버가 코인·경험치 합계를 계산하고 개인 최고 기록을 같은 트랜잭션에서 갱신한다.
 export const recordSurvivalRun = mutation({
   args: {
     characterId: v.string(),
@@ -235,8 +236,9 @@ export const recordSurvivalRun = mutation({
     const kills = Math.floor(args.kills);
     const damageDealt = Math.floor(args.damageDealt);
     const damageTaken = Math.floor(args.damageTaken);
-    // 1웨이브 5코인, 2웨이브 10코인 … 완료 웨이브의 합계.
+    // 1웨이브 5코인·10XP, 2웨이브 10코인·20XP … 완료 웨이브의 합계.
     const coinsGranted = SURVIVAL_COIN_PER_CLEARED_WAVE * clearedWaves * (clearedWaves + 1) / 2;
+    const experienceGranted = SURVIVAL_EXPERIENCE_PER_CLEARED_WAVE * clearedWaves * (clearedWaves + 1) / 2;
     const progress = await ctx.db
       .query("characterProgress")
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
@@ -244,7 +246,12 @@ export const recordSurvivalRun = mutation({
     if (!progress) throw new Error("Character not found");
 
     const now = Date.now();
-    await ctx.db.patch(progress._id, { coins: progress.coins + coinsGranted, updatedAt: now });
+    const newExperience = progress.experience + experienceGranted;
+    await ctx.db.patch(progress._id, {
+      coins: progress.coins + coinsGranted,
+      experience: newExperience,
+      updatedAt: now,
+    });
     const record = await ctx.db
       .query("survivalCharacterRecords")
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
@@ -262,7 +269,14 @@ export const recordSurvivalRun = mutation({
     };
     if (record) await ctx.db.patch(record._id, nextRecord);
     else await ctx.db.insert("survivalCharacterRecords", nextRecord);
-    return { coinsGranted, newCoins: progress.coins + coinsGranted, record: nextRecord };
+    return {
+      coinsGranted,
+      experienceGranted,
+      newCoins: progress.coins + coinsGranted,
+      newExperience,
+      growth: growthSummary(newExperience),
+      record: nextRecord,
+    };
   },
 });
 
