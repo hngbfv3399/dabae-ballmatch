@@ -4661,7 +4661,10 @@ function initCombatSettings() {
   const speedButtons = document.querySelectorAll<HTMLButtonElement>("[data-game-speed]");
   speedButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      gameSpeedMultiplier = Number(button.dataset.gameSpeed);
+      const requestedSpeed = Number(button.dataset.gameSpeed);
+      if (![1, 1.5, 2, 2.5].includes(requestedSpeed)) return;
+      gameSpeedMultiplier = requestedSpeed;
+      gameLounge?.setSimulationSpeed(gameSpeedMultiplier);
       speedButtons.forEach((candidate) => {
         const isSelected = candidate === button;
         candidate.classList.toggle("active", isSelected);

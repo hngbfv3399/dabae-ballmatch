@@ -668,6 +668,12 @@ export class GameLounge {
     this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
   }
 
+  /** 모든 게임 모드가 공유하는 전투 시뮬레이션 배속. 게임 종료 연출 중에는 유지한다. */
+  public setSimulationSpeed(multiplier: number): void {
+    if (this.isGameOver) return;
+    this.simulationSpeed = Math.min(2.5, Math.max(1, multiplier));
+  }
+
   /**
    * 시뮬레이션을 정지합니다.
    */
