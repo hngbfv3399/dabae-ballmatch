@@ -12,14 +12,15 @@ This document maps character-specific file paths and `#region` maps to allow AI 
 
 ## 1. Chanhwi (chanhwi)
 - **File**: `src/characters/chanhwi/normal.ts`
-- **Role**: Nuker | **Tier**: S
+- **Role**: Juggernaut | **Tier**: A
 - **Region Map**:
-  - `CONSTANTS`: Timing durations (17.4s), quotes, scale multiplier, blast ranges.
-  - `CONFIG`: Config fields (tier, role, color).
-  - `SKILL_TRIGGER`: Initial teleport setup.
-  - `UPDATE`: Slide -> Cast -> Blast phase ticks.
-  - `DAMAGE`: 97% incoming damage reduction.
-  - `RENDER`: Screen shake, overlay dark, text rendering, portal lines.
+  - `CONSTANTS`: 마천결계 지속·반경·피해·둔화·마기 폭발 수치.
+  - `CONFIG`: 근거리 영역 장악형 기본 수치와 스킬 설명.
+  - `SKILL_TRIGGER`: 마천결계 개시 이펙트.
+  - `UPDATE`: 결계 피해·둔화·마기 스택과 종료 폭발.
+  - `BASIC_ATTACK`: 마기 스택 획득.
+  - `DEATH`: 결계·마기 상태 정리.
+  - `RENDER`: 결계 반경과 마기 스택 시각화.
 
 ## 2. Su (su)
 - **File**: `src/characters/su/normal.ts`
