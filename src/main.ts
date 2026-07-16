@@ -40,14 +40,14 @@ const focusModeBtn = document.getElementById("focus-mode-btn") as HTMLButtonElem
 const gameCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 const pveCommandPanel = document.getElementById("pve-command-panel") as HTMLElement;
 const pvpSetupPanel = document.getElementById("pvp-setup-panel") as HTMLElement;
-const pveCharacterSelectBtn = document.getElementById("pve-character-select-btn") as HTMLButtonElement;
-const pveCharacterSelectAvatar = document.getElementById("pve-character-select-avatar") as HTMLElement;
-const pveCharacterSelectName = document.getElementById("pve-character-select-name") as HTMLElement;
-const pveCharacterSelectStats = document.getElementById("pve-character-select-stats") as HTMLElement;
+const pveCharacterSelectBtn = document.getElementById("pve-character-select-btn") as HTMLButtonElement | null;
+const pveCharacterSelectAvatar = document.getElementById("pve-character-select-avatar") as HTMLElement | null;
+const pveCharacterSelectName = document.getElementById("pve-character-select-name") as HTMLElement | null;
+const pveCharacterSelectStats = document.getElementById("pve-character-select-stats") as HTMLElement | null;
 const pveStartBtn = document.getElementById("pve-start-btn") as HTMLButtonElement;
-const pveCharacterModal = document.getElementById("pve-character-modal") as HTMLElement;
-const pveCharacterModalClose = document.getElementById("pve-character-modal-close") as HTMLButtonElement;
-const pveCharacterList = document.getElementById("pve-character-list") as HTMLElement;
+const pveCharacterModal = document.getElementById("pve-character-modal") as HTMLElement | null;
+const pveCharacterModalClose = document.getElementById("pve-character-modal-close") as HTMLButtonElement | null;
+const pveCharacterList = document.getElementById("pve-character-list") as HTMLElement | null;
 const pveDungeonSelect = document.getElementById("pve-dungeon-select") as HTMLSelectElement;
 
 const matchSelectionSlots = document.getElementById("match-selection-slots") as HTMLElement;
@@ -3157,22 +3157,29 @@ function getPveProgress(characterId: string): PveProgress {
 function updatePveSelectionUI() {
   const selected = availableCharacters.find((character) => character.id === selectedPveCharacterId);
   if (!selected) {
-    pveCharacterSelectAvatar.textContent = "?";
-    pveCharacterSelectName.textContent = "캐릭터 선택";
-    pveCharacterSelectStats.textContent = "선택 후 레벨과 능력치를 확인합니다.";
+    if (pveCharacterSelectAvatar) pveCharacterSelectAvatar.textContent = "?";
+    if (pveCharacterSelectName) pveCharacterSelectName.textContent = "캐릭터 선택";
+    if (pveCharacterSelectStats) pveCharacterSelectStats.textContent = "선택 후 레벨과 능력치를 확인합니다.";
     pveStartBtn.disabled = true;
     return;
   }
   const progress = getPveProgress(selected.id);
-  pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
-  pveCharacterSelectAvatar.style.color = selected.color;
-  pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
-  const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
-  pveCharacterSelectStats.textContent = `DEF ${getLeveledDefenseShield(selected, progress)} · HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  if (pveCharacterSelectAvatar) {
+    pveCharacterSelectAvatar.textContent = selected.name.slice(0, 1);
+    pveCharacterSelectAvatar.style.color = selected.color;
+  }
+  if (pveCharacterSelectName) {
+    pveCharacterSelectName.textContent = `${selected.name} · Lv.${progress.level}`;
+  }
+  if (pveCharacterSelectStats) {
+    const nextSkillUnlock = getNextSkillUnlockLevel(progress.level);
+    pveCharacterSelectStats.textContent = `DEF ${getLeveledDefenseShield(selected, progress)} · HP ${getLeveledHp(selected.maxHp, progress)} · ATK ${getLeveledAttack(selected.attackPower, progress)} · ${nextSkillUnlock ? `다음 스킬 Lv.${nextSkillUnlock}` : "스킬 해금 완료"} · EXP ${getExperienceLabel(progress)} · 던전 ${progress.totalDungeonClears}회 클리어`;
+  }
   pveStartBtn.disabled = false;
 }
 
 function renderPveCharacterList() {
+  if (!pveCharacterList) return;
   pveCharacterList.innerHTML = "";
   const randomButton = document.createElement("button");
   randomButton.type = "button";
@@ -3182,7 +3189,7 @@ function renderPveCharacterList() {
     const random = availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
     if (!random) return;
     selectedPveCharacterId = random.id;
-    pveCharacterModal.classList.add("hidden");
+    pveCharacterModal?.classList.add("hidden");
     updatePveSelectionUI();
   });
   pveCharacterList.appendChild(randomButton);
@@ -3195,7 +3202,7 @@ function renderPveCharacterList() {
     button.innerHTML = `<div class="row-identity">${getAvatarHTML(character.name, character.image)}<div><div class="char-name">${character.name}</div><div class="row-skill-name">Lv.${progress.level} · ${character.role}</div></div></div><div class="char-stats row-stats"><span>DEF <b>${getLeveledDefenseShield(character, progress)}</b></span><span>HP <b>${getLeveledHp(character.maxHp, progress)}</b></span><span>ATK <b>${getLeveledAttack(character.attackPower, progress)}</b></span></div><div class="row-winrate">EXP <strong class="text-neon-yellow">${getExperienceLabel(progress)}</strong><small>${nextSkillUnlock ? `다음 스킬 해금 Lv.${nextSkillUnlock}` : "스킬 해금 완료 · 숙련 강화 준비"} · 던전 ${progress.totalDungeonClears}회 클리어</small></div>`;
     button.addEventListener("click", () => {
       selectedPveCharacterId = character.id;
-      pveCharacterModal.classList.add("hidden");
+      pveCharacterModal?.classList.add("hidden");
       updatePveSelectionUI();
     });
     pveCharacterList.appendChild(button);
@@ -3221,7 +3228,7 @@ function initPveProgressSubscription() {
         ]);
         pveDungeonRewards = new Map((overview.dungeons as PveDungeonReward[]).map((dungeon) => [dungeon.dungeonId, dungeon]));
         updatePveSelectionUI();
-        if (!pveCharacterModal.classList.contains("hidden")) renderPveCharacterList();
+        if (pveCharacterModal && !pveCharacterModal.classList.contains("hidden")) renderPveCharacterList();
       }
     );
   }
@@ -3239,7 +3246,7 @@ function startPveDungeon() {
   const character = availableCharacters.find((entry) => entry.id === selectedPveCharacterId);
   if (!character) return;
   const progress = getPveProgress(character.id);
-  pveCharacterModal.classList.add("hidden");
+  pveCharacterModal?.classList.add("hidden");
   gameModeModal.classList.add("hidden");
   const stage = 1;
   const dungeonId = pveDungeonSelect.value;
@@ -3513,6 +3520,8 @@ function startUserSession() {
   initCosmetics();
   initPersistentItems();
   initPveProgressSubscription();
+
+  selectedPveCharacterId = currentCharacterId;
 
   progressUnsubscribe?.();
   progressUnsubscribe = convexClient.onUpdate(
@@ -4380,8 +4389,12 @@ updateTeamGameTypeVisibility();
 initLobby();
 subscribeToGlobalData();
 initPatchNotesSubscription();
-pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);
-pveCharacterModalClose.addEventListener("click", () => pveCharacterModal.classList.add("hidden"));
+if (pveCharacterSelectBtn) {
+  pveCharacterSelectBtn.addEventListener("click", openPveCharacterModal);
+}
+if (pveCharacterModalClose) {
+  pveCharacterModalClose.addEventListener("click", () => pveCharacterModal?.classList.add("hidden"));
+}
 pveStartBtn.addEventListener("click", startPveDungeon);
 pveDungeonSelect.addEventListener("change", updatePveDungeonUI);
 fillRandomSlotsBtn.addEventListener("click", fillMatchSlotsRandomly);
