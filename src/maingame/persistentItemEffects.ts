@@ -24,33 +24,22 @@ export interface CatalogItem {
   characterId?: string;
   isActive: boolean;
   effects: PersistentItemEffects;
-  isUnlocked?: boolean;
 }
 
-export interface CharacterItemLoadout {
-  clientId: string;
-  characterId: string;
-  slot1ItemId?: string;
-  slot2ItemId?: string;
-  slot3ItemId?: string;
-  updatedAt: number;
-}
-
-export function getEquippedPersistentItemIds(loadout: CharacterItemLoadout | undefined): string[] {
-  if (!loadout) return [];
-  const ids: string[] = [];
-  if (loadout.slot1ItemId) ids.push(loadout.slot1ItemId);
-  if (loadout.slot2ItemId) ids.push(loadout.slot2ItemId);
-  if (loadout.slot3ItemId) ids.push(loadout.slot3ItemId);
-  return ids;
+export interface PlayerItem {
+  itemId: string;
+  name: string;
+  itemCatalogId: string;
+  equippedSlot: number;
+  effects: PersistentItemEffects;
+  level: number;
+  rarity: string;
+  experience: number;
 }
 
 export function resolvePersistentItemEffects(
-  catalog: CatalogItem[],
-  loadout: CharacterItemLoadout | undefined,
-  characterId: string
+  playerItems: PlayerItem[]
 ): PersistentItemEffects {
-  const equippedIds = getEquippedPersistentItemIds(loadout);
   const effects: PersistentItemEffects = {
     maxHpMultiplier: 1,
     speedMultiplier: 1,
@@ -67,13 +56,9 @@ export function resolvePersistentItemEffects(
     pulseInterval: 0,
   };
 
-  for (const itemId of equippedIds) {
-    const item = catalog.find((entry) => entry.itemId === itemId && entry.isActive);
-    if (!item) continue;
+  const equippedItems = playerItems.filter((item) => item.equippedSlot >= 1 && item.equippedSlot <= 8);
 
-    // Verify character restrictions if any
-    if (item.characterId && item.characterId !== characterId) continue;
-
+  for (const item of equippedItems) {
     if (item.effects.maxHpMultiplier) {
       effects.maxHpMultiplier = (effects.maxHpMultiplier ?? 1) * item.effects.maxHpMultiplier;
     }
@@ -107,27 +92,28 @@ export function resolvePersistentItemEffects(
 }
 
 export function applyPersistentItemStats(state: CharacterState, effects: PersistentItemEffects): void {
-  // Apply max HP multiplier
+  // HP multiplier
   if (effects.maxHpMultiplier && effects.maxHpMultiplier !== 1) {
     state.maxHp = Math.round(state.maxHp * effects.maxHpMultiplier);
     state.hp = state.maxHp;
   }
 
-  // Apply speed multiplier
+  // Speed multiplier
   if (effects.speedMultiplier && effects.speedMultiplier !== 1) {
-    state.speed = state.speed * effects.speedMultiplier;
+    state.speed = state.speed * Math.min(2.5, effects.speedMultiplier); // cap speed multiplier at 2.5
   }
 
+  // Attack power multiplier
   if (effects.attackMultiplier && effects.attackMultiplier !== 1) {
     state.attackPower = Math.round(state.attackPower * effects.attackMultiplier);
   }
 
-  // Apply base attack range bonus
+  // Range bonus
   if (effects.baseAttackRangeBonus) {
     state.baseAttackRange = state.baseAttackRange + effects.baseAttackRangeBonus;
   }
 
-  // Apply defense shield bonus
+  // Defense shield bonus
   if (effects.defenseShieldBonus) {
     state.maxDefenseShield = (state.maxDefenseShield ?? 0) + effects.defenseShieldBonus;
     state.defenseShield = state.maxDefenseShield;
@@ -153,17 +139,8 @@ export function applyPersistentItemStats(state: CharacterState, effects: Persist
   }
 }
 
-export function getPersistentItemDisplayEffects(catalog: CatalogItem[], loadout: CharacterItemLoadout | undefined, characterId: string): string[] {
-  const equippedIds = getEquippedPersistentItemIds(loadout);
-  const displays: string[] = [];
-
-  for (const itemId of equippedIds) {
-    const item = catalog.find((entry) => entry.itemId === itemId && entry.isActive);
-    if (item) {
-      if (item.characterId && item.characterId !== characterId) continue;
-      displays.push(`${item.name} (${item.description})`);
-    }
-  }
-
-  return displays;
+export function getPersistentItemDisplayEffects(playerItems: PlayerItem[]): string[] {
+  return playerItems
+    .filter((item) => item.equippedSlot >= 1 && item.equippedSlot <= 8)
+    .map((item) => `${item.name} (Lv.${item.level})`);
 }

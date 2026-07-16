@@ -14,7 +14,6 @@ import {
   experienceRequiredForLevel,
   isV3CharacterId,
   isDungeonId,
-  kstDate,
   levelForExperience,
 } from "./v3Constants";
 import { ensureSeasonReset } from "./season";
@@ -25,7 +24,10 @@ const FIRST_STAGE_FIRST_CLEAR_EXPERIENCE = FIRST_DUNGEON_FIRST_CLEAR_EXPERIENCE 
 const FIRST_STAGE_REPEAT_CLEAR_EXPERIENCE = FIRST_DUNGEON_REPEAT_CLEAR_EXPERIENCE / 5;
 const LABORATORY_STAGE_FIRST_CLEAR_EXPERIENCE = LABORATORY_FIRST_CLEAR_EXPERIENCE / 5;
 const LABORATORY_STAGE_REPEAT_CLEAR_EXPERIENCE = LABORATORY_REPEAT_CLEAR_EXPERIENCE / 5;
-const SKILL_UNLOCK_LEVELS = [5, 10, 15, 20, 25, 30] as const;
+
+// 코인 지급 상수 정의
+const STAGE_CLEAR_COIN_REWARD = 20;
+const DUNGEON_CLEAR_COIN_REWARD = 100;
 
 function assertCharacterId(characterId: string): void {
   if (!isV3CharacterId(characterId)) throw new Error("Unknown character ID");
@@ -66,15 +68,12 @@ function experienceAtLevelStart(level: number): number {
 export function growthSummary(experience: number) {
   const level = levelForExperience(experience);
   const isMaxLevel = level === MAX_CHARACTER_LEVEL;
-  // 5레벨 단위는 새 스킬을 해금하는 구간이므로, 스탯은 나머지 레벨에서만 상승한다.
   const statGrowthSteps = Math.max(0, (level - 1) - Math.floor(level / 5));
   const healthMultiplier = 1 + 0.02 * statGrowthSteps;
   const attackMultiplier = 1 + 0.0125 * statGrowthSteps;
   const defenseShieldBonus = statGrowthSteps;
   const experienceToNextLevel =
     isMaxLevel ? 0 : experienceRequiredForLevel(level);
-  const unlockedSkillLevels = SKILL_UNLOCK_LEVELS.filter((unlockLevel) => level >= unlockLevel);
-  const nextSkillUnlockLevel = SKILL_UNLOCK_LEVELS.find((unlockLevel) => level < unlockLevel) ?? null;
 
   return {
     level,
@@ -85,12 +84,10 @@ export function growthSummary(experience: number) {
     healthMultiplier,
     attackMultiplier,
     defenseShieldBonus,
-    unlockedSkillLevels,
-    nextSkillUnlockLevel,
   };
 }
 
-// 새 클라이언트가 로비에 들어올 때 호출하는 안전한 멱등 초기화다.
+// 스키마 배포 후 강제 동기화용 시딩 액션
 export const ensureInitialState = mutation({
   args: {},
   handler: async (ctx) => {
@@ -108,6 +105,8 @@ export const ensureInitialState = mutation({
           characterId,
           level: 1,
           experience: 0,
+          coins: 1000,               // 기본 1000코인
+          skillPoints: 0,
           totalDungeonClears: 0,
           updatedAt: now,
         });
@@ -127,43 +126,55 @@ export const ensureInitialState = mutation({
   },
 });
 
-export const getOverview = query({
-  args: {},
-  handler: async (ctx) => {
-    const progressByCharacter = new Map<string, { level: number; experience: number; totalDungeonClears: number; updatedAt: number }>();
-    const progress = await ctx.db.query("characterProgress").take(V3_CHARACTER_IDS.length);
-    for (const entry of progress) progressByCharacter.set(entry.characterId, entry);
+// 로그인 검증을 위한 캐릭터 프로필 조회 API
+export const getCharacterProgress = query({
+  args: { characterId: v.string() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    return await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+  },
+});
 
-    const characters = V3_CHARACTER_IDS.map((characterId) => {
-      const entry = progressByCharacter.get(characterId);
-      const experience = entry?.experience ?? 0;
-      return {
-        characterId,
-        ...growthSummary(experience),
-        totalDungeonClears: entry?.totalDungeonClears ?? 0,
-        updatedAt: entry?.updatedAt ?? null,
-      };
-    });
+// 로비 종합 정보 조회 API
+export const getOverview = query({
+  args: { characterId: v.string() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    const entry = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    
+    if (!entry) return null;
 
     const firstDungeon = await ctx.db
       .query("dungeonProgress")
       .withIndex("by_dungeonId", (q) => q.eq("dungeonId", FIRST_DUNGEON_ID))
       .unique();
 
-    const laboratoryUnlockedCharacterIds: string[] = [];
-    for (const characterId of V3_CHARACTER_IDS) {
+    const isLaboratoryUnlocked = await (async () => {
       const clear = await ctx.db
         .query("dungeonCharacterRecords")
         .withIndex("by_dungeonId_and_characterId", (q) =>
-          q.eq("dungeonId", FIRST_DUNGEON_ID).eq("characterId", characterId)
+          q.eq("dungeonId", FIRST_DUNGEON_ID).eq("characterId", args.characterId)
         )
         .unique();
-      if (clear && clear.clearCount > 0) laboratoryUnlockedCharacterIds.push(characterId);
-    }
+      return !!(clear && clear.clearCount > 0);
+    })();
 
     return {
-      characters,
-      laboratoryUnlockedCharacterIds,
+      character: {
+        characterId: args.characterId,
+        ...growthSummary(entry.experience),
+        coins: entry.coins,
+        skillPoints: entry.skillPoints,
+        totalDungeonClears: entry.totalDungeonClears,
+        updatedAt: entry.updatedAt,
+      },
+      isLaboratoryUnlocked,
       dungeons: DUNGEON_IDS.map((dungeonId) => ({
         dungeonId,
         ...getDungeonRewardConfig(dungeonId),
@@ -178,87 +189,118 @@ export const getOverview = query({
   },
 });
 
-export const getClientGachaProgress = query({
-  args: { clientId: v.string() },
+// 코인 보상 연동 뮤테이션
+export const rewardCoins = mutation({
+  args: { characterId: v.string(), amount: v.number() },
   handler: async (ctx, args) => {
-    const state = await ctx.db
-      .query("anonymousGachaStates")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique();
-    const today = kstDate(Date.now());
-    const dailyDrawsUsed = state?.dailyResetDate === today ? state.dailyDrawsUsed : 0;
-    const completedPlayCount = state?.completedPlayCount ?? 0;
-    const bonusDrawsUsed = state?.bonusDrawsUsed ?? 0;
-
-    return {
-      dailyDrawsRemaining: Math.max(0, 5 - dailyDrawsUsed),
-      // 보너스 뽑기 카운트는 PvP 경기 수가 아닌 던전 클리어 수만 집계한다.
-      completedDungeonClears: completedPlayCount,
-      bonusDrawsAvailable: Math.max(0, Math.floor(completedPlayCount / 3) - bonusDrawsUsed),
-      experiencePoints: state?.experiencePoints ?? 0,
-    };
-  },
-});
-
-export const listExperiencePointItems = query({
-  args: { clientId: v.string() },
-  handler: async (ctx, args) => {
-    if (!args.clientId.trim()) return [];
-    const items = await ctx.db
-      .query("experiencePointItems")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .order("desc")
-      .take(100);
-    const legacyPoints = (await ctx.db
-      .query("anonymousGachaStates")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique())?.experiencePoints ?? 0;
-    return [...items, ...(legacyPoints > 0 ? [{ _id: "legacy-points", amount: legacyPoints, rarity: "common" as const, createdAt: 0, isLegacy: true }] : [])];
-  },
-});
-
-export const useExperiencePointItem = mutation({
-  args: { clientId: v.string(), characterId: v.string(), itemId: v.union(v.id("experiencePointItems"), v.literal("legacy-points")) },
-  handler: async (ctx, args) => {
-    if (!args.clientId.trim()) throw new Error("Client ID is required");
     assertCharacterId(args.characterId);
-
-    const gachaState = await ctx.db
-      .query("anonymousGachaStates")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique();
-    let amount: number;
-    if (args.itemId === "legacy-points") {
-      amount = gachaState?.experiencePoints ?? 0;
-      if (amount <= 0 || !gachaState) throw new Error("Experience point item not found");
-    } else {
-      const item = await ctx.db.get(args.itemId);
-      if (!item || item.clientId !== args.clientId) throw new Error("Experience point item not found");
-      amount = item.amount;
-      await ctx.db.delete(item._id);
-    }
-
-    const characterProgress = await ctx.db
+    const progress = await ctx.db
       .query("characterProgress")
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
       .unique();
-    if (!characterProgress) throw new Error("Character progress has not been initialized");
+    if (!progress) throw new Error("Character not found");
 
     const now = Date.now();
-    const experience = characterProgress.experience + amount;
-    await ctx.db.patch(characterProgress._id, {
-      experience,
-      level: levelForExperience(experience),
+    const newCoins = progress.coins + args.amount;
+    await ctx.db.patch(progress._id, {
+      coins: newCoins,
       updatedAt: now,
     });
-    if (args.itemId === "legacy-points" && gachaState) {
-      await ctx.db.patch(gachaState._id, { experiencePoints: 0, updatedAt: now });
-    }
-
-    return { amount, ...growthSummary(experience) };
+    return { success: true, newCoins };
   },
 });
 
+// 캐릭터 스킬 투자 현황 조회 API
+export const getCharacterSkills = query({
+  args: { characterId: v.string() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    return await ctx.db
+      .query("characterSkills")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .collect();
+  },
+});
+
+// 스킬 포인트 투자 뮤테이션
+export const investSkillPoint = mutation({
+  args: { characterId: v.string(), skillId: v.string() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    const progress = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (!progress) throw new Error("Character progress not found");
+    if (progress.skillPoints < 1) throw new Error("Not enough skill points");
+
+    const existingSkill = await ctx.db
+      .query("characterSkills")
+      .withIndex("by_characterId_and_skillId", (q) =>
+        q.eq("characterId", args.characterId).eq("skillId", args.skillId)
+      )
+      .unique();
+
+    const now = Date.now();
+    if (existingSkill) {
+      if (existingSkill.investedPoints >= 3) {
+        throw new Error("Skill is already at max level (3)");
+      }
+      await ctx.db.patch(existingSkill._id, {
+        investedPoints: existingSkill.investedPoints + 1,
+      });
+    } else {
+      await ctx.db.insert("characterSkills", {
+        characterId: args.characterId,
+        skillId: args.skillId,
+        investedPoints: 1,
+      });
+    }
+
+    await ctx.db.patch(progress._id, {
+      skillPoints: progress.skillPoints - 1,
+      updatedAt: now,
+    });
+
+    return { success: true, newSkillPoints: progress.skillPoints - 1 };
+  },
+});
+
+// 스킬 포인트 초기화 (100코인 소모)
+export const resetSkills = mutation({
+  args: { characterId: v.string() },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    const progress = await ctx.db
+      .query("characterProgress")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (!progress) throw new Error("Character progress not found");
+    if (progress.coins < 100) throw new Error("코인이 부족합니다. (100 코인 필요)");
+
+    const skills = await ctx.db
+      .query("characterSkills")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .collect();
+
+    let recoveredPoints = 0;
+    for (const skill of skills) {
+      recoveredPoints += skill.investedPoints;
+      await ctx.db.delete(skill._id);
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(progress._id, {
+      coins: progress.coins - 100,
+      skillPoints: progress.skillPoints + recoveredPoints,
+      updatedAt: now,
+    });
+
+    return { success: true, newCoins: progress.coins - 100, newSkillPoints: progress.skillPoints + recoveredPoints };
+  },
+});
+
+// 던전 스테이지 클리어 기록 및 경험치/코인 획득
 export const recordDungeonStageClear = mutation({
   args: { characterId: v.string(), dungeonId: v.string(), stageNumber: v.number() },
   handler: async (ctx, args) => {
@@ -285,12 +327,23 @@ export const recordDungeonStageClear = mutation({
       .unique();
     const experienceGranted = stageExperienceForDungeon(args.dungeonId, Boolean(stageRecord));
     const experience = characterProgress.experience + experienceGranted;
+    
+    // 코인 보상 추가
+    const coins = characterProgress.coins + STAGE_CLEAR_COIN_REWARD;
+
+    const oldLevel = characterProgress.level;
+    const newLevel = levelForExperience(experience);
+    const levelDiff = newLevel - oldLevel;
+    const skillPoints = characterProgress.skillPoints + levelDiff;
 
     await ctx.db.patch(characterProgress._id, {
       experience,
-      level: levelForExperience(experience),
+      level: newLevel,
+      skillPoints,
+      coins,
       updatedAt: now,
     });
+
     if (stageRecord) {
       await ctx.db.patch(stageRecord._id, { clearCount: stageRecord.clearCount + 1, updatedAt: now });
     } else {
@@ -302,13 +355,14 @@ export const recordDungeonStageClear = mutation({
         updatedAt: now,
       });
     }
-    return { experienceGranted, ...growthSummary(experience) };
+
+    return { experienceGranted, coinReward: STAGE_CLEAR_COIN_REWARD, ...growthSummary(experience), coins };
   },
 });
 
+// 던전 완주 기록 및 완주 코인 보상
 export const recordDungeonClear = mutation({
   args: {
-    clientId: v.string(),
     characterId: v.string(),
     dungeonId: v.string(),
     clearTimeMs: v.number(),
@@ -335,8 +389,13 @@ export const recordDungeonClear = mutation({
         q.eq("dungeonId", args.dungeonId).eq("characterId", args.characterId),
       )
       .unique();
+
+    // 완주 코인 보상 합산
+    const coins = characterProgress.coins + DUNGEON_CLEAR_COIN_REWARD;
+
     await ctx.db.patch(characterProgress._id, {
       totalDungeonClears: characterProgress.totalDungeonClears + 1,
+      coins,
       updatedAt: now,
     });
 
@@ -374,37 +433,11 @@ export const recordDungeonClear = mutation({
       });
     }
 
-    const today = kstDate(now);
-    const gachaState = await ctx.db
-      .query("anonymousGachaStates")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
-      .unique();
-    const nextCompletedPlayCount = (gachaState?.completedPlayCount ?? 0) + 1;
-    if (gachaState) {
-      await ctx.db.patch(gachaState._id, {
-        dailyResetDate: today,
-        dailyDrawsUsed: gachaState.dailyResetDate === today ? gachaState.dailyDrawsUsed : 0,
-        completedPlayCount: nextCompletedPlayCount,
-        bonusDrawsUsed: gachaState.bonusDrawsUsed,
-        updatedAt: now,
-      });
-    } else {
-      await ctx.db.insert("anonymousGachaStates", {
-        clientId: args.clientId,
-        dailyResetDate: today,
-        dailyDrawsUsed: 0,
-        completedPlayCount: nextCompletedPlayCount,
-        bonusDrawsUsed: 0,
-        experiencePoints: 0,
-        updatedAt: now,
-      });
-    }
-
     return {
       ...growthSummary(characterProgress.experience),
       totalDungeonClears: characterProgress.totalDungeonClears + 1,
-      completedDungeonClears: nextCompletedPlayCount,
-      bonusDrawsAvailable: Math.floor(nextCompletedPlayCount / 3) - (gachaState?.bonusDrawsUsed ?? 0),
+      coinReward: DUNGEON_CLEAR_COIN_REWARD,
+      coins,
     };
   },
 });

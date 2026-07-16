@@ -66,7 +66,6 @@ export const getRankingOverview = query({
   },
 });
 
-// 호환용 시작 이벤트다. 전적은 종료 시점에 한 번만 기록해 중복 판수를 막는다.
 export const recordGameStart = mutation({ args: { participantIds: v.array(v.string()), mode: v.string() }, handler: async () => null });
 
 export const recordGameEnd = mutation({
@@ -105,12 +104,27 @@ export const recordGameEnd = mutation({
       } else {
         await ctx.db.insert("pvpCharacterRankings", { seasonId: season!.seasonId, mode, characterId, score: Math.max(0, INITIAL_SCORE + delta), wins: result === "win" ? 1 : 0, games: 1, draws: result === "draw" ? 1 : 0, updatedAt: now });
       }
+
+      // PvP 매치 보상 코인 지급 연동
+      const progress = await ctx.db
+        .query("characterProgress")
+        .withIndex("by_characterId", (q) => q.eq("characterId", characterId))
+        .unique();
+      if (progress) {
+        let coinReward = 10; // 패배 시 10코인
+        if (result === "win") coinReward = 30; // 승리 시 30코인
+        else if (result === "draw") coinReward = 15; // 무승부 시 15코인
+
+        await ctx.db.patch(progress._id, {
+          coins: progress.coins + coinReward,
+          updatedAt: now,
+        });
+      }
     }
     return { seasonId: season!.seasonId, mode, recorded: participantIds.length };
   },
 });
 
-// 기존 상세 통계 화면이 새 시즌 전적을 읽도록 하는 읽기 전용 호환 API다.
 export const getStats = query({
   args: { mode: v.string() },
   handler: async (ctx, args) => {
@@ -127,7 +141,6 @@ export const recordCharacterDeath = mutation({ args: { victimId: v.string(), kil
 export const recordBossResult = mutation({ args: { bossId: v.string(), cleared: v.boolean() }, handler: async () => null });
 export const getBossDifficulty = query({ args: {}, handler: async () => [] });
 
-// 개발용 즉시 초기화는 현재 시즌의 PvP 랭킹만 비운다. 레벨과 스킨은 건드리지 않는다.
 export const resetMatchHistory = mutation({
   args: { confirmation: v.literal("RESET_MATCH_HISTORY") },
   handler: async (ctx) => {

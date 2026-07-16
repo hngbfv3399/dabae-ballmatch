@@ -4,14 +4,209 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>캐릭터 볼게임 시뮬레이터</title>
+    <title>BALL BATTLE - 시즌 4</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbit&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      /* --- 시즌 4 전용 모던 글래스모피즘 스타일 --- */
+      #login-overlay {
+        background: radial-gradient(circle at center, rgba(10, 10, 25, 0.96) 0%, rgba(2, 2, 8, 0.99) 100%);
+        backdrop-filter: blur(12px);
+      }
+      .login-panel {
+        background: rgba(18, 18, 35, 0.75);
+        border: 2px solid rgba(0, 242, 254, 0.2);
+        box-shadow: 0 15px 40px rgba(0, 242, 254, 0.15), inset 0 0 20px rgba(255,255,255,0.02);
+      }
+      .login-panel input:focus {
+        border-color: #00f2fe;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+        outline: none;
+      }
+      .hub-tab {
+        font-family: 'Orbit', sans-serif;
+        font-weight: 700;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .hub-tab.active {
+        background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%) !important;
+        box-shadow: 0 4px 15px rgba(0, 242, 254, 0.35);
+        color: #fff !important;
+      }
+      
+      /* 상점(Store) 디자인 */
+      .store-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1rem;
+      }
+      .store-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .store-card:hover {
+        border-color: rgba(0, 242, 254, 0.3);
+        background: rgba(255,255,255,0.035);
+        transform: translateY(-4px);
+      }
+      
+      /* 성장(Growth) 디자인 */
+      .growth-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.2rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 0.5rem;
+      }
+      .growth-tab-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-family: 'Orbit', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.5rem 1.2rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: 8px;
+      }
+      .growth-tab-btn.active {
+        color: #fff;
+        background: rgba(255,255,255,0.08);
+      }
+      .growth-layout {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 1.5rem;
+        min-height: 480px;
+      }
+      @media(max-width: 768px) {
+        .growth-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+      
+      /* 장비 슬롯 8개 그리드 */
+      .eq-slots-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.8rem;
+      }
+      .eq-slot {
+        background: rgba(0, 0, 0, 0.25);
+        border: 2px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        padding: 0.4rem;
+        box-sizing: border-box;
+      }
+      .eq-slot:hover {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.05);
+      }
+      .eq-slot.equipped {
+        border: 2px solid;
+        border-image-slice: 1;
+      }
+      
+      /* 인벤토리 가방 */
+      .bag-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.6rem;
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 0.2rem;
+      }
+      .bag-item {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1.5px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        aspect-ratio: 1;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        position: relative;
+      }
+      .bag-item.selected {
+        border-color: #00f2fe;
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+      }
+      
+      /* 도감 스탯 시트 */
+      .stat-sheet-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 16px;
+        padding: 1.5rem;
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+      }
+      .stat-row:last-child {
+        border-bottom: none;
+      }
+      
+      /* 캐릭터 스티커 뱃지 */
+      .rarity-common { border-color: #94a3b8; color: #cbd5e1; }
+      .rarity-rare { border-color: #007aff; color: #60a5fa; }
+      .rarity-epic { border-color: #a855f7; color: #c084fc; }
+      .rarity-legendary { border-color: #eab308; color: #fde047; }
+      .rarity-unique { border-color: #ff3b30; color: #fca5a5; }
+
+      .rarity-bg-common { background: rgba(148, 163, 184, 0.1); }
+      .rarity-bg-rare { background: rgba(0, 122, 255, 0.1); }
+      .rarity-bg-epic { background: rgba(168, 85, 247, 0.1); }
+      .rarity-bg-legendary { background: rgba(234, 179, 8, 0.1); }
+      .rarity-bg-unique { background: rgba(255, 59, 48, 0.1); }
+    </style>
   </head>
   <body>
     <div id="app">
+      <!-- 닉네임 입력 로그인 화면 (비회원 차단) -->
+      <div id="login-overlay" class="modal-overlay" style="z-index: 9999;">
+        <div class="login-panel card" style="max-width: 420px; width: 90%; padding: 2.5rem; text-align: center; border-radius: 20px;">
+          <span style="font-size: 3.5rem; display: block; margin-bottom: 1rem; filter: drop-shadow(0 0 10px rgba(0,242,254,0.4));">🔮</span>
+          <h2 style="margin: 0 0 0.5rem 0; font-family: 'Orbit', sans-serif; font-weight: 800; font-size: 1.7rem; color: #fff; letter-spacing: 0.8px;">BALL BATTLE LOGIN</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.55;">
+            시즌 4에 접속할 캐릭터 이름을 입력하세요.<br>
+            <small style="opacity: 0.8; color: var(--neon-yellow); font-weight: 700;">(예: 도윤, doyun, 지호, jiho, 수 등)</small>
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+            <input type="text" id="login-nickname-input" placeholder="캐릭터명 입력" style="width: 100%; height: 46px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.45); color: #fff; padding: 0 1rem; font-size: 1.05rem; text-align: center; box-sizing: border-box; font-family: 'Orbit', sans-serif;" />
+            <button id="login-btn" class="btn btn-primary" style="width: 100%; height: 46px; border-radius: 8px; font-weight: 700; font-size: 1.05rem; letter-spacing: 1px; background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); border: none; box-shadow: 0 4px 15px rgba(0,242,254,0.3); color: #fff;">
+              접속하기
+            </button>
+          </div>
+          <p id="login-error-msg" class="hidden" style="color: #ff3b30; font-size: 0.88rem; font-weight: 700; margin-top: 1rem; line-height: 1.45;"></p>
+        </div>
+      </div>
+
       <!-- 로비 화면 (캐릭터 선택) -->
       <section id="lobby-view" class="view">
         <header class="lobby-header" style="position: relative;">
@@ -21,221 +216,535 @@
             </button>
           </div>
           <h1>BALL BATTLE</h1>
-          <p class="subtitle">담빵 볼게임 시뮬레이터</p>
+          <p class="subtitle">담빵 볼게임 시뮬레이터 · 시즌 4</p>
         </header>
 
+        <!-- 메인 네비게이션 바 -->
         <nav class="hub-tabs" aria-label="메인 메뉴">
-          <button class="hub-tab active" data-hub="gameplay" type="button">🎮 게임플레이</button>
-          <button class="hub-tab" data-hub="gacha" type="button">✨ 가챠</button>
-          <button class="hub-tab" data-hub="ranking" type="button">🏆 랭킹</button>
-          <button class="hub-tab" data-hub="collection" type="button">📚 도감</button>
+          <button class="hub-tab" data-hub="store" type="button">✨ 상점</button>
+          <button class="hub-tab" data-hub="skin" type="button">🎨 스킨</button>
+          <button class="hub-tab active" data-hub="play" type="button">🎮 플레이</button>
+          <button class="hub-tab" data-hub="growth" type="button">🌱 성장</button>
+          <button class="hub-tab" data-hub="book" type="button">📚 도감</button>
         </nav>
 
-        <section class="mode-command-deck" aria-label="게임 모드와 매치 설정">
-          <div class="mode-deck-heading">
-            <div>
-              <span class="eyebrow">GAMEPLAY</span>
-              <h2 id="gameplay-heading">초원의 슬라임 소굴</h2>
-            </div>
-            <button id="open-game-mode-btn" class="btn btn-primary" type="button">게임 시작</button>
-          </div>
-          <div id="mode-settings-row" class="mode-settings-row">
-            <div id="team-game-type-setting" class="hidden compact-setting">
-              <label for="team-game-type">팀전 규칙</label>
-              <select id="team-game-type">
-                <option value="deathmatch">데스매치 · 전원 섬멸</option>
-                <option value="control">점령전 · 중앙 거점 100점</option>
-                <option value="relic">보석 쟁탈전 · 보석 10개 확보</option>
-              </select>
-            </div>
-            <div class="combat-settings-panel" aria-label="전투 및 전적 설정">
-              <div class="combat-setting-block">
-                <span>전투 속도</span>
-                <div class="combat-setting-buttons" role="group" aria-label="시뮬레이션 속도">
-                  <button type="button" class="combat-setting-button active" data-game-speed="1" aria-pressed="true">1.0x <small>보통</small></button>
-                  <button type="button" class="combat-setting-button" data-game-speed="1.5" aria-pressed="false">1.5x <small>빠름</small></button>
-                  <button type="button" class="combat-setting-button" data-game-speed="2" aria-pressed="false">2.0x <small>매우 빠름</small></button>
+        <!-- 1. 플레이 탭 (플레이어 상태 및 전투 진입) -->
+        <section id="play-hub-panel" class="hub-panel">
+          <div class="profile-card card" style="display: flex; gap: 1.5rem; align-items: center; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; position: relative;">
+            <div id="play-profile-avatar" style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; background: rgba(0,242,254,0.1); border: 2px solid #00f2fe; box-shadow: 0 0 15px rgba(0,242,254,0.25);"></div>
+            <div style="flex: 1; min-width: 200px;">
+              <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.4rem;">
+                <h2 id="play-profile-nickname" style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800; font-size: 1.45rem;">-</h2>
+                <span id="play-profile-level" style="background: rgba(255,255,255,0.08); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; color: var(--neon-yellow);">LV 1</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.6rem;">
+                <span>🪙 보유 코인: <strong id="play-profile-coins" style="color: #fff;">1000</strong></span>
+              </div>
+              <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary);">
+                  <span>경험치</span>
+                  <span id="play-profile-exp-text">0 / 100</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                  <div id="play-profile-exp-fill" style="width: 0%; height: 100%; background: #00f2fe; transition: width 0.3s ease;"></div>
                 </div>
               </div>
-              <div class="combat-setting-block">
-                <span id="stats-context-label">게임 방식</span>
-                <div id="stats-mode-buttons" class="combat-setting-buttons stats-mode-buttons" role="group" aria-label="게임 방식">
-                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="2" aria-pressed="false">2인</button>
-                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="3" aria-pressed="false">3인</button>
-                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="4" aria-pressed="false">4인</button>
-                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="5" aria-pressed="false">5인</button>
-                  <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="6" aria-pressed="false">6인</button>
-                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:deathmatch" aria-pressed="false">데스매치</button>
-                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:control" aria-pressed="false">점령전</button>
-                  <button type="button" class="combat-setting-button hidden" data-stats-context="team" data-stats-mode="team:relic" aria-pressed="false">쟁탈전</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="ranking-hub-panel" class="hub-panel hidden">
-          <div class="ranking-hub-head"><div><span class="eyebrow">PVP RANKING</span><h2>시즌 랭킹</h2></div><span id="ranking-season-label" class="ranking-season-label">시즌 정보를 불러오는 중입니다.</span></div>
-          <p class="ranking-rule-note">기본 1,000점 · 승리 +25 · 패배 -10 · 무승부 +5 · 토너먼트 승리 +35 / 패배 -15</p>
-          <div class="ranking-mode-tabs" role="tablist" aria-label="PvP 랭킹 방식">
-            <button class="ranking-mode-tab active" data-ranking-mode="solo" type="button">개인전</button>
-            <button class="ranking-mode-tab" data-ranking-mode="team" type="button">팀전</button>
-            <button class="ranking-mode-tab" data-ranking-mode="tournament" type="button">토너먼트</button>
-          </div>
-          <div id="ranking-list" class="ranking-list" aria-live="polite">랭킹을 불러오는 중입니다.</div>
-        </section>
-        <section id="collection-hub-panel" class="hub-panel hidden">
-          <span class="eyebrow">CHARACTER MANAGEMENT</span><h2>캐릭터 관리</h2>
-          <p class="collection-note">캐릭터를 선택해 현재 스킨과 전투 스킬을 관리하세요. 기존 액티브·고유 패시브는 유지되며, 추가 장착 스킬은 업데이트 예정입니다.</p>
-          <div class="character-management-layout"><div id="collection-list" class="collection-list"></div><aside id="collection-detail" class="collection-detail">캐릭터를 선택하세요.</aside></div>
-        </section>
-
-        <section id="pve-command-panel" class="pve-command-panel">
-          <div class="pve-command-copy">
-            <span class="eyebrow" id="pve-dungeon-number">DUNGEON · 01</span>
-            <h2 id="pve-dungeon-name">초원의 슬라임 소굴</h2>
-            <p id="pve-dungeon-description">각 스테이지를 클리어하면 즉시 경험치를 획득합니다. 가챠 진행도는 던전 1-1부터 1-5까지 완주할 때만 증가합니다.</p>
-          </div>
-          <label class="compact-setting">던전 선택<select id="pve-dungeon-select"><option value="slime-meadow">던전 01 · 초원의 슬라임 소굴</option><option value="collapsed-laboratory">던전 02 · 붕괴한 연구소</option></select></label>
-          <button id="pve-character-select-btn" class="pve-character-select" type="button">
-            <span id="pve-character-select-avatar">?</span>
-            <span><strong id="pve-character-select-name">캐릭터 선택</strong><small id="pve-character-select-stats">선택 후 레벨과 능력치를 확인합니다.</small></span>
-          </button>
-          <div class="pve-reward-card"><span>첫 클리어</span><strong>450 XP</strong><small>반복 클리어 200 XP</small></div>
-          <button id="pve-start-btn" class="btn btn-primary" type="button" disabled>던전 시작하기</button>
-        </section>
-
-        <main id="pvp-setup-panel" class="lobby-main hidden">
-          <div class="character-selection roster-panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
-              <div><span class="eyebrow">ROSTER · 02</span><h2 style="margin: 0.25rem 0 0; font-family: 'Orbit', sans-serif; font-weight: 800;">참가자 선택</h2></div>
-              <button id="select-all-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">전체 선택</button>
-            </div>
-            <div id="match-selection-slots" class="match-selection-slots"></div>
-            <button id="fill-random-slots-btn" class="btn fill-random-slots-btn" type="button">🎲 선택 캐릭터 제외 일괄 랜덤 · 다시 뽑기</button>
-
-            <!-- 역할군 필터 탭 바 -->
-            <div class="role-filter-bar" style="display: flex; gap: 0.45rem; margin-bottom: 1.5rem; flex-wrap: wrap; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 0.6rem 0.8rem; box-sizing: border-box;">
-              <button class="role-tab active" data-role="all">전체</button>
-              <button class="role-tab" data-role="Nuker">🔥 누커</button>
-              <button class="role-tab" data-role="Sniper">🎯 저격수</button>
-              <button class="role-tab" data-role="Speedster">⚡ 기동형</button>
-              <button class="role-tab" data-role="Guardian">🛡️ 수호형</button>
-              <button class="role-tab" data-role="Juggernaut">🦖 돌격형</button>
-              <button class="role-tab" data-role="Disabler">🌀 제어형</button>
-              <button class="role-tab" data-role="Summoner">🌪️ 소환형</button>
-              <button class="role-tab" data-role="Specialist">🎰 변수형</button>
-              <button class="role-tab" data-role="Supporter">🧪 지원형</button>
             </div>
             
-            <div id="character-list" class="character-grid">
-              <!-- JS에서 동적으로 생성됨 -->
-            </div>
-
-            <!-- 특정 역할군 공석 안내 -->
-            <div id="empty-role-notice" class="hidden" style="padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); font-size: 0.95rem; border: 1px dashed rgba(255,255,255,0.08); border-radius: 8px; background: rgba(0,0,0,0.1); margin-top: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; box-sizing: border-box;">
-              <span style="font-size: 2.2rem;">🧪</span>
-              <div style="font-weight: 700; color: #fff; font-family: 'Orbit', sans-serif;">이 포지션의 캐릭터는 아직 없습니다</div>
-              <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 0.2rem;">추후 새로운 담빵 캐릭터 업데이트를 기다려주세요!</div>
+            <div style="min-width: 200px; padding: 0.8rem 1.2rem; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; color: var(--text-secondary);">
+              <div>🏆 PvP 기록: <strong id="play-pvp-stat" style="color: #fff;">-</strong></div>
+              <div>🧪 던전 기록: <strong id="play-pve-stat" style="color: #fff;">-</strong></div>
+              <button id="logout-btn" class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.78rem; padding: 0.3rem 0.6rem; height: auto;">계정 로그아웃</button>
             </div>
           </div>
 
-          <aside class="lobby-controls">
-            <div class="manual-start-card launch-dock">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+            <!-- 빠른 플레이 -->
+            <div class="card" style="padding: 2rem; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 1.2rem; border-color: rgba(0,242,254,0.15);">
               <div>
-                <span class="eyebrow">LAUNCH · 03</span>
-                <strong>전투 편성</strong>
-                <p id="selection-summary">개인전은 최소 2명을 선택하세요.</p>
+                <span class="eyebrow" style="color: #00f2fe;">QUICK PLAY</span>
+                <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.3rem; margin: 0.3rem 0 0.6rem 0;">빠른 팀 대스매치</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">현재 설정된 장착 장비와 스킬로 레드팀 vs 블루팀의 4인 데스매치를 즉시 구동해 랭킹 점수와 코인을 획득합니다.</p>
               </div>
-              <button id="start-btn" class="btn btn-primary" disabled>
-                <span>게임 시작하기</span>
-              </button>
+              <button id="quick-play-btn" class="btn btn-primary" style="width: 100%; height: 46px; font-weight: 700;">빠른 플레이 매칭 시작</button>
             </div>
 
-            <button id="random-start-btn" class="btn random-match-button" type="button">
-              🎲 현재 모드 랜덤전 시작
-            </button>
-
-            <details class="practice-tools">
-              <summary>🏋️ 연습 도구 열기</summary>
-              <div class="practice-match">
-              <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">🏋️ 연습모드</h3>
-              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.45;">
-                선택한 캐릭터와 무한 체력, 0 공격력/방어력을 가진 <b>더미볼(Dummy Ball)</b>을 스폰하여 실시간 전투 공격 대미지 수치를 자유롭게 테스트합니다. (최소 1명 선택 필요)
-              </p>
-              <button id="practice-start-btn" class="btn btn-secondary" disabled style="width: 100%; background: linear-gradient(135deg, #00bfff 0%, #2ecc71 100%); color: #fff; box-shadow: 0 0 10px rgba(0, 191, 255, 0.3); border: none; font-size: 0.95rem; font-weight: 700; height: 42px; transition: all 0.3s ease;">
-                <span>연습모드 시작!</span>
-              </button>
+            <!-- 게임 찾기 -->
+            <div class="card" style="padding: 2rem; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 1.2rem;">
+              <div>
+                <span class="eyebrow">MODE FINDER</span>
+                <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.3rem; margin: 0.3rem 0 0.6rem 0;">게임 모드 디렉터리</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">PVE 슬라임 연구소 던전 클리어 또는 다양한 인원의 사용자 정의 PvP(개인전, 팀전, 토너먼트) 대결을 수동으로 구성해 개시합니다.</p>
               </div>
-            </details>
-          </aside>
-        </main>
+              <button id="open-game-finder-btn" class="btn btn-secondary" style="width: 100%; height: 46px; font-weight: 700;">게임 방식 찾기</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. 상점 탭 (가챠 소환 상점) -->
+        <section id="store-hub-panel" class="hub-panel hidden">
+          <div class="store-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <span class="eyebrow">COIN STORE</span>
+              <h2>상점 및 소환</h2>
+            </div>
+            <div style="font-family: 'Orbit', sans-serif; font-weight: 700; background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+              🪙 <span id="store-coins-label">0</span> 코인
+            </div>
+          </div>
+
+          <div class="store-grid">
+            <!-- 스킨 & 세레모니 가챠 -->
+            <div class="store-card">
+              <div>
+                <div class="rarity-bg-epic" style="padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.72rem; font-weight: 700; color: #c084fc; width: fit-content; margin-bottom: 0.8rem;">🎨 외형 가챠</div>
+                <h3 style="font-family: 'Orbit', sans-serif; margin: 0 0 0.5rem 0; font-size: 1.15rem;">스킨 & 세레모니 상자</h3>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;">희귀 전설 스킨 패키지 및 승리 모션, 배경 효과, 특수 이벤트를 랜덤 소환합니다.<br><strong>중복 획득 시 등급에 따라 코인으로 환불됩니다!</strong></p>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+                <button id="store-gacha-skin-btn" class="btn btn-primary" style="width: 100%;">소환 1회 (200 코인)</button>
+              </div>
+            </div>
+
+            <!-- 영구 장비 가챠 -->
+            <div class="store-card">
+              <div>
+                <div class="rarity-bg-legendary" style="padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.72rem; font-weight: 700; color: #fde047; width: fit-content; margin-bottom: 0.8rem;">⚙️ 장비 가챠</div>
+                <h3 style="font-family: 'Orbit', sans-serif; margin: 0 0 0.5rem 0; font-size: 1.15rem;">영구 아이템 기어</h3>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;">캐릭터 슬롯에 장착하여 스펙을 영구 증폭시키는 인스턴스 장비를 소환합니다. (최대 인벤토리 한도: 20개)<br>중복 아이템을 획득해 강화 제물로 활용할 수 있습니다.</p>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.4rem;">
+                  👜 가방 공간: <span id="store-bag-space" style="color:#fff; font-weight:700;">0 / 20</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <button id="store-gacha-item-1-btn" class="btn btn-primary" style="flex: 1;">1회 (100)</button>
+                <button id="store-gacha-item-5-btn" class="btn btn-secondary" style="flex: 1.3; background: rgba(0,242,254,0.1); border-color: rgba(0,242,254,0.3); color: #00f2fe;">5회 (450)</button>
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 1.5rem; text-align: right;">
+            <button id="btn-show-rate-table" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; height: auto;">📋 획득 확률표 확인</button>
+          </div>
+        </section>
+
+        <!-- 3. 스킨 탭 (스킨 장착 관리) -->
+        <section id="skin-hub-panel" class="hub-panel hidden">
+          <span class="eyebrow">COSMETIC CLOSET</span>
+          <h2>내 외형 옷장</h2>
+          <p class="collection-note" style="margin-bottom: 1.5rem;">가챠에서 획득한 외형 스킨 및 승리 세레모니 모달 전용 배경, 애니메이션을 캐릭터에 장착하세요.</p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem;">
+            <!-- 좌측: 현재 장착 상태 미리보기 -->
+            <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center; min-height: 320px;">
+              <span class="eyebrow">EQUIPPED PREVIEW</span>
+              <div id="skin-equipped-avatar-box" style="width: 90px; height: 90px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; transition: all 0.3s ease;">?</div>
+              <div>
+                <h4 id="skin-equipped-name" style="margin: 0; font-family: 'Orbit', sans-serif; font-size: 1.15rem; color: #fff;">-</h4>
+                <p id="skin-equipped-details" style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.3rem 0 0 0; line-height: 1.4;"></p>
+              </div>
+            </div>
+
+            <!-- 우측: 도감 카테고리 -->
+            <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+              <!-- 서브 카테고리 선택 -->
+              <div class="gacha-type-tabs" role="tablist" style="margin-bottom: 0;">
+                <button class="gacha-type-tab active" data-skin-tab="skin" type="button">🎨 스킨</button>
+                <button class="gacha-type-tab" data-skin-tab="action" type="button">👏 세레모니 모션</button>
+                <button class="gacha-type-tab" data-skin-tab="background" type="button">🖼️ 승리 배경</button>
+                <button class="gacha-type-tab" data-skin-tab="specialEvent" type="button">⚡ 특수 이벤트</button>
+              </div>
+
+              <!-- 리스트 목록 -->
+              <div id="skin-items-grid" class="gacha-catalog" style="height: 280px; overflow-y: auto; padding: 0.3rem;">
+                <!-- JS에서 동적 로드 -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. 성장 탭 (장비 인벤토리 장착/판매/제물합성 & 스킬포인트 강화) -->
+        <section id="growth-hub-panel" class="hub-panel hidden">
+          <div class="growth-tabs">
+            <button class="growth-tab-btn active" data-growth-sub="equipment">⚙️ 능력 관리 (장비)</button>
+            <button class="growth-tab-btn" data-growth-sub="skills">✨ 스킬 강화 (특성)</button>
+          </div>
+
+          <!-- 4-1. 능력 관리 (장비 및 인벤토리) -->
+          <div id="growth-equipment-panel" class="growth-layout">
+            <!-- 왼쪽: 장착 슬롯 8개 및 가방 -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+              <div>
+                <h4 style="margin: 0 0 0.8rem 0; font-family: 'Orbit', sans-serif; font-size: 0.95rem; color: #fff; font-weight: 700; display: flex; justify-content: space-between;">
+                  <span>🛡️ 8슬롯 장착 슬롯</span>
+                  <small style="color: var(--text-secondary); font-size: 0.78rem;">(동일 아이템 중복 장착 불가)</small>
+                </h4>
+                <div class="eq-slots-grid">
+                  <div class="eq-slot" data-eq-slot="1"><span>Slot 1</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="2"><span>Slot 2</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="3"><span>Slot 3</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="4"><span>Slot 4</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="5"><span>Slot 5</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="6"><span>Slot 6</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="7"><span>Slot 7</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                  <div class="eq-slot" data-eq-slot="8"><span>Slot 8</span><small style="font-size:0.65rem; color:var(--text-secondary); margin-top:4px;">비어있음</small></div>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="margin: 0 0 0.8rem 0; font-family: 'Orbit', sans-serif; font-size: 0.95rem; color: #fff; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                  <span>👜 내 장비 인벤토리 가방</span>
+                  <span id="bag-count-label" style="font-size:0.8rem; color:var(--text-secondary);">0 / 20</span>
+                </h4>
+                <div id="equipment-bag-grid" class="bag-grid">
+                  <!-- 장비 리스트 동적 로드 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 오른쪽: 상세 정보 및 조작 (제물 강화/판매/탈착) -->
+            <div class="card" id="equipment-inspector-panel" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 400px; text-align: left;">
+              <div id="inspector-placeholder" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; gap: 0.5rem;">
+                <span style="font-size: 2.5rem;">⚙️</span>
+                <span>장착 슬롯이나 인벤토리의 장비를 선택하면 상세 정보 및 강화/판매를 진행할 수 있습니다.</span>
+              </div>
+              <div id="inspector-content" class="hidden" style="display: flex; flex-direction: column; gap: 1.2rem; height: 100%; width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                  <div>
+                    <span id="inspector-item-rarity" style="font-size: 0.72rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">COMMON</span>
+                    <h3 id="inspector-item-name" style="margin: 0.3rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.2rem;">관성 베어링</h3>
+                  </div>
+                  <div style="text-align: right;">
+                    <span id="inspector-item-level" style="font-family: monospace; font-weight: 800; color: var(--neon-yellow); font-size: 1.1rem;">LV. 1</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 0.8rem; font-size: 0.82rem; line-height: 1.45; width: 100%; box-sizing: border-box;">
+                  <div style="color: var(--text-secondary); margin-bottom: 0.3rem;">아이템 효과</div>
+                  <div id="inspector-item-effects" style="color: #fff; font-weight: 600;"></div>
+                </div>
+
+                <!-- 경험치 게이지 -->
+                <div style="width: 100%;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 4px;">
+                    <span>경험치</span>
+                    <span id="inspector-item-exp">0 / 100</span>
+                  </div>
+                  <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                    <div id="inspector-item-exp-fill" style="width: 0%; height: 100%; background: #00f2fe;"></div>
+                  </div>
+                </div>
+
+                <!-- 제물 합성 UI 영역 -->
+                <div id="feed-composite-area" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem; width: 100%;">
+                  <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">🧪 제물 합성 (강화 재료 선택)</span>
+                  <p style="font-size: 0.7rem; color: var(--text-secondary); margin: 0;">가방에서 합성 재료로 쓸 장비들을 다중 선택하세요. (장착된 장비는 제외)</p>
+                  <div id="feed-materials-summary" style="font-size: 0.78rem; color: var(--neon-yellow); font-weight: 700;">선택된 제물: 없음</div>
+                  <button id="btn-execute-feed" class="btn btn-secondary" style="height: 36px; font-size: 0.85rem; width: 100%;" disabled>제물 합성 실행 (경험치 흡수)</button>
+                </div>
+
+                <!-- 제어 버튼들 (장착/탈착/판매) -->
+                <div style="margin-top: auto; display: flex; gap: 0.5rem; width: 100%;">
+                  <button id="btn-inspector-equip" class="btn btn-primary" style="flex: 1; height: 38px; font-size: 0.88rem;">장착하기</button>
+                  <button id="btn-inspector-unequip" class="btn btn-secondary" style="flex: 1; height: 38px; font-size: 0.88rem;">해제하기</button>
+                  <button id="btn-inspector-sell" class="btn btn-danger" style="flex: 0.8; height: 38px; font-size: 0.88rem; background: #ff3b30; color: #fff; border: none; font-weight: 700;">판매</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4-2. 스킬 강화 (레벨 스킬 포인트 기반 스킬 트리) -->
+          <div id="growth-skills-panel" class="growth-layout hidden" style="grid-template-columns: 1.2fr 1fr;">
+            <!-- 스킬 강화 구조 -->
+            <div class="card" style="padding: 1.8rem; display: flex; flex-direction: column; gap: 1.5rem; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <span class="eyebrow">SKILL TRAINING</span>
+                  <h3 style="margin: 0.25rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.25rem;">특성 능력치 강화</h3>
+                </div>
+                <div style="background: rgba(0,242,254,0.1); border: 1px solid rgba(0,242,254,0.25); color: #00f2fe; padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; font-family: 'Orbit', sans-serif; font-size: 0.9rem;">
+                  사용 가능 스킬포인트: <span id="skill-points-avail">0</span> P
+                </div>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">레벨이 상승할 때마다 1 스킬 포인트가 제공됩니다. 포인트를 투자해 캐릭터 고유 스탯을 영구 강화하세요.</p>
+
+              <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem;">
+                <!-- ATK 스킬 노드 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
+                  <div>
+                    <strong style="font-size: 0.95rem; color:#fff;">🔥 공격력 강화 (ATK)</strong>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 공격 스케일러 +7% 누적 증가</div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="skill-lv-atk" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
+                    <button id="skill-add-atk" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
+                  </div>
+                </div>
+
+                <!-- HP 스킬 노드 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
+                  <div>
+                    <strong style="font-size: 0.95rem; color:#fff;">💖 최대 체력 강화 (HP)</strong>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 최대 체력 배율 +8% 누적 증가</div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="skill-lv-hp" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
+                    <button id="skill-add-hp" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
+                  </div>
+                </div>
+
+                <!-- COOLDOWN 스킬 노드 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;">
+                  <div>
+                    <strong style="font-size: 0.95rem; color:#fff;">🌀 스킬 쿨타임 속도 강화 (CDR)</strong>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">투자당 쿨다운 속도 +10% 누적 증가</div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="skill-lv-cd" style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--neon-yellow);">0 / 20</span>
+                    <button id="skill-add-cd" class="btn btn-secondary" style="width: 32px; height: 32px; min-width: auto; padding: 0; border-radius: 50%; font-size: 1.2rem; font-weight: 700;">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 오른쪽: 스킬 포인트 초기화 -->
+            <div class="card" style="padding: 1.8rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; text-align: left;">
+              <div>
+                <span class="eyebrow">RESET POINTS</span>
+                <h3 style="margin: 0.25rem 0 0 0; font-family: 'Orbit', sans-serif; font-size: 1.2rem;">특성 포인트 리셋</h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.6rem;">언제든지 <strong>100 코인</strong>을 지불하여 투자한 모든 스킬 포인트를 전량 회수하고 초기화하여 다시 세팅할 수 있습니다.</p>
+              </div>
+              <button id="skill-reset-btn" class="btn btn-danger" style="width: 100%; height: 42px; font-weight: 700; background: #ff3b30; border: none; color: #fff;">포인트 전원 회수 (100 코인)</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. 도감 탭 (플레이어 상세 스탯 계산기 & 캐릭터 20명 전체 로스터 브라우저) -->
+        <section id="book-hub-panel" class="hub-panel hidden">
+          <span class="eyebrow">CHARACTER ARCHIVE</span>
+          <h2>시뮬레이션 캐릭터 아카이브</h2>
+          <p class="collection-note" style="margin-bottom: 1.5rem;">내 캐릭터의 장비 및 성장 특성이 모두 합산된 최종 종합 스탯 스펙 계산기와 전체 20인 캐릭터 고유 성능을 열람합니다.</p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 1.5rem;">
+            <!-- 스탯 종합 연산서 -->
+            <div class="stat-sheet-card">
+              <span class="eyebrow" style="color: #00f2fe;">FINAL STAT SHEET</span>
+              <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; color:#fff;">내 종합 전투 스펙 시트</h3>
+
+              <div style="display: flex; flex-direction: column; gap: 0.1rem;">
+                <div class="stat-row">
+                  <span>체력 (Max HP)</span>
+                  <strong id="stat-final-hp">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>공격력 (ATK Damage)</span>
+                  <strong id="stat-final-atk">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>이동속도 (SPD)</span>
+                  <strong id="stat-final-spd">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>최대 DEF 보호막</span>
+                  <strong id="stat-final-def">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>기본 사거리 보너스</span>
+                  <strong id="stat-final-range">-</strong>
+                </div>
+                <div class="stat-row">
+                  <span>스킬 쿨다운 충전속도</span>
+                  <strong id="stat-final-cd">-</strong>
+                </div>
+              </div>
+              <div style="margin-top: 1rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; text-align: left; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 8px;">
+                * 최종 수치 = (기본 스탯) * (1 + 특성 스킬 %보너스) * (장비 합산 배율 보너스) + (장비 합산 플랫 보너스). 게임 내부 구동 시 실시간 대입 적용됩니다.
+              </div>
+            </div>
+
+            <!-- 전체 캐릭터 열람 로스터 -->
+            <div class="card" style="padding: 1.5rem; text-align: left; display: flex; flex-direction: column;">
+              <span class="eyebrow">ROSTER DIRECTORY</span>
+              <h3 style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; color:#fff;">전체 캐릭터 명단 (20종)</h3>
+              <div id="book-character-list" class="character-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; overflow-y: auto; max-height: 280px; padding: 0.2rem;">
+                <!-- JS에서 채움 -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 게임 찾기용 모드 선택 모달 -->
+        <div id="game-finder-modal" class="modal-overlay hidden" style="z-index: 500;">
+          <div class="modal-content card game-mode-modal-content" style="max-width: 580px; width: 92%;">
+            <div class="gacha-modal-header">
+              <div><span class="eyebrow">CHOOSE COMBAT MODE</span><h2>어떤 전투에 참가하시겠습니까?</h2></div>
+              <button id="game-finder-modal-close" class="btn btn-secondary" type="button">닫기</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;">
+              <button id="finder-btn-pve" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
+                <span>🧪 던전 모드 (PvE 보스 챌린지)</span>
+                <small style="opacity: 0.7;">1-1 ~ 1-5 돌파</small>
+              </button>
+              <button id="finder-btn-solo" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
+                <span>⚔️ PvP 개인전 (서바이벌 프리폴)</span>
+                <small style="opacity: 0.7;">2인 ~ 6인 구성</small>
+              </button>
+              <button id="finder-btn-team" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
+                <span>🔴🔵 PvP 팀전 (데스매치/점령/쟁탈)</span>
+                <small style="opacity: 0.7;">팀별 협동 난타전</small>
+              </button>
+              <button id="finder-btn-tournament" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
+                <span>🏆 토너먼트 모드 (최강자전)</span>
+                <small style="opacity: 0.7;">16강 토너먼트 배틀</small>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 원래 있었던 하위 기능적 서브 셋업 오버레이들 (모드 셋업 UI 등 - play 탭의 모드 선택 시 뒷받침 역할) -->
+        <div id="pve-setup-wrapper-overlay" class="modal-overlay hidden" style="z-index: 450;">
+          <div class="modal-content card" style="max-width: 600px; width: 92%;">
+            <div class="gacha-modal-header">
+              <div><span class="eyebrow">PVE SETUP</span><h2>던전 플레이 설정</h2></div>
+              <button id="pve-setup-close" class="btn btn-secondary" type="button">닫기</button>
+            </div>
+            <section id="pve-command-panel" class="pve-command-panel" style="display:block; border:none; padding:1rem 0 0 0;">
+              <div class="pve-command-copy">
+                <span class="eyebrow" id="pve-dungeon-number">DUNGEON · 01</span>
+                <h2 id="pve-dungeon-name">초원의 슬라임 소굴</h2>
+                <p id="pve-dungeon-description">각 스테이지를 클리어하면 즉시 경험치를 획득합니다. 완주할 때만 골드 보너스가 주어집니다.</p>
+              </div>
+              <label class="compact-setting" style="margin-top: 1rem; display:block;">던전 선택
+                <select id="pve-dungeon-select" style="width:100%; height:38px; border-radius:6px; background:#000; color:#fff; border:1px solid rgba(255,255,255,0.1); padding:0 0.5rem;">
+                  <option value="slime-meadow">던전 01 · 초원의 슬라임 소굴</option>
+                  <option value="collapsed-laboratory">던전 02 · 붕괴한 연구소</option>
+                </select>
+              </label>
+              <div class="pve-reward-card" style="margin: 1rem 0; padding:1rem; border-radius:10px; background:rgba(255,255,255,0.015); border:1px solid rgba(255,255,255,0.04); text-align:center;">
+                <span>클리어 보상</span>
+                <strong style="color:var(--neon-yellow); display:block; font-size:1.4rem; margin:0.2rem 0;">450 XP & 100 코인</strong>
+              </div>
+              <button id="pve-start-btn" class="btn btn-primary" type="button" style="width:100%; height:42px;">던전 입장 및 시작</button>
+            </section>
+          </div>
+        </div>
+
+        <div id="pvp-setup-wrapper-overlay" class="modal-overlay hidden" style="z-index: 450;">
+          <div class="modal-content card" style="max-width: 900px; width: 95%; max-height: 80vh; overflow-y: auto;">
+            <div class="gacha-modal-header">
+              <div><span class="eyebrow">PVP MATCH SETUP</span><h2>매치 참가 봇 구성</h2></div>
+              <button id="pvp-setup-close" class="btn btn-secondary" type="button">닫기</button>
+            </div>
+            
+            <main id="pvp-setup-panel" class="lobby-main" style="display:grid; grid-template-columns:1.2fr 1fr; gap:1.5rem; padding-top:1rem; border:none; text-align: left;">
+              <div class="character-selection roster-panel" style="padding:0; border:none; background:transparent;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                  <div><span class="eyebrow">ROSTER</span><h3 style="margin:0; font-family:'Orbit';">참가 봇 선택</h3></div>
+                  <button id="select-all-btn" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.3rem 0.6rem; height:auto;">전체 선택</button>
+                </div>
+                <div id="match-selection-slots" class="match-selection-slots" style="margin-bottom:0.8rem;"></div>
+                <button id="fill-random-slots-btn" class="btn fill-random-slots-btn" type="button" style="font-size:0.8rem; height:34px; margin-bottom:1rem; width:100%;">🎲 빈자리 무작위 봇으로 채우기</button>
+
+                <!-- 역할군 필터 탭 바 -->
+                <div class="role-filter-bar" style="display: flex; gap: 0.35rem; margin-bottom: 1rem; flex-wrap: wrap; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 0.4rem; box-sizing: border-box;">
+                  <button class="role-tab active" data-role="all" style="font-size:0.75rem; padding:2px 8px;">전체</button>
+                  <button class="role-tab" data-role="Nuker" style="font-size:0.75rem; padding:2px 8px;">🔥 누커</button>
+                  <button class="role-tab" data-role="Sniper" style="font-size:0.75rem; padding:2px 8px;">🎯 저격수</button>
+                  <button class="role-tab" data-role="Speedster" style="font-size:0.75rem; padding:2px 8px;">⚡ 기동형</button>
+                  <button class="role-tab" data-role="Guardian" style="font-size:0.75rem; padding:2px 8px;">🛡️ 수호형</button>
+                  <button class="role-tab" data-role="Juggernaut" style="font-size:0.75rem; padding:2px 8px;">🦖 돌격형</button>
+                  <button class="role-tab" data-role="Disabler" style="font-size:0.75rem; padding:2px 8px;">🌀 제어형</button>
+                  <button class="role-tab" data-role="Summoner" style="font-size:0.75rem; padding:2px 8px;">🌪️ 소환형</button>
+                  <button class="role-tab" data-role="Specialist" style="font-size:0.75rem; padding:2px 8px;">🎰 변수형</button>
+                  <button class="role-tab" data-role="Supporter" style="font-size:0.75rem; padding:2px 8px;">🧪 지원형</button>
+                </div>
+                
+                <div id="character-list" class="character-grid" style="grid-template-columns: repeat(4, 1fr); max-height:220px; overflow-y:auto; padding:0.2rem;">
+                  <!-- JS 동적 생성 -->
+                </div>
+                <div id="empty-role-notice" class="hidden">공석</div>
+              </div>
+
+              <aside class="lobby-controls" style="padding:0; border:none; background:transparent;">
+                <div style="display:flex; flex-direction:column; gap:0.8rem; background:rgba(255,255,255,0.015); border:1px solid rgba(255,255,255,0.04); padding:1rem; border-radius:12px;">
+                  <span class="eyebrow">OPTIONS</span>
+                  <div id="team-game-type-setting" class="hidden compact-setting" style="display:block;">
+                    <label for="team-game-type" style="font-size:0.8rem; font-weight:700;">팀전 세부 규칙</label>
+                    <select id="team-game-type" style="width:100%; height:34px; border-radius:6px; background:#000; color:#fff; border:1px solid rgba(255,255,255,0.1); margin-top:4px;">
+                      <option value="deathmatch">데스매치 · 전원 섬멸</option>
+                      <option value="control">점령전 · 중앙 거점 100점</option>
+                      <option value="relic">보석 쟁탈전 · 보석 10개 확보</option>
+                    </select>
+                  </div>
+                  
+                  <div class="combat-setting-block">
+                    <span style="font-size:0.8rem; font-weight:700; color:var(--text-secondary);">전투 인원 수</span>
+                    <div id="stats-mode-buttons" class="combat-setting-buttons stats-mode-buttons" role="group" style="display:flex; gap:0.2rem; margin-top:4px;">
+                      <button type="button" class="combat-setting-button active" data-stats-context="solo" data-stats-mode="2" style="font-size:0.75rem; padding:4px 8px;">2인</button>
+                      <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="3" style="font-size:0.75rem; padding:4px 8px;">3인</button>
+                      <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="4" style="font-size:0.75rem; padding:4px 8px;">4인</button>
+                      <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="5" style="font-size:0.75rem; padding:4px 8px;">5인</button>
+                      <button type="button" class="combat-setting-button" data-stats-context="solo" data-stats-mode="6" style="font-size:0.75rem; padding:4px 8px;">6인</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="manual-start-card launch-dock" style="margin-top:1.5rem; padding:1rem; border-radius:12px;">
+                  <div>
+                    <span class="eyebrow" id="selection-header">PVP MATCH</span>
+                    <strong style="font-family:'Orbit'; font-size:1.1rem; display:block;">매치 시작</strong>
+                    <p id="selection-summary" style="font-size:0.75rem; margin:0.2rem 0 0.8rem 0;">최소 2명을 선택하세요.</p>
+                  </div>
+                  <button id="start-btn" class="btn btn-primary" disabled style="width:100%; height:40px;">매치 가동</button>
+                </div>
+              </aside>
+            </main>
+          </div>
+        </div>
+
       </section>
 
-      <div id="pve-character-modal" class="modal-overlay hidden">
-        <div class="modal-content card" style="max-width: 860px; width: 92%; max-height: 82vh; overflow: auto;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;">
-            <div><span class="eyebrow">DUNGEON LOADOUT</span><h2 style="margin:0.3rem 0 0;">캐릭터 선택</h2></div>
-            <button id="pve-character-modal-close" class="btn btn-secondary" type="button">닫기</button>
-          </div>
-          <div id="pve-character-list" class="character-grid"></div>
-        </div>
-      </div>
-
-      <div id="match-character-picker-modal" class="modal-overlay hidden">
-        <div class="modal-content card picker-modal-content"><div class="gacha-modal-header"><div><span class="eyebrow">CHARACTER PICKER</span><h2>캐릭터 선택</h2></div><button id="match-character-picker-close" class="btn btn-secondary" type="button">닫기</button></div><div class="picker-layout"><div id="match-character-picker-list" class="picker-character-grid"></div><aside id="match-character-picker-detail" class="picker-character-detail">왼쪽의 캐릭터 아이콘을 선택하세요.</aside></div></div>
-      </div>
-
-      <div id="game-mode-modal" class="modal-overlay hidden">
-        <div class="modal-content card game-mode-modal-content">
-          <div class="gacha-modal-header"><div><span class="eyebrow">CHOOSE GAMEPLAY</span><h2>어떤 전투를 시작할까?</h2></div><button id="game-mode-modal-close" class="btn btn-secondary" type="button">닫기</button></div>
-          <div class="game-mode-tabs" role="tablist" aria-label="게임 방식 선택">
-            <button class="game-mode-tab active" data-game-mode="pve" type="button">🧪 던전</button>
-            <button class="game-mode-tab" data-game-mode="solo" type="button">⚔️ 개인전</button>
-            <button class="game-mode-tab" data-game-mode="team" type="button">🔴🔵 팀전</button>
-            <button class="game-mode-tab" data-game-mode="tournament" type="button">🏆 토너먼트</button>
-          </div>
-          <div id="game-mode-setup-host" class="game-mode-setup-host"></div>
-        </div>
-      </div>
-
-      <section id="gacha-modal" class="hub-panel gacha-hub-panel hidden">
-        <div class="gacha-hub-content">
-          <div class="gacha-modal-header">
-            <div><span class="eyebrow">GACHA</span><h2 id="gacha-title">스킨 뽑기</h2></div>
-          </div>
-          <div class="gacha-type-tabs" role="tablist" aria-label="가챠 분류">
-            <button class="gacha-type-tab active" data-gacha-type="skin" type="button" role="tab" aria-selected="true">🎨 스킨</button>
-            <button class="gacha-type-tab" data-gacha-type="action" type="button" role="tab" aria-selected="false">👏 플레이어 행동</button>
-            <button class="gacha-type-tab" data-gacha-type="background" type="button" role="tab" aria-selected="false">🖼️ 배경 효과</button>
-            <button class="gacha-type-tab" data-gacha-type="specialEvent" type="button" role="tab" aria-selected="false">⚡ 특수 이벤트</button>
-          </div>
-          <div class="gacha-controls">
-            <p id="gacha-draw-status" class="gacha-draw-status">스킨 도감을 불러오는 중입니다.</p>
-            <button id="gacha-draw-btn" class="btn btn-primary" type="button" disabled>뽑기</button>
-          </div>
-          <p id="gacha-type-help" class="experience-point-help">중복 스킨을 획득하면 등급별 경험치 포인트가 적립됩니다. 적립한 포인트는 <b>도감 탭</b>에서 원하는 캐릭터에게 나누어 사용하세요. 스킨 장착 여부와는 관계없습니다.</p>
-          <p id="gacha-result" class="gacha-result" aria-live="polite"></p>
-          <div class="gacha-preview-layout"><div id="gacha-catalog" class="gacha-catalog"></div><aside id="gacha-preview" class="gacha-preview">왼쪽 아이콘을 클릭하면 스킨 미리보기가 표시됩니다.</aside></div>
-        </div>
-      </section>
-
-      <div id="gacha-reveal-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="가챠 결과">
-        <div id="gacha-reveal-content" class="gacha-reveal-content card"></div>
-      </div>
-
-      <div id="persistent-item-rate-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="persistent-item-rate-title">
+      <!-- --------------------- 공통 가챠 확률 정보 모달 --------------------- -->
+      <div id="persistent-item-rate-modal" class="modal-overlay hidden" style="z-index: 1000;">
         <div class="modal-content card persistent-item-rate-modal-content">
           <div class="gacha-modal-header persistent-item-rate-header">
-            <div><span class="eyebrow">PLAYER ITEM DRAW INFO</span><h2 id="persistent-item-rate-title">영구 아이템 확률표</h2></div>
+            <div><span class="eyebrow">COSTORE DRAW RATIO</span><h2 id="persistent-item-rate-title">획득 뽑기 확률표</h2></div>
             <button id="persistent-item-rate-close" class="btn btn-secondary" type="button">닫기</button>
           </div>
-          <p class="persistent-item-rate-note">미보유 아이템만 뽑기 후보에 남습니다. 이미 보유한 아이템은 다시 나오지 않습니다.</p>
-          <div id="persistent-item-rate-content" class="persistent-item-rate-content"></div>
+          <p class="persistent-item-rate-note">외형 가챠 및 장비 가챠의 등급 소환 확률 정보입니다.</p>
+          <div id="persistent-item-rate-content" class="persistent-item-rate-content" style="display:flex; flex-direction:column; gap:1.2rem; text-align:left; max-height:350px; overflow-y:auto; padding-right:0.4rem;">
+            <div>
+              <strong style="color: #00f2fe;">🎨 외형 뽑기 (스킨/세레모니) 확률</strong>
+              <ul style="font-size:0.82rem; margin:0.4rem 0 0 1rem; line-height:1.45;">
+                <li>일반 (Common): 47.0%</li>
+                <li>희귀 (Rare): 30.0%</li>
+                <li>에픽 (Epic): 15.0%</li>
+                <li>전설 (Legendary): 6.0%</li>
+                <li>고유 (Unique): 2.0%</li>
+              </ul>
+            </div>
+            <div>
+              <strong style="color: #ffd700;">⚙️ 영구 장비 뽑기 확률</strong>
+              <ul style="font-size:0.82rem; margin:0.4rem 0 0 1rem; line-height:1.45;">
+                <li>일반 (Common): 50.0%</li>
+                <li>희귀 (Rare): 30.0%</li>
+                <li>에픽 (Epic): 14.0%</li>
+                <li>전설 (Legendary): 5.0%</li>
+                <li>고유 (Unique): 1.0%</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- 게임 화면 -->
+      <!-- 가챠 연출(Reveal) 모달 -->
+      <div id="gacha-reveal-modal" class="modal-overlay hidden" style="z-index: 1000;">
+        <div id="gacha-reveal-content" class="gacha-reveal-content card" style="text-align: center; max-width: 440px; padding: 2.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;">
+          <!-- JS에서 대박 이펙트 연출 주입 -->
+        </div>
+      </div>
+
+      <!-- --------------------- 게임 화면 (기존 Canvas 뷰 전면 보존) --------------------- -->
       <section id="game-view" class="view hidden">
         <header class="game-header" style="margin-bottom: 1rem;">
           <button id="back-to-lobby-btn" class="btn btn-secondary">← 로비로</button>
@@ -248,7 +757,7 @@
           </div>
         </header>
 
-        <!-- 보스전 전용 상단 거대 체력바 (로비 아래, 캔버스 위에 배치하여 가독성 강화) -->
+        <!-- 보스전 전용 상단 거대 체력바 -->
         <div id="boss-battle-header" class="boss-battle-header hidden" style="width: 100%; max-width: 800px; margin: 0 auto 1.5rem auto; display: flex; flex-direction: column; gap: 8px; padding: 1rem 1.5rem; box-sizing: border-box; background: rgba(18, 18, 37, 0.65); border: 2px solid rgba(255, 215, 0, 0.45); border-radius: 16px; backdrop-filter: blur(16px); box-shadow: 0 0 30px rgba(255, 215, 0, 0.15), inset 0 0 15px rgba(255, 215, 0, 0.05); z-index: 10;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span id="boss-name-label" style="font-family: 'Orbit', sans-serif; font-weight: 800; color: #ffd700; font-size: 1.15rem; display: flex; align-items: center; gap: 6px; letter-spacing: 0.8px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">👑 BOSS</span>
@@ -300,7 +809,7 @@
         </main>
       </section>
 
-      <!-- 승리자 모달 -->
+      <!-- 승리자 세레모니 모달 -->
       <div id="winner-modal" class="modal-overlay hidden">
         <div class="modal-content card winner-modal-content">
           <h2 class="winner-title">VICTORY!</h2>
@@ -311,6 +820,7 @@
         </div>
       </div>
 
+      <!-- 던전 증강 모달 -->
       <div id="augment-choice-modal" class="augment-choice-modal hidden" role="dialog" aria-modal="true" aria-labelledby="augment-choice-title">
         <div class="augment-choice-panel">
           <span id="augment-choice-tier" class="augment-choice-tier">SILVER AUGMENT</span>
@@ -328,7 +838,7 @@
             <h2 id="patch-history-title" style="font-size: 1.3rem; margin: 0; color: #fff; font-family: 'Orbit', sans-serif;">전체 패치 내역</h2>
           </div>
           <div id="patch-history-list" style="flex: 1; overflow-y: auto; margin: 1rem 0; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
-            <!-- JS에서 동적으로 패치 내역이 중첩되어 채워집니다 -->
+            <!-- JS에서 동적으로 패치 내역이 채워짐 -->
           </div>
           <div class="patch-footer">
             <button id="patch-close-btn" class="btn btn-primary">확인했습니다</button>
@@ -336,87 +846,58 @@
         </div>
       </div>
 
-      <!-- 실시간 전적 및 통계 센터 모달 -->
+      <!-- 실시간 전적 및 티어 통계 센터 모달 -->
       <div id="stats-center-modal" class="modal-overlay hidden">
         <div class="modal-content card" style="max-width: 950px; width: 90%; max-height: 85vh; padding: 2rem; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(255, 215, 0, 0.25); box-shadow: 0 0 40px rgba(255, 215, 0, 0.1);">
-          <!-- 모달 헤더 -->
           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.8rem;">
             <div style="display: flex; align-items: center; gap: 0.8rem;">
               <span style="font-size: 1.8rem;">📊</span>
               <h2 style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800; color: #fff;">실시간 전적 및 티어 통계 센터</h2>
               <span id="total-sim-games" style="font-size: 0.82rem; color: var(--neon-yellow); background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 700;">0판</span>
             </div>
-            <div style="display: flex; gap: 0.8rem; align-items: center;">
-              <button id="close-stats-btn" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.4rem 1rem; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;">✕ 닫기</button>
-            </div>
+            <button id="close-stats-btn" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.4rem 1rem; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;">✕ 닫기</button>
           </div>
 
-          <!-- 모달 바디 (2단 그리드 구성) -->
           <div class="stats-center-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; width: 100%; overflow: hidden; flex: 1; text-align: left;">
-            
-            <!-- 왼쪽: S~F 실시간 티어표 -->
             <div style="display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 1.2rem;">
               <h3 style="margin-top: 0; margin-bottom: 1rem; font-family: 'Orbit', sans-serif; color: #ffd700; display: flex; align-items: center; gap: 0.4rem;">
                 <span>🏆</span> 실시간 티어표 (승률 기준)
               </h3>
               <div id="tier-list-notice" class="hidden" style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #ffd700; line-height: 1.5; border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px; background: rgba(255, 215, 0, 0.05); margin-bottom: 0.5rem;"></div>
               <div class="tier-rows" id="tier-rows-wrapper" style="overflow-y: auto; flex: 1; padding-right: 0.4rem; display: flex; flex-direction: column; gap: 0.6rem;">
-                <div class="tier-row tier-s">
-                  <span class="tier-badge">S</span>
-                  <div class="tier-chars" id="tier-chars-s"></div>
-                </div>
-                <div class="tier-row tier-a">
-                  <span class="tier-badge">A</span>
-                  <div class="tier-chars" id="tier-chars-a"></div>
-                </div>
-                <div class="tier-row tier-b">
-                  <span class="tier-badge">B</span>
-                  <div class="tier-chars" id="tier-chars-b"></div>
-                </div>
-                <div class="tier-row tier-c">
-                  <span class="tier-badge">C</span>
-                  <div class="tier-chars" id="tier-chars-c"></div>
-                </div>
-                <div class="tier-row tier-d">
-                  <span class="tier-badge">D</span>
-                  <div class="tier-chars" id="tier-chars-d"></div>
-                </div>
-                <div class="tier-row tier-e">
-                  <span class="tier-badge">E</span>
-                  <div class="tier-chars" id="tier-chars-e"></div>
-                </div>
-                <div class="tier-row tier-f">
-                  <span class="tier-badge">F</span>
-                  <div class="tier-chars" id="tier-chars-f"></div>
-                </div>
+                <div class="tier-row tier-s"><span class="tier-badge">S</span><div class="tier-chars" id="tier-chars-s"></div></div>
+                <div class="tier-row tier-a"><span class="tier-badge">A</span><div class="tier-chars" id="tier-chars-a"></div></div>
+                <div class="tier-row tier-b"><span class="tier-badge">B</span><div class="tier-chars" id="tier-chars-b"></div></div>
+                <div class="tier-row tier-c"><span class="tier-badge">C</span><div class="tier-chars" id="tier-chars-c"></div></div>
+                <div class="tier-row tier-d"><span class="tier-badge">D</span><div class="tier-chars" id="tier-chars-d"></div></div>
+                <div class="tier-row tier-e"><span class="tier-badge">E</span><div class="tier-chars" id="tier-chars-e"></div></div>
+                <div class="tier-row tier-f"><span class="tier-badge">F</span><div class="tier-chars" id="tier-chars-f"></div></div>
               </div>
             </div>
 
-            <!-- 오른쪽: 평균 가한 피해량 리더보드 -->
             <div style="display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 1.2rem;">
               <h3 style="margin-top: 0; margin-bottom: 1rem; font-family: 'Orbit', sans-serif; color: #ff3366; display: flex; align-items: center; gap: 0.4rem;">
                 <span>⚔️</span> 평균 가한 피해량 랭킹
               </h3>
               <div id="damage-ranking-wrapper" style="overflow-y: auto; flex: 1; padding-right: 0.4rem; display: flex; flex-direction: column; gap: 0.6rem;">
-                <!-- JS에서 동적으로 렌더링됨 -->
+                <!-- JS 렌더링 -->
               </div>
             </div>
-
           </div>
-          <div class="stats-reset-zone">
+          
+          <div class="stats-reset-zone" style="margin-top: 1rem; border-top:1px dashed rgba(255,255,255,0.08); padding-top:0.8rem; display:flex; justify-content:space-between; align-items:center;">
             <div>
               <strong>전적 DB 초기화</strong>
-                <span>개인전·팀전·보스 난이도·피해량·상성·1대1 티어 기록을 모두 삭제합니다.</span>
+              <span style="font-size:0.75rem; color:var(--text-secondary); display:block;">PvP 시뮬레이션 역사 전적 랭킹을 리셋합니다. (계정 정보 보존)</span>
             </div>
-            <button id="reset-stats-btn" class="btn stats-reset-btn" type="button">전적 전체 초기화</button>
+            <button id="reset-stats-btn" class="btn stats-reset-btn" type="button" style="height:36px; padding:0 0.8rem;">전적 리셋</button>
           </div>
         </div>
       </div>
 
-      <!-- 캐릭터 상세 설명 모달 -->
-      <div id="char-detail-modal" class="modal-overlay hidden">
+      <!-- 캐릭터 상세 정보 모달 -->
+      <div id="char-detail-modal" class="modal-overlay hidden" style="z-index: 1000;">
         <div class="modal-content card" style="max-width: 580px; width: 90%; max-height: 85vh; padding: 2rem; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 0 35px rgba(255, 255, 255, 0.05); text-align: left;">
-          <!-- 모달 헤더 (이름, 역할군) -->
           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.8rem;">
             <div style="display: flex; align-items: center; gap: 0.8rem;">
               <h2 id="detail-char-name" style="margin: 0; font-family: 'Orbit', sans-serif; font-weight: 800; font-size: 1.8rem; color: #fff;">캐릭터명</h2>
@@ -425,9 +906,7 @@
             <button id="detail-close-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.8rem; cursor: pointer;">✕ 닫기</button>
           </div>
 
-          <!-- 모달 바디 (스크롤 가능한 콘텐츠) -->
           <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.2rem; text-align: left; padding-right: 0.3rem;">
-            <!-- 프로필 & 설명 -->
             <div style="display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem;">
               <div id="detail-char-avatar-container" style="flex-shrink: 0;"></div>
               <div id="detail-char-desc" style="flex: 1; min-width: 200px; font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary);">
@@ -435,11 +914,9 @@
               </div>
             </div>
 
-            <!-- 스탯 그래프 부문 -->
             <div>
               <h3 style="margin-top: 0; margin-bottom: 0.8rem; font-family: 'Orbit', sans-serif; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.3rem;">📊 시뮬레이션 기본 능력치</h3>
               <div class="detail-stats-grid" style="display: flex; flex-direction: column; gap: 0.7rem; background: rgba(0, 0, 0, 0.15); border-radius: 10px; padding: 1rem; border: 1px solid rgba(255,255,255,0.02);">
-                <!-- HP -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
                   <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">체력 (HP)</span>
                   <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
@@ -447,7 +924,6 @@
                   </div>
                   <span id="detail-stat-val-hp" style="font-size: 0.85rem; font-family: monospace; width: 35px; text-align: right; color: #fff;">0</span>
                 </div>
-                <!-- ATK -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
                   <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">공격력 (ATK)</span>
                   <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
@@ -455,7 +931,6 @@
                   </div>
                   <span id="detail-stat-val-atk" style="font-size: 0.85rem; font-family: monospace; width: 35px; text-align: right; color: #fff;">0</span>
                 </div>
-                <!-- SPEED -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
                   <span style="font-size: 0.75rem; width: 75px; color: var(--text-secondary); font-weight: 700;">속도 (SPD)</span>
                   <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
@@ -466,7 +941,6 @@
               </div>
             </div>
 
-            <!-- 스킬 정보 부문 -->
             <div>
               <h3 style="margin-top: 0; margin-bottom: 0.8rem; font-family: 'Orbit', sans-serif; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.3rem;">⚡ 보유 고유 기술</h3>
               <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
@@ -481,7 +955,7 @@
           </div>
         </div>
       </div>
-    </div>
+
     </div>
 
     <script type="module" src="/src/main.ts"></script>

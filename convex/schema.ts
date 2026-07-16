@@ -14,14 +14,25 @@ export default defineSchema({
     general: v.optional(v.array(v.string())),
   }),
 
-  // v3.0.0: 캐릭터는 계정이 아닌 서버 전체가 함께 성장시킨다.
+  // v4.0.0: 캐릭터(계정) 매핑 기반 성장 정보
   characterProgress: defineTable({
-    characterId: v.string(),
+    characterId: v.string(),         // 계정 식별자 (예: "doyun", "jiho")
     level: v.number(),
     experience: v.number(),
+    coins: v.number(),               // 보유 코인 (가챠 재화)
+    skillPoints: v.number(),         // 남은 스킬 포인트
     totalDungeonClears: v.number(),
     updatedAt: v.number(),
   }).index("by_characterId", ["characterId"]),
+
+  // 캐릭터별 스킬 트리 투자 현황
+  characterSkills: defineTable({
+    characterId: v.string(),
+    skillId: v.string(),             // e.g. "skill_1", "skill_2", "passive_1"
+    investedPoints: v.number(),      // 투자한 스킬 포인트 레벨 (최대 3 또는 5)
+  })
+    .index("by_characterId", ["characterId"])
+    .index("by_characterId_and_skillId", ["characterId", "skillId"]),
 
   // 던전 해금 상태도 서버 공용이다. 개별 클리어 기록은 dungeonCharacterRecords에서 관리한다.
   dungeonProgress: defineTable({
@@ -31,7 +42,7 @@ export default defineSchema({
     lastClearedAt: v.optional(v.number()),
   }).index("by_dungeonId", ["dungeonId"]),
 
-  // 캐릭터별 던전 최고 기록은 별도 문서로 두어 이후 PvE 순위표를 지원한다.
+  // 캐릭터별 던전 최고 기록
   dungeonCharacterRecords: defineTable({
     dungeonId: v.string(),
     characterId: v.string(),
@@ -42,7 +53,7 @@ export default defineSchema({
     .index("by_dungeonId_and_characterId", ["dungeonId", "characterId"])
     .index("by_dungeonId_and_fastestClearMs", ["dungeonId", "fastestClearMs"]),
 
-  // 스테이지 보상은 개별 클리어 단위로 지급하되, 첫 클리어와 반복 클리어를 구분한다.
+  // 스테이지 보상 기록
   dungeonStageRecords: defineTable({
     dungeonId: v.string(),
     characterId: v.string(),
@@ -74,14 +85,7 @@ export default defineSchema({
     .index("by_seasonId_and_mode_and_characterId", ["seasonId", "mode", "characterId"])
     .index("by_seasonId_and_mode_and_score", ["seasonId", "mode", "score"]),
 
-  // 8주 시즌 전환 시 던전 진행·가챠 카운트를 한 번만 초기화하기 위한 단일 상태 문서다.
-  v3SeasonStates: defineTable({
-    key: v.literal("global"),
-    seasonId: v.string(),
-    updatedAt: v.number(),
-  }).index("by_key", ["key"]),
-
-  // 스킨 정의는 향후 이동 흔적·이름표 등 다른 코스메틱 종류로 확장할 수 있다.
+  // 스킨 정의
   cosmetics: defineTable({
     cosmeticId: v.string(),
     name: v.string(),
@@ -115,58 +119,24 @@ export default defineSchema({
     .index("by_cosmeticId", ["cosmeticId"])
     .index("by_scope_and_rarity", ["scope", "rarity"]),
 
-  // 한 번 해금된 스킨은 전 서버가 사용할 수 있는 공용 도감에 남는다.
+  // 캐릭터별 스킨 해금 정보
   cosmeticUnlocks: defineTable({
-    cosmeticId: v.string(),
-    unlockedAt: v.number(),
-    unlockedByClientId: v.optional(v.string()),
-  }).index("by_cosmeticId", ["cosmeticId"]),
-
-  // 캐릭터별 현재 공용 장착 스킨. 다른 클라이언트도 이 값을 구독해 같은 외형을 렌더링한다.
-  characterCosmeticLoadouts: defineTable({
     characterId: v.string(),
     cosmeticId: v.string(),
+    unlockedAt: v.number(),
+  }).index("by_characterId_and_cosmeticId", ["characterId", "cosmeticId"]),
+
+  // 캐릭터별 현재 장착 스킨/세레모니 정보
+  characterCosmeticLoadouts: defineTable({
+    characterId: v.string(),
+    equippedCosmeticId: v.optional(v.string()),
+    equippedActionId: v.optional(v.string()),
+    equippedBackgroundId: v.optional(v.string()),
+    equippedSpecialEventId: v.optional(v.string()),
     updatedAt: v.number(),
-    updatedByClientId: v.optional(v.string()),
   }).index("by_characterId", ["characterId"]),
 
-  // 승리 세레모니는 스킨과 별도 가챠 분류로 관리하며, 전투 결과 1위에게 공용으로 적용된다.
-  victoryCeremonies: defineTable({
-    ceremonyId: v.string(),
-    name: v.string(),
-    rarity: v.union(
-      v.literal("common"),
-      v.literal("rare"),
-      v.literal("epic"),
-      v.literal("legendary"),
-      v.literal("unique"),
-    ),
-    animation: v.union(
-      v.literal("wave"),
-      v.literal("jump"),
-      v.literal("clap"),
-      v.literal("dance"),
-      v.literal("trophy"),
-      v.literal("fireworks"),
-    ),
-    isActive: v.boolean(),
-    createdAt: v.number(),
-  }).index("by_ceremonyId", ["ceremonyId"]),
-
-  victoryCeremonyUnlocks: defineTable({
-    ceremonyId: v.string(),
-    unlockedAt: v.number(),
-    unlockedByClientId: v.optional(v.string()),
-  }).index("by_ceremonyId", ["ceremonyId"]),
-
-  victoryCeremonyLoadouts: defineTable({
-    key: v.literal("global"),
-    ceremonyId: v.string(),
-    updatedAt: v.number(),
-    updatedByClientId: v.optional(v.string()),
-  }).index("by_key", ["key"]),
-
-  // v3.2.2: 승리 세레모니는 행동과 배경을 독립 수집·장착한다. 이전 통합 세레모니 테이블은 호환용으로 유지한다.
+  // 세레모니 액션 정보
   victoryActions: defineTable({
     actionId: v.string(),
     name: v.string(),
@@ -179,10 +149,14 @@ export default defineSchema({
 
   victoryActionUnlocks: defineTable({
     actionId: v.string(),
+    characterId: v.string(),
     unlockedAt: v.number(),
-    unlockedByClientId: v.optional(v.string()),
-  }).index("by_actionId", ["actionId"]),
+  })
+    .index("by_actionId", ["actionId"])
+    .index("by_characterId", ["characterId"])
+    .index("by_characterId_and_actionId", ["characterId", "actionId"]),
 
+  // 세레모니 배경 정보
   victoryBackgrounds: defineTable({
     backgroundId: v.string(),
     name: v.string(),
@@ -195,19 +169,14 @@ export default defineSchema({
 
   victoryBackgroundUnlocks: defineTable({
     backgroundId: v.string(),
+    characterId: v.string(),
     unlockedAt: v.number(),
-    unlockedByClientId: v.optional(v.string()),
-  }).index("by_backgroundId", ["backgroundId"]),
+  })
+    .index("by_backgroundId", ["backgroundId"])
+    .index("by_characterId", ["characterId"])
+    .index("by_characterId_and_backgroundId", ["characterId", "backgroundId"]),
 
-  victoryCeremonyPartLoadouts: defineTable({
-    key: v.literal("global"),
-    actionId: v.optional(v.string()),
-    backgroundId: v.optional(v.string()),
-    updatedAt: v.number(),
-    updatedByClientId: v.optional(v.string()),
-  }).index("by_key", ["key"]),
-
-  // 특수 이벤트는 승리 모달 전체에 적용되는 연출이다. 행동·무대 배경과 별도 수집·장착한다.
+  // 특수 연출 정보
   victorySpecialEvents: defineTable({
     specialEventId: v.string(),
     name: v.string(),
@@ -220,54 +189,12 @@ export default defineSchema({
 
   victorySpecialEventUnlocks: defineTable({
     specialEventId: v.string(),
+    characterId: v.string(),
     unlockedAt: v.number(),
-    unlockedByClientId: v.optional(v.string()),
-  }).index("by_specialEventId", ["specialEventId"]),
-
-  victorySpecialEventLoadouts: defineTable({
-    key: v.literal("global"),
-    specialEventId: v.optional(v.string()),
-    updatedAt: v.number(),
-    updatedByClientId: v.optional(v.string()),
-  }).index("by_key", ["key"]),
-
-  // 로그인 없는 환경의 일일 뽑기·플레이·경험치 포인트 상태. 브라우저 익명 ID 단위로만 관리한다.
-  anonymousGachaStates: defineTable({
-    clientId: v.string(),
-    dailyResetDate: v.string(),
-    dailyDrawsUsed: v.number(),
-    completedPlayCount: v.number(),
-    bonusDrawsUsed: v.number(),
-    // v3.1.1 이전에 숫자로 보관하던 포인트. 도감 아이템으로 한 번 사용할 때까지 유지한다.
-    experiencePoints: v.optional(v.number()),
-    updatedAt: v.number(),
-  }).index("by_clientId", ["clientId"]),
-
-  experiencePointItems: defineTable({
-    clientId: v.string(),
-    amount: v.number(),
-    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
-    createdAt: v.number(),
-  }).index("by_clientId", ["clientId"]),
-
-  // 가챠 이력은 계속 늘어나므로 상태 문서와 분리한다.
-  gachaDrawHistory: defineTable({
-    clientId: v.string(),
-    targetCharacterId: v.optional(v.string()),
-    cosmeticId: v.string(),
-    result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
-    experienceGranted: v.number(),
-    createdAt: v.number(),
-  }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
-
-  // 세레모니 이력은 기존 스킨 가챠 이력과 분리해 대상 종류를 명확히 한다.
-  victoryCeremonyDrawHistory: defineTable({
-    clientId: v.string(),
-    ceremonyId: v.string(),
-    result: v.union(v.literal("unlocked"), v.literal("duplicateExperience")),
-    experienceGranted: v.number(),
-    createdAt: v.number(),
-  }).index("by_clientId_and_createdAt", ["clientId", "createdAt"]),
+  })
+    .index("by_specialEventId", ["specialEventId"])
+    .index("by_characterId", ["characterId"])
+    .index("by_characterId_and_specialEventId", ["characterId", "specialEventId"]),
 
   // 영구 플레이어 아이템 도감 정의
   persistentItemCatalog: defineTable({
@@ -287,11 +214,16 @@ export default defineSchema({
     effects: v.object({
       maxHpMultiplier: v.optional(v.number()),
       speedMultiplier: v.optional(v.number()),
-      attackMultiplier: v.optional(v.number()),
       baseAttackRangeBonus: v.optional(v.number()),
       defenseShieldBonus: v.optional(v.number()),
-      damageReductionMultiplier: v.optional(v.number()),
+      attackPowerBonus: v.optional(v.number()),
+      defenseBonus: v.optional(v.number()),
+      attackSpeedMultiplier: v.optional(v.number()),
+      cooldownReductionBonus: v.optional(v.number()),
+      luckBonus: v.optional(v.number()),
+      attackMultiplier: v.optional(v.number()),
       skillChargeRateMultiplier: v.optional(v.number()),
+      damageReductionMultiplier: v.optional(v.number()),
       orbitDamage: v.optional(v.number()),
       orbitRadius: v.optional(v.number()),
       orbitInterval: v.optional(v.number()),
@@ -299,61 +231,40 @@ export default defineSchema({
       pulseRadius: v.optional(v.number()),
       pulseInterval: v.optional(v.number()),
     }),
-  })
-    .index("by_itemId", ["itemId"])
-    .index("by_isActive", ["isActive"]),
+  }).index("by_itemId", ["itemId"]),
 
-  // 플레이어가 해금한 아이템 목록
-  persistentItemUnlocks: defineTable({
-    clientId: v.string(),
-    characterId: v.string(),
-    itemId: v.string(),
+  // 캐릭터(계정)별 장비 인벤토리 및 장착 상태
+  playerItems: defineTable({
+    characterId: v.string(),         // 소유 캐릭터 ID (계정)
+    itemId: v.string(),              // 고유 인스턴스 ID (UUID 또는 랜덤 스트링)
+    itemCatalogId: v.string(),       // e.g. "inertial_bearing"
+    name: v.string(),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    level: v.number(),               // 장비 강화 레벨
+    experience: v.number(),          // 장비 누적 강화 XP
+    equippedSlot: v.number(),        // 0: 미장착, 1~8: 장착 슬롯 번호
+    effects: v.object({
+      maxHpMultiplier: v.optional(v.number()),
+      speedMultiplier: v.optional(v.number()),
+      baseAttackRangeBonus: v.optional(v.number()),
+      defenseShieldBonus: v.optional(v.number()),
+      attackPowerBonus: v.optional(v.number()),
+      defenseBonus: v.optional(v.number()),
+      attackSpeedMultiplier: v.optional(v.number()),
+      cooldownReductionBonus: v.optional(v.number()),
+      luckBonus: v.optional(v.number()),
+      attackMultiplier: v.optional(v.number()),
+      skillChargeRateMultiplier: v.optional(v.number()),
+      damageReductionMultiplier: v.optional(v.number()),
+      orbitDamage: v.optional(v.number()),
+      orbitRadius: v.optional(v.number()),
+      orbitInterval: v.optional(v.number()),
+      pulseDamage: v.optional(v.number()),
+      pulseRadius: v.optional(v.number()),
+      pulseInterval: v.optional(v.number()),
+    }),
     unlockedAt: v.number(),
   })
-    .index("by_clientId", ["clientId"])
-    .index("by_clientId_and_itemId", ["clientId", "itemId"])
-    .index("by_clientId_and_characterId", ["clientId", "characterId"])
-    .index("by_clientId_and_characterId_and_itemId", ["clientId", "characterId", "itemId"]),
-
-  // 캐릭터별 영구 아이템 장착 정보
-  characterItemLoadouts: defineTable({
-    clientId: v.string(),
-    characterId: v.string(),
-    slot1ItemId: v.optional(v.string()),
-    slot2ItemId: v.optional(v.string()),
-    slot3ItemId: v.optional(v.string()),
-    updatedAt: v.number(),
-  }).index("by_clientId_and_characterId", ["clientId", "characterId"]),
-
-  // 뽑기권 잔액
-  itemTicketBalances: defineTable({
-    clientId: v.string(),
-    characterId: v.string(),
-    availableTickets: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_clientId", ["clientId"])
-    .index("by_clientId_and_characterId", ["clientId", "characterId"]),
-
-  // 마일스톤 레벨 보상 티켓 수령 여부
-  itemTicketClaims: defineTable({
-    clientId: v.string(),
-    characterId: v.string(),
-    milestoneLevel: v.number(),
-    claimedAt: v.number(),
-  })
-    .index("by_clientId_and_characterId_and_milestoneLevel", ["clientId", "characterId", "milestoneLevel"])
-    .index("by_clientId_and_characterId", ["clientId", "characterId"]),
-
-  // 뽑기 이력
-  itemDrawHistory: defineTable({
-    clientId: v.string(),
-    characterId: v.string(),
-    itemId: v.string(),
-    result: v.literal("unlocked"),
-    ticketConsumed: v.number(),
-    createdAt: v.number(),
-  })
-    .index("by_clientId_and_createdAt", ["clientId", "createdAt"])
-    .index("by_clientId_and_characterId_and_createdAt", ["clientId", "characterId", "createdAt"]),
+    .index("by_characterId", ["characterId"])
+    .index("by_characterId_and_equippedSlot", ["characterId", "equippedSlot"]),
 });
