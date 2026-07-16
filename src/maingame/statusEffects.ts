@@ -22,6 +22,7 @@ export function getCharacterStatusEffects(char: CharacterState): CharacterStatus
     ...(char.isConfused ? [timed('🌀', '혼란', char.confusedTimeLeft, '#fb7185')] : []),
     ...(char.nayutaControlled ? [timed('⛓', '지배', char.nayutaControlTimeLeft, '#ef4444')] : []),
     ...(char.isPoisoned ? [timed('☠', '독', char.poisonTimeLeft, '#84cc16')] : []),
+    ...((char.movementSlowTimeLeft ?? 0) > 0 ? [timed('⛓', '둔화', char.movementSlowTimeLeft, '#93c5fd')] : []),
     ...(char.isImmune || char.isSuInvisible ? [timed('🛡', '무적', char.immuneTimeLeft, '#67e8f9')] : []),
     ...(char.statusIndicators ?? []),
     ...(char.getStatusEffects?.(char) ?? []),

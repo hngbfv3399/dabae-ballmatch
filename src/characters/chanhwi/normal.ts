@@ -1,382 +1,192 @@
-import type { CharacterConfig, CharacterState, CharacterBehaviorContext } from '../character.interface';
+import type { CharacterBehaviorContext, CharacterConfig, CharacterState } from '../character.interface';
 
-// ═══════════════════════════════════════════
+// #region TYPES
+// 찬휘의 마기 상태는 CharacterState에 선언해 HUD·렌더링·전투가 같은 값을 사용한다.
+// #endregion TYPES
+
 // #region CONSTANTS
-// ═══════════════════════════════════════════
 const SKILL_CONSTANTS = {
-  TOTAL_DURATION: 17.4,       // 2.0s slide + 15.0s casting + 0.4s blast
-  SLIDE_DURATION: 2.0,        // teleport slide to center
-  CASTING_DURATION: 15.0,     // casting phase with quotes
-  BLAST_DURATION: 0.4,        // shockwave expansion
-  BLAST_TRIGGER_TIME: 17.0,   // when blast fires (TOTAL - BLAST)
-  DMG_REDUCTION: 0.03,        // 97% reduction = only 3% taken
-  // Distance-based HP ratio thresholds
-  CLOSE_RANGE: 200,           // <= 200px
-  CLOSE_HP_RATIO: 0.03,       // leave 3% HP
-  MID_RANGE: 400,             // <= 400px
-  MID_HP_RATIO: 0.18,         // leave 18% HP
-  FAR_HP_RATIO: 0.38,         // leave 38% HP
-  BOSS_DAMAGE_RATIO: 0.08,   // bosses take 8% of their maximum HP
-  STUN_DURATION: 1.8,
-  BLAST_VISUAL_RADIUS: 850,
-  SHAKE_MAX_CASTING: 10,      // max screen shake px during casting
-  SHAKE_MAX_BLAST: 25,        // max screen shake px at blast
-  QUOTE_INTERVAL: 2.1,        // seconds between quote lines
-};
-
-const QUOTES = [
-  '이타미오 칸지로',
-  '이타미오 칸가에로',
-  '이타미오 우케토레',
-  '이타미오 시레',
-  '이타미오 시라노 모노니 혼또노 헤이와오 와카란',
-  '오레와 야히코노 이타미오 와스레나이',
-  '코코요이 세카이니 이타미오',
-];
-
-const FINAL_QUOTE = '신라... 텐세!!!';
+  BARRIER_DURATION: 3,
+  BARRIER_RADIUS_MULTIPLIER: 4,
+  DAMAGE_INTERVAL: 0.5,
+  DAMAGE_RATIO: 0.3,
+  SLOW_MULTIPLIER: 0.75,
+  SLOW_DURATION: 0.65,
+  MAX_DEMONIC_STACKS: 5,
+  STACK_DURATION: 6,
+  EXPLOSION_RADIUS_MULTIPLIER: 4.8,
+  EXPLOSION_DAMAGE_RATIO: 1.4,
+  EXPLOSION_STUN_DURATION: 0.3,
+  BARRIER_COLOR: '#dc2626',
+  DEMONIC_COLOR: '#f97316',
+} as const;
 // #endregion CONSTANTS
 
-// ═══════════════════════════════════════════
 // #region HELPERS
-// ═══════════════════════════════════════════
 function isEnemy(first: CharacterState, second: CharacterState): boolean {
   return first.teamId === undefined || second.teamId === undefined || first.teamId !== second.teamId;
 }
+
+function addDemonicStack(char: CharacterState, ctx: CharacterBehaviorContext): void {
+  char.chanhwiDemonicStacks = Math.min(
+    SKILL_CONSTANTS.MAX_DEMONIC_STACKS,
+    (char.chanhwiDemonicStacks ?? 0) + 1,
+  );
+  char.chanhwiDemonicStackTimeLeft = SKILL_CONSTANTS.STACK_DURATION;
+  if (char.chanhwiDemonicStacks === SKILL_CONSTANTS.MAX_DEMONIC_STACKS) {
+    ctx.addFloatingText(char.x, char.y - char.radius - 26, '마기 포화', SKILL_CONSTANTS.DEMONIC_COLOR, 0.8);
+  }
+}
+
+function getBarrierTargets(char: CharacterState, ctx: CharacterBehaviorContext, radiusMultiplier: number): CharacterState[] {
+  const radius = char.radius * radiusMultiplier;
+  return ctx.characters.filter((target) =>
+    !target.isDead
+    && target.id !== char.id
+    && isEnemy(char, target)
+    && Math.hypot(target.x - char.x, target.y - char.y) <= radius + target.radius,
+  );
+}
+
+function detonateDemonicEnergy(char: CharacterState, ctx: CharacterBehaviorContext): void {
+  const targets = getBarrierTargets(char, ctx, SKILL_CONSTANTS.EXPLOSION_RADIUS_MULTIPLIER);
+  targets.forEach((target) => {
+    ctx.dealDamage(char, target, char.attackPower * SKILL_CONSTANTS.EXPLOSION_DAMAGE_RATIO, '마기 폭발');
+    ctx.applyStun(char, target, SKILL_CONSTANTS.EXPLOSION_STUN_DURATION);
+  });
+  ctx.createExplosion(char.x, char.y, SKILL_CONSTANTS.DEMONIC_COLOR, 28);
+  ctx.addFloatingText(char.x, char.y - 54, '마기 폭발!', '#fde68a', 1.1);
+  ctx.logMessage?.(`🔥 [마기 폭발] 찬휘가 ${targets.length}명에게 결계 폭발을 일으켰습니다.`, 'skill');
+  char.chanhwiDemonicStacks = 0;
+  char.chanhwiDemonicStackTimeLeft = 0;
+}
 // #endregion HELPERS
 
-// ═══════════════════════════════════════════
-// #region CONFIG — character stats & metadata
-// ═══════════════════════════════════════════
+// #region CONFIG
 export const chanhwiConfig: CharacterConfig = {
   id: 'chanhwi',
   name: '찬휘',
-  maxHp: 70,
-  speed: 1.6,
-  attackPower: 25,
-  defense: 2,
-  baseAttackRange: 45,
-  skillName: '신라천정 (Shinra Tensei)',
-  skillDescription: '6초 쿨타임. 스킬 시전 시 2초간 현재 전장 중앙으로 부드럽게 이끌려가며 순간이동 궤적을 그리고, 이후 15초 동안 공중 부양(부동 상태)한 채 화면을 암전시키고 신라천정 대사를 전장 중앙에 렌더링합니다. 이후 일반 적의 체력을 거리 비례(200px 이하 3%, 200px~400px 18%, 400px 초과 38%)로 남기고 1.8초간 기절시킵니다. 아군은 영향을 받지 않습니다. 보스에게는 최대 체력의 8% 피해만 주며 CC는 적용하지 않습니다. 캐스팅 및 방출 동안 받는 피해가 97% 감소(3%만 피해 적용)합니다.',
-  color: '#8a2be2', // 보라색
-  skillChargeRate: 16.67,
-  tier: 'S',
-  role: 'Nuker',
-  detailedDescription: '찬휘는 엄청난 충격파로 필드의 모든 적을 궤멸시키는 맵 지배형 누커 캐릭터입니다. 스킬 게이지가 완료되면 화면 중앙으로 공중 도약하여 대사를 외치며, 적에게만 거리 비례 파멸적인 체력 고정 대미지와 기절을 가합니다.',
-  luck: 14,
-  attackSpeed: 1.0,
-// #endregion CONFIG
+  maxHp: 175,
+  speed: 1.25,
+  attackPower: 15,
+  defense: 8,
+  baseAttackRange: 36,
+  skillName: '마천결계',
+  skillDescription: '3초 동안 자신 주변에 마천결계를 펼칩니다. 결계 안의 적은 0.5초마다 공격력의 30% 피해를 받고 25% 둔화됩니다. 피해를 줄 때마다 마기 1스택(최대 5)을 얻으며, 결계 종료 시 마기가 5스택이면 넓은 범위에 공격력의 140% 피해와 0.3초 경직을 주는 마기 폭발을 일으킵니다.',
+  color: '#dc2626',
+  skillChargeRate: 12.5,
+  tier: 'A',
+  role: 'Juggernaut',
+  detailedDescription: '찬휘는 마천결계로 전장 한가운데를 장악하는 근거리 브루저입니다. 기본 공격과 결계 피해로 마기를 채운 뒤 폭발을 만들며, PvP와 PvE에서 동일한 결계·둔화·마기 규칙을 사용합니다.',
+  luck: 15,
+  attackSpeed: 1.15,
 
-  // ═══════════════════════════════════════════
-  // #region SKILL_TRIGGER — skill activation
-  // ═══════════════════════════════════════════
-  onSkillTrigger(char: CharacterState) {
+  // #region SKILL_TRIGGER
+  onSkillTrigger(char, ctx) {
     char.skillActive = true;
-    char.skillDurationLeft = SKILL_CONSTANTS.TOTAL_DURATION;
-    (char as any).blastTriggered = false;
-
-    // Record starting position for slide animation
-    (char as any).preX = char.x;
-    (char as any).preY = char.y;
-    char.vx = 0;
-    char.vy = 0;
+    char.skillDurationLeft = SKILL_CONSTANTS.BARRIER_DURATION;
+    char.chanhwiBarrierPulseTimer = 0;
+    ctx.createExplosion(char.x, char.y, SKILL_CONSTANTS.BARRIER_COLOR, 14);
+    ctx.addFloatingText(char.x, char.y - 48, '마천결계', '#fecaca', 0.9);
+    ctx.logMessage?.('🔴 [마천결계] 찬휘가 전장을 억누르는 결계를 펼쳤습니다.', 'skill');
   },
   // #endregion SKILL_TRIGGER
 
-  // ═══════════════════════════════════════════
-  // #region UPDATE — per-frame update logic
-  // ═══════════════════════════════════════════
-  onUpdate(char: CharacterState, dt: number, ctx) {
-    if (char.skillActive) {
-      char.skillDurationLeft -= dt;
+  // #region UPDATE
+  onUpdate(char, dt, ctx) {
+    if ((char.chanhwiDemonicStackTimeLeft ?? 0) > 0) {
+      char.chanhwiDemonicStackTimeLeft = Math.max(0, (char.chanhwiDemonicStackTimeLeft ?? 0) - dt);
+      if (char.chanhwiDemonicStackTimeLeft === 0) char.chanhwiDemonicStacks = 0;
+    }
+    if (!char.skillActive) return;
 
-      // Lock movement during skill
-      char.vx = 0;
-      char.vy = 0;
+    char.skillDurationLeft -= dt;
+    char.chanhwiBarrierPulseTimer = (char.chanhwiBarrierPulseTimer ?? 0) - dt;
+    if (char.chanhwiBarrierPulseTimer <= 0) {
+      const targets = getBarrierTargets(char, ctx, SKILL_CONSTANTS.BARRIER_RADIUS_MULTIPLIER);
+      targets.forEach((target) => {
+        ctx.dealDamage(char, target, char.attackPower * SKILL_CONSTANTS.DAMAGE_RATIO, '마천결계');
+        target.movementSlowMultiplier = Math.min(target.movementSlowMultiplier ?? 1, SKILL_CONSTANTS.SLOW_MULTIPLIER);
+        target.movementSlowTimeLeft = Math.max(target.movementSlowTimeLeft ?? 0, SKILL_CONSTANTS.SLOW_DURATION);
+        ctx.createParticle(target.x, target.y, SKILL_CONSTANTS.BARRIER_COLOR, 2.8, 10);
+      });
+      if (targets.length > 0) addDemonicStack(char, ctx);
+      char.chanhwiBarrierPulseTimer = SKILL_CONSTANTS.DAMAGE_INTERVAL;
+    }
 
-      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
-      const centerX = ctx.arenaWidth / 2;
-      const centerY = ctx.arenaHeight / 2;
-
-      // Phase 1: Teleport slide (0.0 ~ 2.0s)
-      if (elapsed < SKILL_CONSTANTS.SLIDE_DURATION) {
-        const t = elapsed / SKILL_CONSTANTS.SLIDE_DURATION;
-        char.x = (char as any).preX + (centerX - (char as any).preX) * t;
-        char.y = (char as any).preY + (centerY - (char as any).preY) * t;
-
-        // Trail particles
-        if (Math.random() < 0.6) {
-          ctx.createParticle(char.x, char.y, '#da70d6', 3.0, 12);
-        }
-        (char as any).currentQuotes = undefined;
-      } else {
-        // Lock at center after slide
-        char.x = centerX;
-        char.y = centerY;
-
-        // Phase 2: Quote display
-        const quoteElapsed = elapsed - SKILL_CONSTANTS.SLIDE_DURATION;
-        const quotes: string[] = [];
-
-        for (let i = 0; i < QUOTES.length; i++) {
-          if (quoteElapsed >= i * SKILL_CONSTANTS.QUOTE_INTERVAL) {
-            quotes.push(QUOTES[i]);
-          }
-        }
-
-        if (quoteElapsed >= SKILL_CONSTANTS.CASTING_DURATION) {
-          (char as any).currentQuotes = [FINAL_QUOTE];
-        } else {
-          (char as any).currentQuotes = quotes;
-        }
-
-        // Casting suction particles
-        if (quoteElapsed < SKILL_CONSTANTS.CASTING_DURATION) {
-          if (Math.random() < 0.4) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 120 + Math.random() * 180;
-            const spawnX = char.x + Math.cos(angle) * dist;
-            const spawnY = char.y + Math.sin(angle) * dist;
-            ctx.createParticle(spawnX, spawnY, '#9933ff', 2.5, 8);
-          }
-        }
-
-        // Phase 3: Blast trigger at 17.0s
-        if (elapsed >= SKILL_CONSTANTS.BLAST_TRIGGER_TIME && !(char as any).blastTriggered) {
-          (char as any).blastTriggered = true;
-
-          console.log(`💥 [신라천정 격발] 찬휘 -> 전 화면 무차별 전탄 척력파 방출! 전원 체력 거리 비례 감소 및 기절!`);
-          ctx.logMessage?.(`💥 [신라천정 격발] 찬휘 ➡️ 전 화면 무차별 척력파 방출!`, 'skill');
-          ctx.addFloatingText(char.x, char.y - 60, 'SHINRA TENSEI!!!', '#ffcc00', 2.0);
-          ctx.createExplosion(char.x, char.y, '#da70d6', 50);
-          ctx.createExplosion(char.x, char.y, '#8a2be2', 35);
-
-          // Hit all alive enemies
-          const chars = (ctx as any).characters as CharacterState[];
-          chars.forEach((enemy) => {
-            if (enemy.isDead || enemy.id === char.id || !isEnemy(char, enemy)) return;
-
-            const dist = Math.hypot(enemy.x - char.x, enemy.y - char.y);
-            let hpRatio = SKILL_CONSTANTS.FAR_HP_RATIO;
-            if (dist <= SKILL_CONSTANTS.CLOSE_RANGE) {
-              hpRatio = SKILL_CONSTANTS.CLOSE_HP_RATIO;
-            } else if (dist <= SKILL_CONSTANTS.MID_RANGE) {
-              hpRatio = SKILL_CONSTANTS.MID_HP_RATIO;
-            }
-
-            const targetHp = Math.round(enemy.maxHp * hpRatio);
-            const damage = enemy.isBoss
-              ? Math.max(1, Math.round(enemy.maxHp * SKILL_CONSTANTS.BOSS_DAMAGE_RATIO))
-              : Math.max(1, enemy.hp - targetHp);
-            const hitText = enemy.isBoss
-              ? `💥 신라천정(보스 ${Math.round(SKILL_CONSTANTS.BOSS_DAMAGE_RATIO * 100)}%)`
-              : `💥 신라천정(${Math.round(hpRatio * 100)}%)`;
-
-            ctx.dealDamage(char, enemy, damage, hitText);
-
-            if (!enemy.isBoss) {
-              // Stun without forced displacement
-              ctx.applyStun(char, enemy, SKILL_CONSTANTS.STUN_DURATION);
-            }
-
-            const effectText = enemy.isBoss
-              ? `보스 최대 HP ${Math.round(SKILL_CONSTANTS.BOSS_DAMAGE_RATIO * 100)}% 피해, CC 면역`
-              : `거리: ${Math.round(dist)}px, HP ${Math.round(hpRatio * 100)}%만 남김, ${SKILL_CONSTANTS.STUN_DURATION}초 기절 (넉백 없음)`;
-            console.log(`💥 [신라천정 타격] 찬휘 -> ${enemy.name} | 대미지: ${damage} (${effectText})`);
-            ctx.logMessage?.(`💥 [신라천정 타격] 찬휘 ➡️ ${enemy.name} | ${damage} 피해 (${effectText})`, 'skill');
-          });
-        }
-      }
-
-      // Skill end
-      if (char.skillDurationLeft <= 0) {
-        char.skillActive = false;
-        (char as any).currentQuotes = undefined;
-
-        const randomAngle = Math.random() * Math.PI * 2;
-        const baseSpeed = 3.5 * char.speed;
-        char.vx = Math.cos(randomAngle) * baseSpeed;
-        char.vy = Math.sin(randomAngle) * baseSpeed;
-      }
-    } else {
-      // Stun handling
-      if (char.isStunned) {
-        char.stunTimeLeft -= dt;
-        char.vx = 0;
-        char.vy = 0;
-        if (char.stunTimeLeft <= 0) {
-          char.isStunned = false;
-          const randomAngle = Math.random() * Math.PI * 2;
-          const baseSpeed = 3.5 * char.speed;
-          char.vx = Math.cos(randomAngle) * baseSpeed;
-          char.vy = Math.sin(randomAngle) * baseSpeed;
-        }
-      }
+    if (char.skillDurationLeft <= 0) {
+      char.skillActive = false;
+      if ((char.chanhwiDemonicStacks ?? 0) >= SKILL_CONSTANTS.MAX_DEMONIC_STACKS) detonateDemonicEnergy(char, ctx);
     }
   },
   // #endregion UPDATE
 
-  // ═══════════════════════════════════════════
-  // #region DAMAGE — damage reduction while casting
-  // ═══════════════════════════════════════════
-  onTakeDamage(target: CharacterState, _attacker: CharacterState, damage: number, _ctx: CharacterBehaviorContext) {
-    if (target.skillActive) {
-      // 97% damage reduction during Shinra Tensei
-      let finalDamage = Math.round(damage * SKILL_CONSTANTS.DMG_REDUCTION);
-      if (finalDamage < 1 && damage >= 1) {
-        finalDamage = 1; // Minimum 1 damage
-      }
-      return { finalDamage, blocked: false };
-    }
+  // #region BASIC_ATTACK
+  onBasicAttack(char, _opponent, ctx) {
+    addDemonicStack(char, ctx);
+  },
+  // #endregion BASIC_ATTACK
+
+  // #region COLLISION
+  onCollisionWithTarget() {
+    // 기본 충돌 판정은 공통 전투 엔진이 처리한다.
+  },
+  // #endregion COLLISION
+
+  // #region DAMAGE
+  onTakeDamage(_target, _attacker, damage) {
     return { finalDamage: damage, blocked: false };
   },
   // #endregion DAMAGE
 
-  // ═══════════════════════════════════════════
-  // #region RENDER — visual effects
-  // ═══════════════════════════════════════════
-
-  // Pre-render: screen shake calculation is done in onRenderOverlay
-  onPreRender(_char: CharacterState, _canvasCtx: CanvasRenderingContext2D) {
-    // No per-character pre-render needed for chanhwi
+  // #region DEATH
+  onDeath(char) {
+    char.skillActive = false;
+    char.chanhwiDemonicStacks = 0;
+    char.chanhwiDemonicStackTimeLeft = 0;
   },
+  // #endregion DEATH
 
-  // Fullscreen overlay: screen darkening, subtitles, screen shake
-  onRenderOverlay(char: CharacterState, canvasCtx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
-    if (!char.skillActive || char.isDead) return;
-
-    const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
-
-    // Screen shake
-    if (elapsed >= SKILL_CONSTANTS.SLIDE_DURATION && elapsed < SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-      const ratio = (elapsed - SKILL_CONSTANTS.SLIDE_DURATION) / SKILL_CONSTANTS.CASTING_DURATION;
-      const shakeAmount = ratio * SKILL_CONSTANTS.SHAKE_MAX_CASTING;
-      const dx = (Math.random() - 0.5) * shakeAmount;
-      const dy = (Math.random() - 0.5) * shakeAmount;
-      canvasCtx.translate(dx, dy);
-    } else if (elapsed >= SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-      const blastElapsed = elapsed - SKILL_CONSTANTS.BLAST_TRIGGER_TIME;
-      const shakeAmount = (1.0 - (blastElapsed / SKILL_CONSTANTS.BLAST_DURATION)) * SKILL_CONSTANTS.SHAKE_MAX_BLAST;
-      if (shakeAmount > 0) {
-        const dx = (Math.random() - 0.5) * shakeAmount;
-        const dy = (Math.random() - 0.5) * shakeAmount;
-        canvasCtx.translate(dx, dy);
-      }
-    }
-
-    // Screen darkening during casting
-    if (elapsed >= SKILL_CONSTANTS.SLIDE_DURATION && elapsed < SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-      const alpha = Math.min(0.55, ((elapsed - SKILL_CONSTANTS.SLIDE_DURATION) / SKILL_CONSTANTS.CASTING_DURATION) * 0.55);
-      canvasCtx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-      canvasCtx.fillRect(-50, -50, canvasWidth + 100, canvasHeight + 100);
-    } else if (elapsed >= SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-      // White flash at blast
-      const blastElapsed = elapsed - SKILL_CONSTANTS.BLAST_TRIGGER_TIME;
-      const flashAlpha = 1.0 - (blastElapsed / SKILL_CONSTANTS.BLAST_DURATION);
-      if (flashAlpha > 0) {
-        canvasCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-        canvasCtx.fillRect(-50, -50, canvasWidth + 100, canvasHeight + 100);
-      }
-    }
-
-    // Subtitle rendering (on top of darkened overlay)
-    if ((char as any).currentQuotes && (char as any).currentQuotes.length > 0) {
-      canvasCtx.save();
-      canvasCtx.fillStyle = '#ffffff';
-      canvasCtx.strokeStyle = '#000000';
-      canvasCtx.lineWidth = 4.5;
-      canvasCtx.font = 'bold 20px "Noto Sans KR", Arial, sans-serif';
-      canvasCtx.textAlign = 'center';
-      canvasCtx.textBaseline = 'middle';
-
-      const lines = (char as any).currentQuotes as string[];
-      const isFinalBlast = lines[0].includes('신라');
-
-      if (isFinalBlast) {
-        canvasCtx.font = 'bold 46px "Noto Sans KR", Arial, sans-serif';
-        canvasCtx.fillStyle = '#ffcc00';
-        canvasCtx.strokeText(lines[0], canvasWidth / 2, canvasHeight / 2);
-        canvasCtx.fillText(lines[0], canvasWidth / 2, canvasHeight / 2);
-      } else {
-        const currentLine = lines[lines.length - 1];
-        canvasCtx.strokeText(currentLine, canvasWidth / 2, canvasHeight / 2);
-        canvasCtx.fillText(currentLine, canvasWidth / 2, canvasHeight / 2);
-      }
-      canvasCtx.restore();
-    }
-  },
-
-  // Character-level render: energy lines, barrier, shockwave
-  onRenderExtra(char: CharacterState, canvasCtx: CanvasRenderingContext2D, currentRadius: number) {
+  // #region RENDER
+  onRenderExtra(char, canvasCtx, currentRadius) {
+    const stacks = char.chanhwiDemonicStacks ?? 0;
     if (char.skillActive) {
-      const elapsed = SKILL_CONSTANTS.TOTAL_DURATION - char.skillDurationLeft;
-
-      // Gravity energy lines during casting
-      if (elapsed >= SKILL_CONSTANTS.SLIDE_DURATION && elapsed < SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-        canvasCtx.save();
-        canvasCtx.strokeStyle = 'rgba(138, 43, 226, 0.2)';
-        canvasCtx.lineWidth = 1.4;
-        const timeSeed = Date.now() / 300;
-        for (let i = 0; i < 12; i++) {
-          const angle = timeSeed + (i * Math.PI * 2) / 12;
-          const startDist = 240 - ((Date.now() / 3.5) % 220);
-          const sX = char.x + Math.cos(angle) * startDist;
-          const sY = char.y + Math.sin(angle) * startDist;
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(sX, sY);
-          canvasCtx.lineTo(char.x, char.y);
-          canvasCtx.stroke();
-        }
-
-        // Gravity barrier circle
-        const shieldPulse = currentRadius + 6 + Math.abs(Math.sin(Date.now() / 80)) * 6;
-        canvasCtx.strokeStyle = 'rgba(186, 85, 211, 0.7)';
-        canvasCtx.lineWidth = 2.5;
-        canvasCtx.fillStyle = 'rgba(138, 43, 226, 0.08)';
-        canvasCtx.beginPath();
-        canvasCtx.arc(char.x, char.y, shieldPulse, 0, Math.PI * 2);
-        canvasCtx.fill();
-        canvasCtx.stroke();
-        canvasCtx.restore();
-      } else if (elapsed >= SKILL_CONSTANTS.BLAST_TRIGGER_TIME) {
-        // Shockwave expansion
-        const blastElapsed = elapsed - SKILL_CONSTANTS.BLAST_TRIGGER_TIME;
-        const blastRatio = blastElapsed / SKILL_CONSTANTS.BLAST_DURATION;
-        const blastRadius = blastRatio * SKILL_CONSTANTS.BLAST_VISUAL_RADIUS;
-
-        canvasCtx.save();
-        const alpha = 1.0 - blastRatio;
-        canvasCtx.strokeStyle = `rgba(230, 230, 250, ${alpha})`;
-        canvasCtx.lineWidth = 9 * (1 - blastRatio) + 2;
-        canvasCtx.beginPath();
-        canvasCtx.arc(char.x, char.y, blastRadius, 0, Math.PI * 2);
-        canvasCtx.stroke();
-
-        canvasCtx.fillStyle = `rgba(186, 85, 211, ${alpha * 0.18})`;
-        canvasCtx.beginPath();
-        canvasCtx.arc(char.x, char.y, blastRadius, 0, Math.PI * 2);
-        canvasCtx.fill();
-        canvasCtx.restore();
-      }
+      const radius = char.radius * SKILL_CONSTANTS.BARRIER_RADIUS_MULTIPLIER;
+      const pulse = 1 + Math.sin(Date.now() / 130) * 0.035;
+      canvasCtx.save();
+      canvasCtx.fillStyle = 'rgba(127, 29, 29, 0.14)';
+      canvasCtx.strokeStyle = 'rgba(248, 113, 113, 0.82)';
+      canvasCtx.lineWidth = 2.4;
+      canvasCtx.setLineDash([7, 8]);
+      canvasCtx.beginPath();
+      canvasCtx.arc(char.x, char.y, radius * pulse, 0, Math.PI * 2);
+      canvasCtx.fill();
+      canvasCtx.stroke();
+      canvasCtx.setLineDash([]);
+      canvasCtx.strokeStyle = 'rgba(251, 146, 60, 0.38)';
+      canvasCtx.beginPath();
+      canvasCtx.arc(char.x, char.y, currentRadius + 8, 0, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.restore();
     }
 
-    // Stun stars
-    if (char.isStunned) {
+    if (stacks > 0) {
       canvasCtx.save();
-      const numStars = 3;
-      const timeFactor = Date.now() / 150;
-      canvasCtx.fillStyle = '#ffd700';
-      canvasCtx.font = '12px Arial';
-      canvasCtx.textAlign = 'center';
-      canvasCtx.textBaseline = 'middle';
-      for (let idx = 0; idx < numStars; idx++) {
-        const starAngle = timeFactor + (idx * Math.PI * 2) / numStars;
-        const starX = char.x + Math.cos(starAngle) * (currentRadius + 6);
-        const starY = char.y - currentRadius - 10 + Math.sin(starAngle) * 4;
-        canvasCtx.fillText('💫', starX, starY);
+      for (let index = 0; index < SKILL_CONSTANTS.MAX_DEMONIC_STACKS; index += 1) {
+        canvasCtx.fillStyle = index < stacks ? SKILL_CONSTANTS.DEMONIC_COLOR : 'rgba(255,255,255,.2)';
+        canvasCtx.beginPath();
+        canvasCtx.arc(char.x - 16 + index * 8, char.y - currentRadius - 18, 2.8, 0, Math.PI * 2);
+        canvasCtx.fill();
       }
       canvasCtx.restore();
     }
-  }
+  },
+  getStatusEffects(char) {
+    const effects = [];
+    if (char.skillActive) effects.push({ icon: '🔴', label: '마천결계', timeLeft: Math.max(0, char.skillDurationLeft), duration: SKILL_CONSTANTS.BARRIER_DURATION, color: '#f87171' });
+    if ((char.chanhwiDemonicStacks ?? 0) > 0) effects.push({ icon: '🔥', label: `마기 ${char.chanhwiDemonicStacks}/${SKILL_CONSTANTS.MAX_DEMONIC_STACKS}`, timeLeft: char.chanhwiDemonicStackTimeLeft ?? 0, duration: SKILL_CONSTANTS.STACK_DURATION, color: '#fb923c' });
+    return effects;
+  },
   // #endregion RENDER
 };
+// #endregion CONFIG

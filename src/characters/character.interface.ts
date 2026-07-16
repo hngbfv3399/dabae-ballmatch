@@ -220,6 +220,13 @@ export interface CharacterState extends CharacterConfig {
   runCompanionRange?: number;
   runCompanionInterval?: number;
   runCompanionTimer?: number;
+  // 공통 감속 상태. 개별 캐릭터는 수치만 부여하고 이동 반영은 엔진에서 동일하게 처리한다.
+  movementSlowMultiplier?: number;
+  movementSlowTimeLeft?: number;
+  // 찬휘 고유 패시브: 피해를 줄 때 쌓이는 마기.
+  chanhwiDemonicStacks?: number;
+  chanhwiDemonicStackTimeLeft?: number;
+  chanhwiBarrierPulseTimer?: number;
   
   // === 게임 모드 관련 확장 프로퍼티 ===
   teamId?: number;            // 1: 레드팀/도전자팀, 2: 블루팀/보스팀

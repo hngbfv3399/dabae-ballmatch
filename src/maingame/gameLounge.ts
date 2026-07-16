@@ -1073,6 +1073,10 @@ export class GameLounge {
         if (char.raidImmunityTimeLeft! > 0) char.statusIndicators.push({ icon: '🛡', label: '레이드: 시간 보호막', timeLeft: char.raidImmunityTimeLeft!, duration: 3, color: '#67e8f9' });
       }
       // 2-A. 캐릭터 고유 업데이트 로직 실행 (지호의 코딩 틱, 도윤의 덩크 틱 등)
+      if ((char.movementSlowTimeLeft ?? 0) > 0) {
+        char.movementSlowTimeLeft = Math.max(0, (char.movementSlowTimeLeft ?? 0) - dt);
+        if (char.movementSlowTimeLeft === 0) char.movementSlowMultiplier = 1;
+      }
       char.onUpdate?.(char, dt, context);
       this.updatePersistentItemCombatEffects(char, dt, context);
       if (isBossGame && !char.isBoss) char.bossSurvivalTime = (char.bossSurvivalTime ?? 0) + dt;
@@ -1139,7 +1143,7 @@ export class GameLounge {
       }
 
       // 위치 업데이트
-      const moveMultiplier = (char.relicSpeedMultiplier ?? 1) * (char.raidSpeedMultiplier ?? 1);
+      const moveMultiplier = (char.relicSpeedMultiplier ?? 1) * (char.raidSpeedMultiplier ?? 1) * (char.movementSlowMultiplier ?? 1);
       char.x += char.vx * dt * 60 * moveMultiplier; // 60fps 기준 속도 조절
       char.y += char.vy * dt * 60 * moveMultiplier;
 
