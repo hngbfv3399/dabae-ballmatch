@@ -1432,7 +1432,7 @@ export class GameLounge {
 
     const criticalChance = Math.min(0.75, Math.max(0, (attacker.luck ?? 0) * 0.005));
     const isCriticalHit = amount > 0 && Math.random() < criticalChance;
-    let finalDamage = amount * (isCriticalHit ? 1.5 : 1);
+    let finalDamage = amount * (isCriticalHit ? 1.5 * (attacker.persistentItemCriticalDamageMultiplier ?? 1) : 1);
     const resolvedDamageText = isCriticalHit
       ? `${customText ? `${customText} · ` : ""}CRITICAL!`
       : customText;
@@ -1673,6 +1673,15 @@ export class GameLounge {
   private triggerSkill(char: CharacterState) {
     char.skillGauge = 0;
     char.skillActive = true;
+    const skillCastHeal = Math.round(char.maxHp * (char.persistentItemSkillCastHealPercent ?? 0));
+    if (skillCastHeal > 0) {
+      const previousHp = char.hp;
+      char.hp = Math.min(char.maxHp, char.hp + skillCastHeal);
+      const restored = Math.round(char.hp - previousHp);
+      if (restored > 0) {
+        this.floatingTexts.push({ x: char.x, y: char.y - 68, text: `+${restored} 회복`, color: "#4ade80", life: 1.1 });
+      }
+    }
     console.log(
       `✨ [스킬 발동] ${char.name} -> 스킬 [${char.skillName}] 활성화!`,
     );

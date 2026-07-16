@@ -204,6 +204,8 @@ export interface CharacterState extends CharacterConfig {
   // 영구 아이템의 공통 전투 효과. 캐릭터별 분기 없이 엔진에서 처리한다.
   persistentItemDefenseBonus?: number;
   persistentItemDamageReductionMultiplier?: number;
+  persistentItemCriticalDamageMultiplier?: number;
+  persistentItemSkillCastHealPercent?: number;
   persistentItemOrbitDamage?: number;
   persistentItemOrbitRadius?: number;
   persistentItemOrbitInterval?: number;

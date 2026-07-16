@@ -33,13 +33,25 @@ const SEED_ITEMS = [
   { itemId: "resonance_emitter", name: "공명 방출기", description: "주변 116px에 3초마다 충격파 16 피해", rarity: "epic" as const, isActive: true, effects: { pulseDamage: 16, pulseRadius: 116, pulseInterval: 3.0 } },
   { itemId: "overclock_matrix", name: "오버클록 매트릭스", description: "공격력 +6, 스킬 쿨다운 속도 +18%", rarity: "epic" as const, isActive: true, effects: { attackPowerBonus: 6, skillChargeRateMultiplier: 1.18 } },
   { itemId: "fortress_heart", name: "요새의 심장", description: "최대 체력 +32, 최대 DEF 보호막 +20", rarity: "epic" as const, isActive: true, effects: { maxHpBonus: 32, defenseShieldBonus: 20 } },
+  { itemId: "reactive_armor", name: "반응 장갑", description: "최대 DEF 보호막 +14, 받는 피해 8% 감소", rarity: "epic" as const, isActive: true, effects: { defenseShieldBonus: 14, damageReductionMultiplier: 0.92 } },
+  { itemId: "focusing_targeter", name: "집중 조준기", description: "공격력 +4, 기본 공격 사거리 +24px", rarity: "epic" as const, isActive: true, effects: { attackPowerBonus: 4, baseAttackRangeBonus: 24 } },
+  { itemId: "wave_capacitor", name: "파동 축전기", description: "주변 84px에 3.6초마다 충격파 10 피해", rarity: "epic" as const, isActive: true, effects: { pulseDamage: 10, pulseRadius: 84, pulseInterval: 3.6 } },
   
   { itemId: "nova_ring", name: "노바 위성군", description: "노바 위성 3기가 주변 104px의 적에게 1초마다 16 피해", rarity: "legendary" as const, isActive: true, effects: { orbitDamage: 16, orbitRadius: 104, orbitInterval: 1.0, orbitSatelliteCount: 3, orbitSatelliteStyle: "nova" as const } },
   { itemId: "aegis_protocol", name: "이지스 프로토콜", description: "최대 DEF 보호막 +38, 방어력 +3 (피해 1회당 -3)", rarity: "legendary" as const, isActive: true, effects: { defenseShieldBonus: 38, defenseBonus: 3 } },
   { itemId: "apex_drive", name: "에이펙스 드라이브", description: "공격력 +9, 이동 속도 +16%", rarity: "legendary" as const, isActive: true, effects: { attackPowerBonus: 9, speedMultiplier: 1.16 } },
+  { itemId: "resonance_accelerator", name: "공명 가속기", description: "주변 128px에 2.8초마다 충격파 22 피해", rarity: "legendary" as const, isActive: true, effects: { pulseDamage: 22, pulseRadius: 128, pulseInterval: 2.8 } },
+  { itemId: "satellite_control_core", name: "위성 제어 코어", description: "공전 위성 장비의 피해 +12, 반경 +18px", rarity: "legendary" as const, isActive: true, effects: { orbitDamageBonus: 12, orbitRadiusBonus: 18 } },
+  { itemId: "doom_scope", name: "종말 조준기", description: "기본 공격 사거리 +54px, 운 +8", rarity: "legendary" as const, isActive: true, effects: { baseAttackRangeBonus: 54, luckBonus: 8 } },
+  { itemId: "regeneration_protocol", name: "재생 프로토콜", description: "최대 체력 +36, 스킬 충전 +25%, 받는 피해 10% 감소", rarity: "legendary" as const, isActive: true, effects: { maxHpBonus: 36, skillChargeRateMultiplier: 1.25, damageReductionMultiplier: 0.9 } },
   
   { itemId: "singularity_engine", name: "특이점 엔진", description: "주변 132px에 2.4초마다 충격파 28 피해, 스킬 쿨다운 속도 +25%", rarity: "unique" as const, isActive: true, effects: { pulseDamage: 28, pulseRadius: 132, pulseInterval: 2.4, skillChargeRateMultiplier: 1.25 } },
   { itemId: "singularity_satellite_array", name: "특이점 위성군", description: "특이점 위성 4기가 주변 130px의 적에게 0.75초마다 25 피해", rarity: "unique" as const, isActive: true, effects: { orbitDamage: 25, orbitRadius: 130, orbitInterval: 0.75, orbitSatelliteCount: 4, orbitSatelliteStyle: "singularity" as const } },
+  { itemId: "zero_point_reactor", name: "영점 반응로", description: "공격력 +14, 스킬 충전 +35%, 공격 간격 12% 감소", rarity: "unique" as const, isActive: true, effects: { attackPowerBonus: 14, skillChargeRateMultiplier: 1.35, attackSpeedMultiplier: 0.88 } },
+  { itemId: "immortal_armor", name: "불멸 장갑", description: "최대 체력 +65, 최대 DEF 보호막 +50, 방어력 +5, 받는 피해 15% 감소", rarity: "unique" as const, isActive: true, effects: { maxHpBonus: 65, defenseShieldBonus: 50, defenseBonus: 5, damageReductionMultiplier: 0.85 } },
+  { itemId: "phase_leap_device", name: "위상 도약 장치", description: "이동 속도 +25%, 기본 공격 사거리 +25px, 받는 피해 12% 감소", rarity: "unique" as const, isActive: true, effects: { speedMultiplier: 1.25, baseAttackRangeBonus: 25, damageReductionMultiplier: 0.88 } },
+  { itemId: "nebula_catalyst", name: "성운 촉매", description: "운 +20, 치명타 피해 +30%", rarity: "unique" as const, isActive: true, effects: { luckBonus: 20, criticalDamageMultiplier: 1.3 } },
+  { itemId: "temporal_relay_core", name: "시간 역행 코어", description: "스킬 충전 +50%, 스킬 발동 시 최대 체력의 8% 회복", rarity: "unique" as const, isActive: true, effects: { skillChargeRateMultiplier: 1.5, skillCastHealPercent: 0.08 } },
 ];
 
 // 장비 제물 합성 경험치 계수
