@@ -135,10 +135,13 @@ export const getCharacterProgress = query({
   args: { characterId: v.string() },
   handler: async (ctx, args) => {
     assertCharacterId(args.characterId);
-    return await ctx.db
+    const entry = await ctx.db
       .query("characterProgress")
       .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
       .unique();
+    // 로비·도감은 DB의 누적 경험치와 동일한 서버 성장 공식을 함께 받아야 한다.
+    // 누적 XP와 현재 레벨 구간 XP를 클라이언트에서 따로 추측하지 않는다.
+    return entry ? { ...entry, ...growthSummary(entry.experience) } : null;
   },
 });
 
