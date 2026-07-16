@@ -133,7 +133,9 @@ function matchesAugmentContext(augment: AugmentDefinition, context: PveAugmentCo
 
 export function rollPveAugmentChoices(rarity: Extract<RunModifierRarity, "silver" | "gold" | "platinum">, selectedIds: readonly string[], acquiredAtStage: number, context: PveAugmentContext): RunModifier[] {
   const selected = new Set(selectedIds);
-  const eligible = PVE_AUGMENTS.filter((augment) => augment.rarity === rarity && !selected.has(augment.id) && matchesAugmentContext(augment, context));
+  // 무한 생존전은 증강 풀이 모두 소진된 뒤에도 같은 증강을 중첩 선택할 수 있다.
+  const allowStacks = context.dungeonId === "survival";
+  const eligible = PVE_AUGMENTS.filter((augment) => augment.rarity === rarity && (allowStacks || !selected.has(augment.id)) && matchesAugmentContext(augment, context));
   const characterSkillChoices = shuffle(eligible.filter((augment) => augment.requirements));
   const commonChoices = shuffle(eligible.filter((augment) => !augment.requirements));
   const choices = [...characterSkillChoices.slice(0, 1), ...commonChoices].slice(0, 3);
@@ -141,7 +143,12 @@ export function rollPveAugmentChoices(rarity: Extract<RunModifierRarity, "silver
 }
 
 export function addPveRunAugment(modifiers: PveRunModifiers, augment: RunModifier): void {
-  if (augment.kind !== "augment" || modifiers.augments.some((entry) => entry.id === augment.id)) return;
+  if (augment.kind !== "augment") return;
+  const existing = modifiers.augments.find((entry) => entry.id === augment.id);
+  if (existing) {
+    existing.stacks += augment.stacks;
+    return;
+  }
   modifiers.augments.push(augment);
 }
 
@@ -161,18 +168,20 @@ export function applyPveRunModifierStats(state: CharacterState, modifiers: PveRu
   for (const modifier of getAllRunModifiers(modifiers)) {
     const effects = modifier.effects;
     if (!effects) continue;
-    state.maxHp *= effects.maxHpMultiplier ?? 1;
-    state.attackPower *= effects.attackMultiplier ?? 1;
-    state.speed *= effects.speedMultiplier ?? 1;
-    state.skillChargeRate *= effects.skillChargeMultiplier ?? 1;
+    for (let stack = 0; stack < modifier.stacks; stack += 1) {
+      state.maxHp *= effects.maxHpMultiplier ?? 1;
+      state.attackPower *= effects.attackMultiplier ?? 1;
+      state.speed *= effects.speedMultiplier ?? 1;
+      state.skillChargeRate *= effects.skillChargeMultiplier ?? 1;
+    }
     if (effects.orbitDamage && effects.orbitRadius && effects.orbitInterval) {
-      state.persistentItemOrbitDamage = Math.max(state.persistentItemOrbitDamage ?? 0, effects.orbitDamage);
+      state.persistentItemOrbitDamage = Math.max(state.persistentItemOrbitDamage ?? 0, effects.orbitDamage * modifier.stacks);
       state.persistentItemOrbitRadius = Math.max(state.persistentItemOrbitRadius ?? 0, effects.orbitRadius);
       state.persistentItemOrbitInterval = Math.min(state.persistentItemOrbitInterval ?? Infinity, effects.orbitInterval);
       state.persistentItemOrbitTimer = 0;
     }
     if (effects.companionDamage && effects.companionRange && effects.companionInterval) {
-      state.runCompanionDamage = Math.max(state.runCompanionDamage ?? 0, effects.companionDamage);
+      state.runCompanionDamage = Math.max(state.runCompanionDamage ?? 0, effects.companionDamage * modifier.stacks);
       state.runCompanionRange = Math.max(state.runCompanionRange ?? 0, effects.companionRange);
       state.runCompanionInterval = Math.min(state.runCompanionInterval ?? Infinity, effects.companionInterval);
       state.runCompanionTimer = 0;

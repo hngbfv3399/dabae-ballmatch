@@ -2258,7 +2258,7 @@ function getPveRunMaximumHp(run: PveRun): number {
   if (!character) return run.maxHp;
   const progress = getPveProgress(character.id);
   return Math.round(getAllRunModifiers(run.modifiers).reduce(
-    (maxHp, modifier) => maxHp * (modifier.effects?.maxHpMultiplier ?? 1),
+    (maxHp, modifier) => maxHp * Math.pow(modifier.effects?.maxHpMultiplier ?? 1, modifier.stacks),
     getLeveledHp(character.maxHp, progress),
   ));
 }
@@ -2281,7 +2281,15 @@ function applyPveRunSelectionEffect(run: PveRun, effects: { maxHpMultiplier?: nu
   if (effects.shieldPercent) run.currentShield += Math.round(maxHp * effects.shieldPercent);
 }
 
-function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
+function getPveAugmentRarityForClearedStage(stageNumber: number, dungeonId: string): Extract<RunModifierRarity, "silver" | "gold" | "platinum"> | null {
+  if (dungeonId === "survival") {
+    if (stageNumber === 0) return "silver";
+    if (stageNumber > 0 && stageNumber % 3 === 0) {
+      const rotation: readonly Extract<RunModifierRarity, "silver" | "gold" | "platinum">[] = ["silver", "gold", "platinum"];
+      return rotation[(Math.floor(stageNumber / 3) - 1) % rotation.length];
+    }
+    return null;
+  }
   if (stageNumber === 0) return "silver";
   if (stageNumber === 1) return "silver";
   if (stageNumber === 3) return "gold";
@@ -2290,7 +2298,7 @@ function getPveAugmentRarityForClearedStage(stageNumber: number): Extract<RunMod
 }
 
 function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: () => void) {
-  const rarity = getPveAugmentRarityForClearedStage(clearedStageNumber);
+  const rarity = getPveAugmentRarityForClearedStage(clearedStageNumber, run.dungeonId);
   if (!rarity) { onChoose(); return; }
   const choices = rollPveAugmentChoices(rarity, run.modifiers.augments.map((augment) => augment.id), clearedStageNumber, getPveAugmentContext(run));
   if (choices.length === 0) { onChoose(); return; }
@@ -2299,7 +2307,9 @@ function showAugmentChoice(run: PveRun, clearedStageNumber: number, onChoose: ()
     gold: { tier: "GOLD AUGMENT · 2/3", title: "빌드를 강화하세요", subtitle: "강력한 효과 하나를 골라 다음 전투를 준비하세요." },
     platinum: { tier: "PLATINUM AUGMENT · 3/3", title: "최종 증강을 선택하세요", subtitle: "5스테이지 진입 전에 마지막 빌드 완성을 선택하세요." },
   };
-  const label = labels[rarity];
+  const label = run.dungeonId === "survival" && clearedStageNumber > 0
+    ? { tier: `${rarity.toUpperCase()} AUGMENT · WAVE ${clearedStageNumber}`, title: `웨이브 ${clearedStageNumber} 증강 선택`, subtitle: "무한 생존전에서는 증강을 중첩해 계속 강화할 수 있습니다." }
+    : labels[rarity];
   augmentChoiceTier.textContent = label.tier;
   augmentChoiceTier.className = `augment-choice-tier rarity-${rarity}`;
   augmentChoiceTitle.textContent = label.title;
