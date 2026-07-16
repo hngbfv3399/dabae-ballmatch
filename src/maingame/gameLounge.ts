@@ -679,6 +679,11 @@ export class GameLounge {
     }
   }
 
+  /** 외부 UI가 중단 결과를 표시할 때만 읽는 현재 전투원 스냅샷이다. */
+  public getCharacters(): CharacterState[] {
+    return [...this.characters];
+  }
+
   /**
    * 메인 게임 루프
    */

@@ -38,6 +38,7 @@ const startBtn = document.getElementById("start-btn") as HTMLButtonElement;
 const backToLobbyBtn = document.getElementById(
   "back-to-lobby-btn",
 ) as HTMLButtonElement;
+const survivalExitBtn = document.getElementById("survival-exit-btn") as HTMLButtonElement;
 const focusModeBtn = document.getElementById("focus-mode-btn") as HTMLButtonElement;
 const gameCanvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 const pveCommandPanel = document.getElementById("pve-command-panel") as HTMLElement;
@@ -2054,10 +2055,19 @@ function formatSurvivalTime(milliseconds: number): string {
 function updateSurvivalHud() {
   const visible = currentMode === "pve" && pveRun?.dungeonId === "survival";
   survivalHud.classList.toggle("hidden", !visible);
+  survivalExitBtn.classList.toggle("hidden", !visible);
   if (!visible || !pveRun) return;
   survivalHudTime.textContent = formatSurvivalTime(Date.now() - pveRun.startedAt);
   survivalHudWave.textContent = `WAVE ${pveRun.stage}`;
   survivalHudCoins.textContent = `🪙 ${pveRun.survivalCoins}`;
+}
+
+function endSurvivalRunEarly() {
+  if (currentMode !== "pve" || pveRun?.dungeonId !== "survival" || !gameLounge) return;
+  // 현재 진행 중인 웨이브는 보상에 포함하지 않고, 완료한 웨이브만 서버가 정산한다.
+  const characters = gameLounge.getCharacters();
+  gameLounge.stop();
+  showWinner(null, characters);
 }
 
 // Update HUD lists
@@ -2887,6 +2897,7 @@ function startRandomGame() {
 // Listeners
 startBtn.addEventListener("click", startGame);
 backToLobbyBtn.addEventListener("click", goBackToLobby);
+survivalExitBtn.addEventListener("click", endSurvivalRunEarly);
 modalCloseBtn.addEventListener("click", closeWinnerModal);
 if (randomStartBtn) {
   randomStartBtn.addEventListener("click", startRandomGame);
