@@ -4471,7 +4471,7 @@ function renderBookTab() {
   renderValue("stat-final-hp", mineStats.hp, compareStats.hp, mineStats.hp.toLocaleString(), compareStats.hp.toLocaleString());
   renderValue("stat-final-atk", mineStats.atk, compareStats.atk, mineStats.atk.toLocaleString(), compareStats.atk.toLocaleString());
   renderValue("stat-final-spd", mineStats.spd, compareStats.spd, mineStats.spd.toFixed(2), compareStats.spd.toFixed(2));
-  renderValue("stat-final-defense", mineStats.defense, compareStats.defense, `-${mineStats.defense}`, `-${compareStats.defense}`);
+  renderValue("stat-final-defense", mineStats.defense, compareStats.defense, `${mineStats.defense}`, `${compareStats.defense}`);
   renderValue("stat-final-def", mineStats.def, compareStats.def, mineStats.def.toLocaleString(), compareStats.def.toLocaleString());
   renderValue("stat-final-range", mineStats.range, compareStats.range, `${mineStats.range}px`, `${compareStats.range}px`);
   renderValue("stat-final-cd", mineStats.cd, compareStats.cd, `+${mineStats.cd}%`, `+${compareStats.cd}%`);
