@@ -49,7 +49,7 @@ const pveCharacterModal = document.getElementById("pve-character-modal") as HTML
 const pveCharacterModalClose = document.getElementById("pve-character-modal-close") as HTMLButtonElement;
 const pveCharacterList = document.getElementById("pve-character-list") as HTMLElement;
 const pveDungeonSelect = document.getElementById("pve-dungeon-select") as HTMLSelectElement;
-const modeSettingsRow = document.getElementById("mode-settings-row") as HTMLElement;
+
 const matchSelectionSlots = document.getElementById("match-selection-slots") as HTMLElement;
 const fillRandomSlotsBtn = document.getElementById("fill-random-slots-btn") as HTMLButtonElement;
 const matchCharacterPickerModal = document.getElementById("match-character-picker-modal") as HTMLElement;
@@ -58,10 +58,13 @@ const matchCharacterPickerList = document.getElementById("match-character-picker
 const matchCharacterPickerDetail = document.getElementById("match-character-picker-detail") as HTMLElement;
 const rankingSeasonLabel = document.getElementById("ranking-season-label") as HTMLElement;
 const rankingList = document.getElementById("ranking-list") as HTMLElement;
-const openGameModeBtn = document.getElementById("open-game-mode-btn") as HTMLButtonElement;
-const gameModeModal = document.getElementById("game-mode-modal") as HTMLElement;
-const gameModeModalClose = document.getElementById("game-mode-modal-close") as HTMLButtonElement;
-const gameModeSetupHost = document.getElementById("game-mode-setup-host") as HTMLElement;
+const openGameModeBtn = document.getElementById("open-game-finder-btn") as HTMLButtonElement;
+const gameModeModal = document.getElementById("game-finder-modal") as HTMLElement;
+const gameModeModalClose = document.getElementById("game-finder-modal-close") as HTMLButtonElement;
+const pveSetupOverlay = document.getElementById("pve-setup-wrapper-overlay") as HTMLElement;
+const pvpSetupOverlay = document.getElementById("pvp-setup-wrapper-overlay") as HTMLElement;
+const pveSetupCloseBtn = document.getElementById("pve-setup-close") as HTMLButtonElement;
+const pvpSetupCloseBtn = document.getElementById("pvp-setup-close") as HTMLButtonElement;
 const gachaResult = document.getElementById("gacha-result") as HTMLElement;
 const gachaTitle = document.getElementById("gacha-title") as HTMLElement;
 const gachaTypeHelp = document.getElementById("gacha-type-help") as HTMLElement;
@@ -99,7 +102,7 @@ const augmentChoiceCards = document.getElementById("augment-choice-cards") as HT
 const hudToggleBtn = document.getElementById("hud-toggle-btn") as HTMLButtonElement;
 const randomStartBtn = document.getElementById(
   "random-start-btn",
-) as HTMLButtonElement;
+) as HTMLButtonElement | null;
 const tierListNotice = document.getElementById(
   "tier-list-notice",
 ) as HTMLElement;
@@ -2669,6 +2672,58 @@ function goBackToLobby() {
   initLobby();
 }
 
+function startQuickPlay() {
+  if (!currentCharacterId) {
+    alert("먼저 로그인해 주세요.");
+    return;
+  }
+  
+  // Set game mode to team deathmatch
+  currentMode = "team";
+  teamGameType = "deathmatch";
+  
+  // Clear selections
+  selectedIds.clear();
+  selectedRedIds.clear();
+  selectedBlueIds.clear();
+  bossCharacterId = null;
+  
+  // Player is on Red Team
+  selectedIds.add(currentCharacterId);
+  selectedRedIds.add(currentCharacterId);
+  
+  // Find other characters (excluding current character's family)
+  const playerChar = availableCharacters.find((c) => c.id === currentCharacterId);
+  const playerFamilyId = playerChar ? getCharacterFamilyId(playerChar) : "";
+  const candidates = availableCharacters.filter((c) => getCharacterFamilyId(c) !== playerFamilyId);
+  
+  // Shuffle candidates
+  const shuffled = [...candidates];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  
+  // Red Team: 1 more member (total 2)
+  if (shuffled[0]) {
+    selectedIds.add(shuffled[0].id);
+    selectedRedIds.add(shuffled[0].id);
+  }
+  
+  // Blue Team: 2 members (total 2)
+  if (shuffled[1]) {
+    selectedIds.add(shuffled[1].id);
+    selectedBlueIds.add(shuffled[1].id);
+  }
+  if (shuffled[2]) {
+    selectedIds.add(shuffled[2].id);
+    selectedBlueIds.add(shuffled[2].id);
+  }
+  
+  // Start the game!
+  startGame();
+}
+
 function startRandomGame() {
   const shuffled = [...availableCharacters];
   for (let index = shuffled.length - 1; index > 0; index--) {
@@ -2720,7 +2775,9 @@ function startRandomGame() {
 startBtn.addEventListener("click", startGame);
 backToLobbyBtn.addEventListener("click", goBackToLobby);
 modalCloseBtn.addEventListener("click", closeWinnerModal);
-randomStartBtn.addEventListener("click", startRandomGame);
+if (randomStartBtn) {
+  randomStartBtn.addEventListener("click", startRandomGame);
+}
 
 const practiceStartBtn = document.getElementById("practice-start-btn");
 if (practiceStartBtn) {
@@ -3267,7 +3324,7 @@ function selectGameplayMode(selectedMode: Exclude<GameMode, "boss">) {
   const isPve = selectedMode === "pve";
   pveCommandPanel.classList.toggle("hidden", !isPve);
   pvpSetupPanel.classList.toggle("hidden", isPve);
-  gameModeSetupHost.replaceChildren(modeSettingsRow, isPve ? pveCommandPanel : pvpSetupPanel);
+  // gameModeSetupHost.replaceChildren(modeSettingsRow, isPve ? pveCommandPanel : pvpSetupPanel);
   updateTeamGameTypeVisibility();
   updateStatsModeControls(selectedMode);
   if (modeDesc) modeDesc.textContent = modeDescriptions[selectedMode];
@@ -4150,8 +4207,74 @@ function initHubNavigation() {
     };
   }
 
-  openGameModeBtn.addEventListener("click", () => { selectGameplayMode(currentMode as Exclude<GameMode, "boss">); gameModeModal.classList.remove("hidden"); });
-  gameModeModalClose.addEventListener("click", () => gameModeModal.classList.add("hidden"));
+  // Quick Play Button
+  const quickPlayBtn = document.getElementById("quick-play-btn");
+  if (quickPlayBtn) {
+    quickPlayBtn.onclick = () => { startQuickPlay(); };
+  }
+
+  // Game Finder Modal Buttons
+  if (openGameModeBtn) {
+    openGameModeBtn.onclick = () => {
+      gameModeModal.classList.remove("hidden");
+    };
+  }
+  if (gameModeModalClose) {
+    gameModeModalClose.onclick = () => {
+      gameModeModal.classList.add("hidden");
+    };
+  }
+
+  const finderBtnPve = document.getElementById("finder-btn-pve");
+  if (finderBtnPve) {
+    finderBtnPve.onclick = () => {
+      gameModeModal.classList.add("hidden");
+      pveSetupOverlay.classList.remove("hidden");
+    };
+  }
+
+  const finderBtnSolo = document.getElementById("finder-btn-solo");
+  if (finderBtnSolo) {
+    finderBtnSolo.onclick = () => {
+      gameModeModal.classList.add("hidden");
+      currentMode = "solo";
+      selectGameplayMode("solo");
+      pvpSetupOverlay.classList.remove("hidden");
+    };
+  }
+
+  const finderBtnTeam = document.getElementById("finder-btn-team");
+  if (finderBtnTeam) {
+    finderBtnTeam.onclick = () => {
+      gameModeModal.classList.add("hidden");
+      currentMode = "team";
+      selectGameplayMode("team");
+      pvpSetupOverlay.classList.remove("hidden");
+    };
+  }
+
+  const finderBtnTournament = document.getElementById("finder-btn-tournament");
+  if (finderBtnTournament) {
+    finderBtnTournament.onclick = () => {
+      gameModeModal.classList.add("hidden");
+      currentMode = "tournament";
+      selectGameplayMode("tournament");
+      pvpSetupOverlay.classList.remove("hidden");
+    };
+  }
+
+  // Setup Overlay Close Buttons
+  if (pveSetupCloseBtn) {
+    pveSetupCloseBtn.onclick = () => {
+      pveSetupOverlay.classList.add("hidden");
+    };
+  }
+  if (pvpSetupCloseBtn) {
+    pvpSetupCloseBtn.onclick = () => {
+      pvpSetupOverlay.classList.add("hidden");
+    };
+  }
+
   document.querySelectorAll<HTMLButtonElement>("[data-game-mode]").forEach((button) => button.addEventListener("click", () => { selectGameplayMode(button.dataset.gameMode as Exclude<GameMode, "boss">); document.querySelectorAll<HTMLButtonElement>(".game-mode-tab").forEach((tab) => tab.classList.toggle("active", tab === button)); }));
   document.querySelectorAll<HTMLButtonElement>("[data-ranking-mode]").forEach((button) => button.addEventListener("click", () => {
     activeRankingMode = button.dataset.rankingMode as "solo" | "team" | "tournament";
@@ -4223,6 +4346,7 @@ function updateStatsModeControls(mode: GameMode) {
 }
 
 function updateRandomMatchButtonLabel() {
+  if (!randomStartBtn) return;
   if (currentMode === "solo") {
     const count = /^[2-6]$/.test(selectedStatsMode) ? selectedStatsMode : "2";
     randomStartBtn.textContent = `🎲 ${count}인 랜덤전 시작`;
