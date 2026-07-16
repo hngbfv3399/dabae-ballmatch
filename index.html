@@ -704,6 +704,20 @@
 
       </section>
 
+      <!-- --------------------- 매치 캐릭터 선택 모달 --------------------- -->
+      <div id="match-character-picker-modal" class="modal-overlay hidden" style="z-index: 1000;">
+        <div class="modal-content card picker-modal-content" style="max-width: 860px; width: 92%; max-height: 82vh; overflow: auto; display: flex; flex-direction: column; padding: 2rem;">
+          <div class="gacha-modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.8rem;">
+            <div><span class="eyebrow">CHARACTER PICKER</span><h2 style="margin:0; font-family:'Orbit';">참가 봇 캐릭터 선택</h2></div>
+            <button id="match-character-picker-close" class="btn btn-secondary" type="button" style="font-size:0.85rem; padding:0.35rem 0.8rem;">✕ 닫기</button>
+          </div>
+          <div class="picker-layout" style="display:grid; grid-template-columns:1.3fr 1fr; gap:1.5rem; overflow:hidden; flex:1;">
+            <div id="match-character-picker-list" class="picker-character-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.6rem; overflow-y:auto; padding-right:0.4rem; max-height:420px;"></div>
+            <aside id="match-character-picker-detail" class="picker-character-detail" style="background:rgba(255,255,255,0.015); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:1.2rem; display:flex; flex-direction:column; gap:0.8rem; overflow-y:auto; max-height:420px; font-size:0.88rem; line-height:1.5; color:var(--text-secondary);">왼쪽의 캐릭터 아이콘을 선택하세요.</aside>
+          </div>
+        </div>
+      </div>
+
       <!-- --------------------- 공통 가챠 확률 정보 모달 --------------------- -->
       <div id="persistent-item-rate-modal" class="modal-overlay hidden" style="z-index: 1000;">
         <div class="modal-content card persistent-item-rate-modal-content">
