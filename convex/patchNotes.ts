@@ -1,4 +1,4 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 function compareVersions(v1: string, v2: string) {
@@ -23,7 +23,7 @@ function compareVersions(v1: string, v2: string) {
 export const getLatest = query({
   args: {},
   handler: async (ctx) => {
-    const patches = await ctx.db.query("patchNotes").collect();
+    const patches = await ctx.db.query("patchNotes").withIndex("by_createdAt").order("desc").take(50);
     if (patches.length === 0) return null;
     patches.sort((a, b) => compareVersions(a.version, b.version));
     return patches[0];
@@ -34,9 +34,48 @@ export const getLatest = query({
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const patches = await ctx.db.query("patchNotes").collect();
+    const patches = await ctx.db.query("patchNotes").withIndex("by_createdAt").order("desc").take(50);
     patches.sort((a, b) => compareVersions(a.version, b.version));
     return patches.slice(0, 50);
+  },
+});
+
+const V410_PATCH_NOTE = {
+  version: "v4.1.0",
+  title: "전투 카탈로그 · 균열 생존전",
+  isImportant: true,
+  content: [
+    "Convex 서버 기준 전투 카탈로그: 캐릭터 20종과 경기장 6종의 전투 수치를 실시간 반영합니다.",
+    "균열 생존전: 근거리·빠른·원거리·중장갑 몬스터를 버티며 웨이브 코인을 획득합니다.",
+    "생존 HUD: 생존 시간, 현재 웨이브, 누적 코인을 전투 화면에 표시합니다.",
+  ],
+  adjustments: [
+    "5웨이브마다 체력과 DEF 보호막을 회복합니다.",
+    "사망 결과에 생존 시간, 웨이브, 처치 수, 가한/받은 피해, 서버 정산 코인, 선택 증강을 표시합니다.",
+    "근거리 사거리를 공 표면 간격 기준으로 조정하고 원거리 기본 공격은 실제 투사체로 적용했습니다.",
+  ],
+  general: [
+    "정찰 드론 펫, 회전 절단기, 쌍둥이 수호 펫 증강을 추가했습니다.",
+    "선택한 증강은 런 종료 전까지 유지되며 결과창에서 다시 확인할 수 있습니다.",
+  ],
+};
+
+// 클라이언트가 임의의 패치 내용을 쓰지 못하도록 최신 릴리스 한 건만 고정한다.
+// 배포 후 `npx convex run patchNotes:seedV410PatchNotes --prod`로 안전하게 재실행할 수 있다.
+export const seedV410PatchNotes = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query("patchNotes")
+      .withIndex("by_version", (q) => q.eq("version", V410_PATCH_NOTE.version))
+      .unique();
+    const patch = { ...V410_PATCH_NOTE, createdAt: Date.now() };
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+      return { created: false, patchId: existing._id };
+    }
+    const patchId = await ctx.db.insert("patchNotes", patch);
+    return { created: true, patchId };
   },
 });
 

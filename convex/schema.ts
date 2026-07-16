@@ -12,7 +12,9 @@ export default defineSchema({
     nerfs: v.optional(v.array(v.string())),
     adjustments: v.optional(v.array(v.string())),
     general: v.optional(v.array(v.string())),
-  }),
+  })
+    .index("by_version", ["version"])
+    .index("by_createdAt", ["createdAt"]),
 
   // v4.0.0: 캐릭터(계정) 매핑 기반 성장 정보
   characterProgress: defineTable({
