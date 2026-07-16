@@ -1430,6 +1430,7 @@ export class GameLounge {
     }
 
     finalDamage *= target.persistentItemDamageReductionMultiplier ?? 1;
+    finalDamage = Math.max(0, finalDamage - (target.persistentItemDefenseBonus ?? 0));
 
     // 방어력은 피해 감소율이 아닌 HP 앞의 정수 보호막이다.
     // 체력, 전적, 콘솔 로그, 플로팅 텍스트가 같은 값을 사용하도록 이 지점에서 한 번만 반올림한다.

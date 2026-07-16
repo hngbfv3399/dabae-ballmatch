@@ -1,11 +1,14 @@
 import type { CharacterState } from "../characters/character.interface";
 
 export interface PersistentItemEffects {
+  maxHpBonus?: number;
   maxHpMultiplier?: number;
   speedMultiplier?: number;
+  attackPowerBonus?: number;
   attackMultiplier?: number;
   baseAttackRangeBonus?: number;
   defenseShieldBonus?: number;
+  defenseBonus?: number;
   damageReductionMultiplier?: number;
   skillChargeRateMultiplier?: number;
   orbitDamage?: number;
@@ -41,11 +44,14 @@ export function resolvePersistentItemEffects(
   playerItems: PlayerItem[]
 ): PersistentItemEffects {
   const effects: PersistentItemEffects = {
+    maxHpBonus: 0,
     maxHpMultiplier: 1,
     speedMultiplier: 1,
+    attackPowerBonus: 0,
     attackMultiplier: 1,
     baseAttackRangeBonus: 0,
     defenseShieldBonus: 0,
+    defenseBonus: 0,
     damageReductionMultiplier: 1,
     skillChargeRateMultiplier: 1,
     orbitDamage: 0,
@@ -59,6 +65,9 @@ export function resolvePersistentItemEffects(
   const equippedItems = playerItems.filter((item) => item.equippedSlot >= 1 && item.equippedSlot <= 8);
 
   for (const item of equippedItems) {
+    if (item.effects.maxHpBonus) {
+      effects.maxHpBonus = (effects.maxHpBonus ?? 0) + item.effects.maxHpBonus;
+    }
     if (item.effects.maxHpMultiplier) {
       effects.maxHpMultiplier = (effects.maxHpMultiplier ?? 1) * item.effects.maxHpMultiplier;
     }
@@ -68,11 +77,17 @@ export function resolvePersistentItemEffects(
     if (item.effects.attackMultiplier) {
       effects.attackMultiplier = (effects.attackMultiplier ?? 1) * item.effects.attackMultiplier;
     }
+    if (item.effects.attackPowerBonus) {
+      effects.attackPowerBonus = (effects.attackPowerBonus ?? 0) + item.effects.attackPowerBonus;
+    }
     if (item.effects.baseAttackRangeBonus) {
       effects.baseAttackRangeBonus = (effects.baseAttackRangeBonus ?? 0) + item.effects.baseAttackRangeBonus;
     }
     if (item.effects.defenseShieldBonus) {
       effects.defenseShieldBonus = (effects.defenseShieldBonus ?? 0) + item.effects.defenseShieldBonus;
+    }
+    if (item.effects.defenseBonus) {
+      effects.defenseBonus = (effects.defenseBonus ?? 0) + item.effects.defenseBonus;
     }
     if (item.effects.damageReductionMultiplier) {
       effects.damageReductionMultiplier = (effects.damageReductionMultiplier ?? 1) * item.effects.damageReductionMultiplier;
@@ -97,6 +112,10 @@ export function applyPersistentItemStats(state: CharacterState, effects: Persist
     state.maxHp = Math.round(state.maxHp * effects.maxHpMultiplier);
     state.hp = state.maxHp;
   }
+  if (effects.maxHpBonus) {
+    state.maxHp += effects.maxHpBonus;
+    state.hp = state.maxHp;
+  }
 
   // Speed multiplier
   if (effects.speedMultiplier && effects.speedMultiplier !== 1) {
@@ -106,6 +125,9 @@ export function applyPersistentItemStats(state: CharacterState, effects: Persist
   // Attack power multiplier
   if (effects.attackMultiplier && effects.attackMultiplier !== 1) {
     state.attackPower = Math.round(state.attackPower * effects.attackMultiplier);
+  }
+  if (effects.attackPowerBonus) {
+    state.attackPower += effects.attackPowerBonus;
   }
 
   // Range bonus
@@ -117,6 +139,9 @@ export function applyPersistentItemStats(state: CharacterState, effects: Persist
   if (effects.defenseShieldBonus) {
     state.maxDefenseShield = (state.maxDefenseShield ?? 0) + effects.defenseShieldBonus;
     state.defenseShield = state.maxDefenseShield;
+  }
+  if (effects.defenseBonus) {
+    state.persistentItemDefenseBonus = effects.defenseBonus;
   }
 
   if (effects.damageReductionMultiplier && effects.damageReductionMultiplier !== 1) {

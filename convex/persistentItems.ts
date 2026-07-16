@@ -14,28 +14,28 @@ const RARITY_DRAW_WEIGHTS: Record<Rarity, number> = {
 
 const SEED_ITEMS = [
   { itemId: "inertial_bearing", name: "관성 베어링", description: "이동 속도 +8%", rarity: "common" as const, isActive: true, effects: { speedMultiplier: 1.08 } },
-  { itemId: "tempered_core", name: "단련 코어", description: "공격력 +7%", rarity: "common" as const, isActive: true, effects: { attackMultiplier: 1.07 } },
+  { itemId: "tempered_core", name: "단련 코어", description: "공격력 +2", rarity: "common" as const, isActive: true, effects: { attackPowerBonus: 2 } },
   { itemId: "quick_charge_cell", name: "급속 충전 셀", description: "스킬 쿨다운 속도 +10%", rarity: "common" as const, isActive: true, effects: { skillChargeRateMultiplier: 1.10 } },
   { itemId: "reinforced_shell", name: "강화 외피", description: "최대 DEF 보호막 +12", rarity: "common" as const, isActive: true, effects: { defenseShieldBonus: 12 } },
   { itemId: "impact_lens", name: "충격 렌즈", description: "기본 공격 사거리 +18px", rarity: "common" as const, isActive: true, effects: { baseAttackRangeBonus: 18 } },
-  { itemId: "bio_buffer", name: "생체 완충재", description: "최대 체력 +8%", rarity: "common" as const, isActive: true, effects: { maxHpMultiplier: 1.08 } },
-  { itemId: "carbon_plating", name: "카본 장갑판", description: "받는 피해 -6%", rarity: "common" as const, isActive: true, effects: { damageReductionMultiplier: 0.94 } },
+  { itemId: "bio_buffer", name: "생체 완충재", description: "최대 체력 +12", rarity: "common" as const, isActive: true, effects: { maxHpBonus: 12 } },
+  { itemId: "carbon_plating", name: "카본 장갑판", description: "방어력 +1 (피해 1회당 -1)", rarity: "common" as const, isActive: true, effects: { defenseBonus: 1 } },
   
   { itemId: "longshot_scope", name: "롱샷 스코프", description: "기본 공격 사거리 +30px", rarity: "rare" as const, isActive: true, effects: { baseAttackRangeBonus: 30 } },
-  { itemId: "vital_reactor", name: "생명 반응로", description: "최대 체력 +14%", rarity: "rare" as const, isActive: true, effects: { maxHpMultiplier: 1.14 } },
+  { itemId: "vital_reactor", name: "생명 반응로", description: "최대 체력 +24", rarity: "rare" as const, isActive: true, effects: { maxHpBonus: 24 } },
   { itemId: "turbo_servo", name: "터보 서보", description: "이동 속도 +14%", rarity: "rare" as const, isActive: true, effects: { speedMultiplier: 1.14 } },
   { itemId: "titanium_guard", name: "티타늄 가드", description: "최대 DEF 보호막 +24", rarity: "rare" as const, isActive: true, effects: { defenseShieldBonus: 24 } },
-  { itemId: "amplifier_chip", name: "증폭 칩", description: "공격력 +13%", rarity: "rare" as const, isActive: true, effects: { attackMultiplier: 1.13 } },
-  { itemId: "adaptive_mesh", name: "적응형 메시", description: "받는 피해 -11%", rarity: "rare" as const, isActive: true, effects: { damageReductionMultiplier: 0.89 } },
+  { itemId: "amplifier_chip", name: "증폭 칩", description: "공격력 +4", rarity: "rare" as const, isActive: true, effects: { attackPowerBonus: 4 } },
+  { itemId: "adaptive_mesh", name: "적응형 메시", description: "방어력 +2 (피해 1회당 -2)", rarity: "rare" as const, isActive: true, effects: { defenseBonus: 2 } },
   
   { itemId: "orbiting_shard", name: "궤도 파편", description: "주변 82px 궤도 링이 1.4초마다 적에게 9 피해", rarity: "epic" as const, isActive: true, effects: { orbitDamage: 9, orbitRadius: 82, orbitInterval: 1.4 } },
   { itemId: "resonance_emitter", name: "공명 방출기", description: "주변 116px에 3초마다 충격파 16 피해", rarity: "epic" as const, isActive: true, effects: { pulseDamage: 16, pulseRadius: 116, pulseInterval: 3.0 } },
-  { itemId: "overclock_matrix", name: "오버클록 매트릭스", description: "공격력 +18%, 스킬 쿨다운 속도 +18%", rarity: "epic" as const, isActive: true, effects: { attackMultiplier: 1.18, skillChargeRateMultiplier: 1.18 } },
-  { itemId: "fortress_heart", name: "요새의 심장", description: "최대 체력 +18%, 최대 DEF 보호막 +20", rarity: "epic" as const, isActive: true, effects: { maxHpMultiplier: 1.18, defenseShieldBonus: 20 } },
+  { itemId: "overclock_matrix", name: "오버클록 매트릭스", description: "공격력 +6, 스킬 쿨다운 속도 +18%", rarity: "epic" as const, isActive: true, effects: { attackPowerBonus: 6, skillChargeRateMultiplier: 1.18 } },
+  { itemId: "fortress_heart", name: "요새의 심장", description: "최대 체력 +32, 최대 DEF 보호막 +20", rarity: "epic" as const, isActive: true, effects: { maxHpBonus: 32, defenseShieldBonus: 20 } },
   
   { itemId: "nova_ring", name: "노바 링", description: "주변 104px 궤도 링이 1초마다 적에게 16 피해", rarity: "legendary" as const, isActive: true, effects: { orbitDamage: 16, orbitRadius: 104, orbitInterval: 1.0 } },
-  { itemId: "aegis_protocol", name: "이지스 프로토콜", description: "최대 DEF 보호막 +38, 받는 피해 -15%", rarity: "legendary" as const, isActive: true, effects: { defenseShieldBonus: 38, damageReductionMultiplier: 0.85 } },
-  { itemId: "apex_drive", name: "에이펙스 드라이브", description: "공격력 +22%, 이동 속도 +16%", rarity: "legendary" as const, isActive: true, effects: { attackMultiplier: 1.22, speedMultiplier: 1.16 } },
+  { itemId: "aegis_protocol", name: "이지스 프로토콜", description: "최대 DEF 보호막 +38, 방어력 +3 (피해 1회당 -3)", rarity: "legendary" as const, isActive: true, effects: { defenseShieldBonus: 38, defenseBonus: 3 } },
+  { itemId: "apex_drive", name: "에이펙스 드라이브", description: "공격력 +9, 이동 속도 +16%", rarity: "legendary" as const, isActive: true, effects: { attackPowerBonus: 9, speedMultiplier: 1.16 } },
   
   { itemId: "singularity_engine", name: "특이점 엔진", description: "주변 132px에 2.4초마다 충격파 28 피해, 스킬 쿨다운 속도 +25%", rarity: "unique" as const, isActive: true, effects: { pulseDamage: 28, pulseRadius: 132, pulseInterval: 2.4, skillChargeRateMultiplier: 1.25 } },
 ];
@@ -79,6 +79,8 @@ function scaleEffects(baseEffects: any, level: number): any {
       if (key.endsWith("Multiplier") || key === "damageReductionMultiplier") {
         const baseOffset = value - 1;
         scaled[key] = Number((1 + baseOffset * scale).toFixed(3));
+      } else if (["maxHpBonus", "attackPowerBonus", "defenseBonus", "defenseShieldBonus"].includes(key)) {
+        scaled[key] = Math.round(value * scale);
       } else {
         scaled[key] = Number((value * scale).toFixed(1));
       }
@@ -138,6 +140,27 @@ export const ensureInitialPersistentItemCatalog = mutation({
       }
     }
     return { seeded, patched };
+  },
+});
+
+// 현재 게임은 고정 20명 × 가방 20칸으로 최대 400개 인스턴스만 존재한다.
+// 카탈로그의 밸런스를 변경할 때 보유 장비 효과도 레벨을 유지한 채 안전하게 동기화한다.
+export const syncPersistentItemBalance = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("playerItems").take(500);
+    let updated = 0;
+    for (const item of items) {
+      const catalogItem = SEED_ITEMS.find((entry) => entry.itemId === item.itemCatalogId);
+      if (!catalogItem) continue;
+      await ctx.db.patch(item._id, {
+        name: catalogItem.name,
+        rarity: catalogItem.rarity,
+        effects: scaleEffects(catalogItem.effects, item.level),
+      });
+      updated += 1;
+    }
+    return { updated, inspected: items.length, complete: items.length < 500 };
   },
 });
 

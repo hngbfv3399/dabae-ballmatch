@@ -202,6 +202,7 @@ export interface CharacterState extends CharacterConfig {
   raidBuffTimeLeft?: number;
   raidImmunityTimeLeft?: number;
   // 영구 아이템의 공통 전투 효과. 캐릭터별 분기 없이 엔진에서 처리한다.
+  persistentItemDefenseBonus?: number;
   persistentItemDamageReductionMultiplier?: number;
   persistentItemOrbitDamage?: number;
   persistentItemOrbitRadius?: number;

@@ -265,6 +265,7 @@ export default defineSchema({
     isActive: v.boolean(),
     createdAt: v.number(),
     effects: v.object({
+      maxHpBonus: v.optional(v.number()),
       maxHpMultiplier: v.optional(v.number()),
       speedMultiplier: v.optional(v.number()),
       baseAttackRangeBonus: v.optional(v.number()),
@@ -297,6 +298,7 @@ export default defineSchema({
     experience: v.number(),          // 장비 누적 강화 XP
     equippedSlot: v.number(),        // 0: 미장착, 1~8: 장착 슬롯 번호
     effects: v.object({
+      maxHpBonus: v.optional(v.number()),
       maxHpMultiplier: v.optional(v.number()),
       speedMultiplier: v.optional(v.number()),
       baseAttackRangeBonus: v.optional(v.number()),

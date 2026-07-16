@@ -862,6 +862,8 @@ function initPersistentItems() {
         });
 
         renderGrowthTab();
+        renderPlayTab();
+        renderBookTab();
       }
     );
   }
@@ -3400,9 +3402,8 @@ function startPveDungeon() {
   let baseMaxHp = getLeveledHp(character.maxHp, progress);
   let baseMaxDefenseShield = getLeveledDefenseShield(character, progress);
 
-  if (effects.maxHpMultiplier) {
-    baseMaxHp = Math.round(baseMaxHp * effects.maxHpMultiplier);
-  }
+  if (effects.maxHpMultiplier) baseMaxHp = Math.round(baseMaxHp * effects.maxHpMultiplier);
+  if (effects.maxHpBonus) baseMaxHp += effects.maxHpBonus;
   if (effects.defenseShieldBonus) {
     baseMaxDefenseShield += effects.defenseShieldBonus;
   }
@@ -4106,12 +4107,15 @@ function selectEquipmentItem(itemId: string): void {
 
 function formatPersistentItemEffects(effects: PlayerItem["effects"]): string[] {
   const lines: string[] = [];
+  if (effects.maxHpBonus) lines.push(`최대 체력 +${effects.maxHpBonus}`);
   if (effects.maxHpMultiplier && effects.maxHpMultiplier !== 1) lines.push(`최대 체력 +${Math.round((effects.maxHpMultiplier - 1) * 100)}%`);
+  if (effects.attackPowerBonus) lines.push(`공격력 +${effects.attackPowerBonus}`);
   if (effects.attackMultiplier && effects.attackMultiplier !== 1) lines.push(`공격력 +${Math.round((effects.attackMultiplier - 1) * 100)}%`);
   if (effects.speedMultiplier && effects.speedMultiplier !== 1) lines.push(`이동 속도 +${Math.round((effects.speedMultiplier - 1) * 100)}%`);
   if (effects.skillChargeRateMultiplier && effects.skillChargeRateMultiplier !== 1) lines.push(`스킬 충전 속도 +${Math.round((effects.skillChargeRateMultiplier - 1) * 100)}%`);
   if (effects.baseAttackRangeBonus) lines.push(`기본 공격 사거리 +${effects.baseAttackRangeBonus}px`);
   if (effects.defenseShieldBonus) lines.push(`최대 DEF 보호막 +${effects.defenseShieldBonus}`);
+  if (effects.defenseBonus) lines.push(`방어력 +${effects.defenseBonus} (피해 1회당 -${effects.defenseBonus})`);
   if (effects.damageReductionMultiplier && effects.damageReductionMultiplier !== 1) lines.push(`받는 피해 ${Math.round((1 - effects.damageReductionMultiplier) * 100)}% 감소`);
   if (effects.orbitDamage && effects.orbitRadius && effects.orbitInterval) lines.push(`반경 ${effects.orbitRadius}px 궤도 공격 · ${effects.orbitInterval}초마다 ${effects.orbitDamage} 피해`);
   if (effects.pulseDamage && effects.pulseRadius && effects.pulseInterval) lines.push(`반경 ${effects.pulseRadius}px 충격파 · ${effects.pulseInterval}초마다 ${effects.pulseDamage} 피해`);
@@ -4438,13 +4442,21 @@ function renderBookTab() {
     const atkLevel = isMine ? (characterSkillsInvested.get("atk") ?? 0) : 0;
     const cdLevel = isMine ? (characterSkillsInvested.get("cd") ?? 0) : 0;
     const luckyLevel = isMine ? (characterSkillsInvested.get("lucky") ?? 0) : 0;
+    const maxHpMultiplier = (effects as any).maxHpMultiplier ?? 1;
+    const maxHpBonus = (effects as any).maxHpBonus ?? 0;
+    const attackMultiplier = (effects as any).attackMultiplier ?? 1;
+    const attackPowerBonus = (effects as any).attackPowerBonus ?? 0;
+    const speedMultiplier = Math.min(2.5, (effects as any).speedMultiplier ?? 1);
+    const rangeBonus = (effects as any).baseAttackRangeBonus ?? 0;
+    const skillChargeMultiplier = (effects as any).skillChargeRateMultiplier ?? 1;
     return {
-      hp: Math.round(getLeveledHp(character.maxHp, progress) * (1 + hpLevel * .08) * ((effects as any).maxHpMultiplier ?? 1)),
-      atk: Math.round(getLeveledAttack(character.attackPower, progress) * (1 + atkLevel * .07)),
-      spd: character.speed,
+      hp: Math.round(getLeveledHp(character.maxHp, progress) * (1 + hpLevel * .08) * maxHpMultiplier) + maxHpBonus,
+      atk: Math.round(getLeveledAttack(character.attackPower, progress) * (1 + atkLevel * .07) * attackMultiplier) + attackPowerBonus,
+      spd: character.speed * speedMultiplier,
+      defense: (effects as any).defenseBonus ?? 0,
       def: getLeveledDefenseShield(character, progress) + ((effects as any).defenseShieldBonus ?? 0),
-      range: character.attackRangeRatio ? Math.round(600 * character.attackRangeRatio) : character.baseAttackRange,
-      cd: cdLevel * 10,
+      range: (character.attackRangeRatio ? Math.round(600 * character.attackRangeRatio) : character.baseAttackRange) + rangeBonus,
+      cd: Math.round((((1 + cdLevel * .1) * skillChargeMultiplier) - 1) * 100),
       luck: (character.luck ?? 10) + luckyLevel * 10,
       interval: (character.attackSpeed ?? 1) * Math.max(.5, 1 - luckyLevel * .06),
     };
@@ -4459,6 +4471,7 @@ function renderBookTab() {
   renderValue("stat-final-hp", mineStats.hp, compareStats.hp, mineStats.hp.toLocaleString(), compareStats.hp.toLocaleString());
   renderValue("stat-final-atk", mineStats.atk, compareStats.atk, mineStats.atk.toLocaleString(), compareStats.atk.toLocaleString());
   renderValue("stat-final-spd", mineStats.spd, compareStats.spd, mineStats.spd.toFixed(2), compareStats.spd.toFixed(2));
+  renderValue("stat-final-defense", mineStats.defense, compareStats.defense, `-${mineStats.defense}`, `-${compareStats.defense}`);
   renderValue("stat-final-def", mineStats.def, compareStats.def, mineStats.def.toLocaleString(), compareStats.def.toLocaleString());
   renderValue("stat-final-range", mineStats.range, compareStats.range, `${mineStats.range}px`, `${compareStats.range}px`);
   renderValue("stat-final-cd", mineStats.cd, compareStats.cd, `+${mineStats.cd}%`, `+${compareStats.cd}%`);
