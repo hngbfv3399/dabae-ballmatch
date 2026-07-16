@@ -3790,12 +3790,18 @@ function renderPlayTab() {
   const coinsEl = document.getElementById("play-profile-coins");
   if (coinsEl) coinsEl.textContent = progress.coins.toLocaleString();
 
-  const nextLevelXp = progress.level * 100;
-  const xpPct = Math.min(100, (progress.experience / nextLevelXp) * 100);
+  const currentLevelXp = Number(progress.experienceInCurrentLevel ?? 0);
+  const nextLevelXp = Number(progress.experienceToNextLevel ?? 100);
+  const isMaxLevel = Boolean(progress.isMaxLevel);
+  const xpPct = isMaxLevel ? 100 : Math.min(100, (currentLevelXp / Math.max(1, nextLevelXp)) * 100);
+  const expLabel = document.getElementById("play-profile-exp-label");
+  if (expLabel) expLabel.textContent = isMaxLevel ? `LV ${progress.level} · 최고 레벨` : `LV ${progress.level} → LV ${progress.level + 1} 성장 경험치`;
   const expText = document.getElementById("play-profile-exp-text");
-  if (expText) expText.textContent = `${progress.experience} / ${nextLevelXp}`;
+  if (expText) expText.textContent = isMaxLevel ? "MAX" : `${currentLevelXp.toLocaleString()} / ${nextLevelXp.toLocaleString()} XP`;
   const expFill = document.getElementById("play-profile-exp-fill");
   if (expFill) expFill.style.width = `${xpPct}%`;
+  const totalExpEl = document.getElementById("play-profile-total-exp");
+  if (totalExpEl) totalExpEl.textContent = `누적 획득 경험치 ${(Number(progress.experience) || 0).toLocaleString()} XP`;
 
   const pvpStat = document.getElementById("play-pvp-stat");
   if (pvpStat) pvpStat.textContent = `${progress.pvpWins ?? 0}승 ${progress.pvpLosses ?? 0}패`;
@@ -4454,6 +4460,15 @@ function renderBookTab() {
   renderValue("stat-final-atk-spd", mineStats.interval, compareStats.interval, `${mineStats.interval.toFixed(2)}초`, `${compareStats.interval.toFixed(2)}초`, true);
   const selectedNameEl = document.getElementById("book-selected-name");
   if (selectedNameEl) selectedNameEl.textContent = `${mine.name} · 성장/장비 반영 정보  |  비교: ${compared.name} · 기본 전투 데이터`;
+  const growthSummaryEl = document.getElementById("book-growth-summary");
+  if (growthSummaryEl) {
+    const level = Number(currentCharacterProgress.level ?? 1);
+    const totalExperience = Number(currentCharacterProgress.experience ?? 0);
+    const isMaxLevel = Boolean(currentCharacterProgress.isMaxLevel);
+    const currentExperience = Number(currentCharacterProgress.experienceInCurrentLevel ?? 0);
+    const requiredExperience = Number(currentCharacterProgress.experienceToNextLevel ?? 100);
+    growthSummaryEl.innerHTML = `<strong style="color:var(--neon-cyan);">내 성장 정보 · LV ${level}</strong><br>${isMaxLevel ? "최고 레벨 달성" : `다음 레벨: ${currentExperience.toLocaleString()} / ${requiredExperience.toLocaleString()} XP`} <span style="margin-left:.4rem; color:var(--text-secondary);">· 누적 ${totalExperience.toLocaleString()} XP</span>`;
+  }
 
 
   const listEl = document.getElementById("book-character-list");
@@ -4580,15 +4595,19 @@ function initHubNavigation() {
     };
   }
 
-  const finderBtnTeam = document.getElementById("finder-btn-team");
-  if (finderBtnTeam) {
-    finderBtnTeam.onclick = () => {
+  const openTeamMatchSetup = (rule: TeamGameType) => {
       gameModeModal.classList.add("hidden");
       currentMode = "team";
+      teamGameType = rule;
+      teamGameTypeSelect.value = rule;
       selectGameplayMode("team");
+      updateStartButtonState();
       pvpSetupOverlay.classList.remove("hidden");
-    };
-  }
+  };
+  (['deathmatch', 'control', 'relic'] as TeamGameType[]).forEach((rule) => {
+    const button = document.getElementById(`finder-btn-team-${rule}`);
+    if (button) button.onclick = () => openTeamMatchSetup(rule);
+  });
 
   const finderBtnTournament = document.getElementById("finder-btn-tournament");
   if (finderBtnTournament) {

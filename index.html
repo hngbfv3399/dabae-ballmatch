@@ -233,14 +233,15 @@
               <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.6rem;">
                 <span>🪙 보유 코인: <strong id="play-profile-coins" style="color: #fff;">1000</strong></span>
               </div>
-              <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+              <div style="width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 4px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-secondary);">
-                  <span>경험치</span>
+                  <span id="play-profile-exp-label">Lv.1 → Lv.2 성장 경험치</span>
                   <span id="play-profile-exp-text">0 / 100</span>
                 </div>
                 <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
                   <div id="play-profile-exp-fill" style="width: 0%; height: 100%; background: #00f2fe; transition: width 0.3s ease;"></div>
                 </div>
+                <small id="play-profile-total-exp" style="color: var(--text-secondary); font-size: 0.68rem;">누적 획득 경험치 0 XP</small>
               </div>
             </div>
             
@@ -517,6 +518,7 @@
             <div class="stat-sheet-card">
               <span class="eyebrow" style="color: #00f2fe;">SELECTED CHARACTER</span>
               <h3 id="book-selected-name" style="font-family: 'Orbit', sans-serif; font-size: 1.15rem; margin: 0.25rem 0 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; color:#fff;">캐릭터 정보</h3>
+              <div id="book-growth-summary" style="margin: -0.25rem 0 0.9rem; padding: 0.65rem 0.75rem; border-radius: 8px; background: rgba(0,242,254,0.06); border: 1px solid rgba(0,242,254,0.18); color: var(--text-secondary); font-size: 0.76rem; line-height: 1.5;">로그인한 내 캐릭터의 성장 정보를 불러옵니다.</div>
 
               <div style="display: flex; flex-direction: column; gap: 0.1rem;">
                 <div class="stat-row">
@@ -587,10 +589,16 @@
                 <span>⚔️ PvP 개인전 (서바이벌 프리폴)</span>
                 <small style="opacity: 0.7;">2인 ~ 6인 구성</small>
               </button>
-              <button id="finder-btn-team" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
-                <span>🔴🔵 PvP 팀전 (데스매치/점령/쟁탈)</span>
-                <small style="opacity: 0.7;">팀별 협동 난타전</small>
-              </button>
+              <div style="padding: 0.75rem; border: 1px solid rgba(0,242,254,.18); border-radius: 10px; background: rgba(0,242,254,.035);">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.55rem; font-weight:700; font-family:'Orbit';">
+                  <span>🔴🔵 PvP 팀전</span><small style="color:var(--text-secondary);">규칙을 바로 선택</small>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:.45rem;">
+                  <button id="finder-btn-team-deathmatch" class="btn btn-secondary" type="button" style="min-height:54px; padding:.45rem; font-size:.76rem; font-weight:700;">⚔️ 데스매치<br><small style="opacity:.7;">상대 처치</small></button>
+                  <button id="finder-btn-team-control" class="btn btn-secondary" type="button" style="min-height:54px; padding:.45rem; font-size:.76rem; font-weight:700;">🎯 점령전<br><small style="opacity:.7;">거점 점령</small></button>
+                  <button id="finder-btn-team-relic" class="btn btn-secondary" type="button" style="min-height:54px; padding:.45rem; font-size:.76rem; font-weight:700;">💎 쟁탈전<br><small style="opacity:.7;">보석 확보</small></button>
+                </div>
+              </div>
               <button id="finder-btn-tournament" class="btn btn-secondary" style="height: 48px; text-align: left; padding: 0 1.2rem; font-weight: 700; font-family:'Orbit'; display:flex; justify-content:space-between; align-items:center;">
                 <span>🏆 토너먼트 모드 (최강자전)</span>
                 <small style="opacity: 0.7;">16강 토너먼트 배틀</small>
