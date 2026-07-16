@@ -69,6 +69,7 @@
 - [x] 도감에 Luck 및 AtkSpd(공격 간격) 최종 수치 표시 추가
 - [x] `gachaManager.ts`, `cosmeticCloset.ts`, `growthManager.ts`, `rosterManager.ts` 추출 파일의 TypeScript 오류 복구
 - [ ] 추출 매니저를 기존 `main.ts` 런타임 상태와 완전히 연결하고 엔트리 전용으로 축소
-- [x] 최종 UI 수동 검증 및 `PATCH_NOTES.md` 기록
+- [ ] 생존전 장시간 수동 검증: 1·2웨이브 HUD·보상·원거리 몬스터 확인 완료, 3웨이브 증강·5웨이브 회복·사망 결과 재확인 필요
+- [x] `PATCH_NOTES.md` 기록
 - [x] Convex 프로덕션 배포 및 전투 카탈로그(캐릭터 20종·경기장 6종) 시딩
 - [ ] Git 커밋/푸시
