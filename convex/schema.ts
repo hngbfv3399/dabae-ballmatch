@@ -151,6 +151,8 @@ export default defineSchema({
     ),
     scope: v.union(v.literal("global"), v.literal("character")),
     characterId: v.optional(v.string()),
+    // 파일 본문은 Convex Storage에, 카탈로그에는 참조 ID만 보관한다.
+    imageStorageId: v.optional(v.id("_storage")),
     style: v.object({
       textColor: v.string(),
       borderColor: v.string(),

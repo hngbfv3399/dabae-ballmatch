@@ -65,6 +65,22 @@ function traceTornEdge(ctx: CanvasRenderingContext2D, cut: MapCut, y: number, re
   }
 }
 
+/** 세로 사진도 공 안에서 찌그러지지 않도록 중앙 얼굴 영역을 정사각형으로 크롭한다. */
+function drawPortraitCover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  size: number,
+) {
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const sourceSize = Math.min(width, height);
+  const sourceX = (width - sourceSize) / 2;
+  const sourceY = Math.max(0, (height - sourceSize) * 0.38);
+  ctx.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, x, y, size, size);
+}
+
 export class GameLounge {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -598,11 +614,12 @@ export class GameLounge {
       }
 
       // 이미지 프리로딩 개시
-      if (char.image && !this.preloadedImages.has(char.image)) {
+      const portraitUrl = char.cosmeticImageUrl ?? char.image;
+      if (portraitUrl && !this.preloadedImages.has(portraitUrl)) {
         const img = new Image();
-        img.src = char.image;
+        img.src = portraitUrl;
         img.onload = () => {
-          this.preloadedImages.set(char.image!, img);
+          this.preloadedImages.set(portraitUrl, img);
         };
       }
     });
@@ -1976,21 +1993,16 @@ export class GameLounge {
           this.ctx.fillStyle = "#121225";
           this.ctx.fill();
 
-          const imgObj = char.image
-            ? this.preloadedImages.get(char.image)
+          const portraitUrl = char.cosmeticImageUrl ?? char.image;
+          const imgObj = portraitUrl
+            ? this.preloadedImages.get(portraitUrl)
             : null;
           if (imgObj) {
             this.ctx.save();
             this.ctx.beginPath();
             this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
             this.ctx.clip();
-            this.ctx.drawImage(
-              imgObj,
-              -radius,
-              -radius,
-              radius * 2,
-              radius * 2,
-            );
+            drawPortraitCover(this.ctx, imgObj, -radius, -radius, radius * 2);
             this.ctx.restore();
           } else {
             this.ctx.fillStyle = "#ffffff";
@@ -2067,16 +2079,11 @@ export class GameLounge {
       this.ctx.fill();
 
       // 원형 내부 이미지 또는 텍스트 렌더링
-      const imgObj = char.image ? this.preloadedImages.get(char.image) : null;
+      const portraitUrl = char.cosmeticImageUrl ?? char.image;
+      const imgObj = portraitUrl ? this.preloadedImages.get(portraitUrl) : null;
       if (imgObj) {
         this.ctx.clip(); // 둥근 구체 내부로 마스킹 클리핑
-        this.ctx.drawImage(
-          imgObj,
-          char.x - currentRadius,
-          char.y - currentRadius,
-          currentRadius * 2,
-          currentRadius * 2,
-        );
+        drawPortraitCover(this.ctx, imgObj, char.x - currentRadius, char.y - currentRadius, currentRadius * 2);
       } else {
         // 이미지가 없으므로 centered name text fallback 드로잉
         this.ctx.fillStyle = skin?.textColor ?? "#ffffff";

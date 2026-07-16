@@ -203,9 +203,74 @@ export const listCatalog = query({
       .withIndex("by_characterId_and_cosmeticId", (q) => q.eq("characterId", args.characterId))
       .collect();
     const unlockedIds = new Set(unlocks.map((unlock) => unlock.cosmeticId));
-    return cosmetics
-      .filter((cosmetic) => cosmetic.isActive)
-      .map((cosmetic) => ({ ...cosmetic, isUnlocked: unlockedIds.has(cosmetic.cosmeticId) }));
+    return await Promise.all(cosmetics
+      // 캐릭터 전용 스킨은 해당 캐릭터의 카탈로그에서만 보인다.
+      .filter((cosmetic) => cosmetic.isActive && (cosmetic.scope === "global" || cosmetic.characterId === args.characterId))
+      .map(async ({ imageStorageId, ...cosmetic }) => ({
+        ...cosmetic,
+        // Storage URL은 짧게 유효한 서명 URL이므로 DB에 저장하지 않고 조회마다 만든다.
+        imageUrl: imageStorageId ? await ctx.storage.getUrl(imageStorageId) : null,
+        isUnlocked: unlockedIds.has(cosmetic.cosmeticId),
+      })));
+  },
+});
+
+/** 운영자용 스킨 이미지 업로드 URL. 이미지 파일은 Storage에만 저장한다. */
+export const generateSkinImageUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+});
+
+/** Storage 이미지를 캐릭터 전용 스킨으로 등록하고 소유자에게 즉시 지급·장착한다. */
+export const registerAndEquipImageSkin = mutation({
+  args: {
+    cosmeticId: v.string(),
+    name: v.string(),
+    characterId: v.string(),
+    rarity: v.union(v.literal("common"), v.literal("rare"), v.literal("epic"), v.literal("legendary"), v.literal("unique")),
+    imageStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    assertCharacterId(args.characterId);
+    const now = Date.now();
+    const style = {
+      textColor: "#f8fafc",
+      borderColor: "#22d3ee",
+      fillColor: "#0f172a",
+      glowColor: "#22d3ee",
+      borderAnimation: "aurora" as const,
+      trail: "spark" as const,
+    };
+    const existing = await ctx.db
+      .query("cosmetics")
+      .withIndex("by_cosmeticId", (q) => q.eq("cosmeticId", args.cosmeticId))
+      .unique();
+    const cosmetic = {
+      cosmeticId: args.cosmeticId,
+      name: args.name,
+      rarity: args.rarity,
+      scope: "character" as const,
+      characterId: args.characterId,
+      imageStorageId: args.imageStorageId,
+      style,
+      isActive: true,
+    };
+    if (existing) await ctx.db.patch(existing._id, cosmetic);
+    else await ctx.db.insert("cosmetics", { ...cosmetic, createdAt: now });
+
+    const unlock = await ctx.db
+      .query("cosmeticUnlocks")
+      .withIndex("by_characterId_and_cosmeticId", (q) => q.eq("characterId", args.characterId).eq("cosmeticId", args.cosmeticId))
+      .unique();
+    if (!unlock) await ctx.db.insert("cosmeticUnlocks", { characterId: args.characterId, cosmeticId: args.cosmeticId, unlockedAt: now });
+
+    const loadout = await ctx.db
+      .query("characterCosmeticLoadouts")
+      .withIndex("by_characterId", (q) => q.eq("characterId", args.characterId))
+      .unique();
+    if (loadout) await ctx.db.patch(loadout._id, { equippedCosmeticId: args.cosmeticId, updatedAt: now });
+    else await ctx.db.insert("characterCosmeticLoadouts", { characterId: args.characterId, equippedCosmeticId: args.cosmeticId, updatedAt: now });
+    return { cosmeticId: args.cosmeticId, characterId: args.characterId, equipped: true };
   },
 });
 

@@ -234,4 +234,5 @@ export interface CharacterState extends CharacterConfig {
   lastGaugeLogTime?: number;
   // 전역 장착 스킨의 시각 효과. 전투 판정 색상(char.color)과 분리한다.
   cosmeticStyle?: CharacterCosmeticStyle;
+  cosmeticImageUrl?: string;
 }
