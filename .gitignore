@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 로컬 전용 스킬·아이템·증강 밸런스 실험실 (절대 원격 저장소에 올리지 않음)
+/labs/combat-sandbox/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

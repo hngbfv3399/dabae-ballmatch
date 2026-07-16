@@ -100,6 +100,16 @@ export function createPveRunModifiers(): PveRunModifiers {
   return { augments: [], items: [] };
 }
 
+/**
+ * UI·밸런스 도구가 전투와 동일한 증강 풀을 읽을 때 사용한다.
+ * 반환값은 새 객체이므로 테스트 화면에서 선택 상태를 바꿔도 원본 카탈로그는 변하지 않는다.
+ */
+export function getAvailablePveAugments(context: PveAugmentContext): RunModifier[] {
+  return PVE_AUGMENTS
+    .filter((augment) => matchesAugmentContext(augment, context))
+    .map((augment) => ({ ...augment, kind: "augment", stacks: 1, acquiredAtStage: context.stage ?? 1 }));
+}
+
 export function getAllRunModifiers(modifiers: PveRunModifiers): RunModifier[] {
   return [...modifiers.augments, ...modifiers.items];
 }
