@@ -65,11 +65,11 @@ const pveSetupOverlay = document.getElementById("pve-setup-wrapper-overlay") as 
 const pvpSetupOverlay = document.getElementById("pvp-setup-wrapper-overlay") as HTMLElement;
 const pveSetupCloseBtn = document.getElementById("pve-setup-close") as HTMLButtonElement;
 const pvpSetupCloseBtn = document.getElementById("pvp-setup-close") as HTMLButtonElement;
-const gachaResult = document.getElementById("gacha-result") as HTMLElement;
-const gachaTitle = document.getElementById("gacha-title") as HTMLElement;
-const gachaTypeHelp = document.getElementById("gacha-type-help") as HTMLElement;
-const gachaCatalog = document.getElementById("gacha-catalog") as HTMLElement;
-const gachaPreview = document.getElementById("gacha-preview") as HTMLElement;
+const gachaResult = document.getElementById("gacha-result") as HTMLElement | null;
+const gachaTitle = document.getElementById("gacha-title") as HTMLElement | null;
+const gachaTypeHelp = document.getElementById("gacha-type-help") as HTMLElement | null;
+const gachaCatalog = document.getElementById("gacha-catalog") as HTMLElement | null;
+const gachaPreview = document.getElementById("gacha-preview") as HTMLElement | null;
 const gachaRevealModal = document.getElementById("gacha-reveal-modal") as HTMLElement;
 const gachaRevealContent = document.getElementById("gacha-reveal-content") as HTMLElement;
 const persistentItemRateModal = document.getElementById("persistent-item-rate-modal") as HTMLElement;
@@ -449,6 +449,7 @@ function renderGachaCatalog() {
 }
 
 function renderGachaPreview() {
+  if (!gachaPreview) return;
   if (activeGachaType === "specialEvent") {
     const specialEvent = victorySpecialEventCatalog.find((entry) => entry.specialEventId === previewVictorySpecialEventId) ?? victorySpecialEventCatalog[0];
     const renderer = getSpecialEventRenderer(specialEvent);
@@ -476,14 +477,18 @@ function renderGachaPreview() {
 
 function updateGachaUI() {
   const catalogReady = cosmeticCatalog.length + victoryActionCatalog.length + victoryBackgroundCatalog.length + victorySpecialEventCatalog.length > 0;
-  gachaTitle.textContent = "통합 가챠";
-  gachaTypeHelp.innerHTML = activeGachaType === "specialEvent"
-    ? `현재 탭은 <b>특수 이벤트</b> 도감 필터입니다. 특수 이벤트는 승리 모달 전체에 적용되며, 뽑기는 모든 카테고리 <b>전체 풀</b>에서 진행됩니다.`
-    : activeGachaType === "action"
-    ? `현재 탭은 <b>플레이어 행동</b> 도감 필터입니다. 행동과 배경은 별도 아이템이며, 뽑기는 스킨·행동·배경 <b>전체 풀</b>에서 진행됩니다.`
-    : activeGachaType === "background"
-      ? `현재 탭은 <b>배경 효과</b> 도감 필터입니다. 행동과 배경은 별도 아이템이며, 뽑기는 스킨·행동·배경 <b>전체 풀</b>에서 진행됩니다.`
-      : `현재 탭은 스킨 도감 필터입니다. 뽑기는 스킨·승리 행동·승리 배경 <b>전체 풀</b>에서 진행됩니다. 중복 획득 시 코인이 환급됩니다.`;
+  if (gachaTitle) {
+    gachaTitle.textContent = "통합 가챠";
+  }
+  if (gachaTypeHelp) {
+    gachaTypeHelp.innerHTML = activeGachaType === "specialEvent"
+      ? `현재 탭은 <b>특수 이벤트</b> 도감 필터입니다. 특수 이벤트는 승리 모달 전체에 적용되며, 뽑기는 모든 카테고리 <b>전체 풀</b>에서 진행됩니다.`
+      : activeGachaType === "action"
+      ? `현재 탭은 <b>플레이어 행동</b> 도감 필터입니다. 행동과 배경은 별도 아이템이며, 뽑기는 스킨·행동·배경 <b>전체 풀</b>에서 진행됩니다.`
+      : activeGachaType === "background"
+        ? `현재 탭은 <b>배경 효과</b> 도감 필터입니다. 행동과 배경은 별도 아이템이며, 뽑기는 스킨·행동·배경 <b>전체 풀</b>에서 진행됩니다.`
+        : `현재 탭은 스킨 도감 필터입니다. 뽑기는 스킨·승리 행동·승리 배경 <b>전체 풀</b>에서 진행됩니다. 중복 획득 시 코인이 환급됩니다.`;
+  }
   
   const gachaDrawStatus = document.getElementById("gacha-draw-status");
   if (gachaDrawStatus) {
@@ -602,20 +607,20 @@ function subscribeSeasonRanking() {
 async function equipCosmetic(characterId: string, cosmeticId: string) {
   try {
     await convexClient.mutation(api.cosmetics.equipForCharacter, { characterId, cosmeticId });
-    gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}에게 스킨을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
+    if (gachaResult) gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}에게 스킨을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
     renderSkinTab();
   } catch {
-    gachaResult.textContent = "스킨 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
+    if (gachaResult) gachaResult.textContent = "스킨 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
   }
 }
 
 async function clearCosmetic(characterId: string) {
   try {
     await convexClient.mutation(api.cosmetics.clearForCharacter, { characterId });
-    gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}의 기본 외형을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
+    if (gachaResult) gachaResult.textContent = `${availableCharacters.find((character) => character.id === characterId)?.name ?? "캐릭터"}의 기본 외형을 장착했습니다. 모든 클라이언트에 반영됩니다.`;
     renderSkinTab();
   } catch {
-    gachaResult.textContent = "기본 외형 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
+    if (gachaResult) gachaResult.textContent = "기본 외형 장착에 실패했습니다. 잠시 후 다시 시도해주세요.";
   }
 }
 
@@ -635,23 +640,23 @@ async function drawGacha() {
     if (result.itemType === "action" || result.itemType === "background") {
       const item = result.item;
       showVictoryPartRevealResult(result.itemType, item, result);
-      gachaResult.textContent = result.result === "unlocked"
+      if (gachaResult) gachaResult.textContent = result.result === "unlocked"
         ? `획득! ${item.name} (${item.rarity.toUpperCase()}) — ${result.itemType === "action" ? "1위 플레이어 공 행동" : "승리 배경"}으로 스킨 탭에서 장착할 수 있습니다.`
         : `중복! ${item.name} · 코인 ${result.coinRefund}개를 환급받았습니다.`;
     } else if (result.itemType === "specialEvent") {
       showVictorySpecialEventRevealResult(result.item, result);
-      gachaResult.textContent = result.result === "unlocked"
+      if (gachaResult) gachaResult.textContent = result.result === "unlocked"
         ? `획득! ${result.item.name} (${result.item.rarity.toUpperCase()}) — 스킨 탭에서 특수 이벤트로 장착할 수 있습니다.`
         : `중복! ${result.item.name} · 코인 ${result.coinRefund}개를 환급받았습니다.`;
     } else {
       showGachaRevealResult(result);
-      gachaResult.textContent = result.result === "unlocked"
+      if (gachaResult) gachaResult.textContent = result.result === "unlocked"
         ? `획득! ${result.item.name} (${result.item.rarity.toUpperCase()}) — 전 캐릭터에 장착할 수 있습니다.`
         : `중복! ${result.item.name} · 코인 ${result.coinRefund}개를 환급받았습니다.`;
     }
   } catch (error) {
     closeGachaReveal();
-    gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
+    if (gachaResult) gachaResult.textContent = error instanceof Error ? error.message : "뽑기에 실패했습니다.";
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -672,12 +677,12 @@ async function equipVictoryPart(itemType: "action" | "background", item: Victory
     } else {
       await convexClient.mutation(api.cosmetics.equipVictoryBackground, { characterId: currentCharacterId!, backgroundId: (item as VictoryBackground).backgroundId });
     }
-    gachaResult.textContent = `${item.name} ${itemType === "action" ? "행동" : "배경"}을 장착했습니다. 다음 게임 결과에 적용됩니다.`;
+    if (gachaResult) gachaResult.textContent = `${item.name} ${itemType === "action" ? "행동" : "배경"}을 장착했습니다. 다음 게임 결과에 적용됩니다.`;
     const result = document.getElementById("collection-victory-ceremony-result");
     if (result) result.textContent = `${item.name} ${itemType === "action" ? "행동" : "배경"}을 장착했습니다.`;
     renderSkinTab();
   } catch (error) {
-    gachaResult.textContent = error instanceof Error ? error.message : "승리 항목 장착에 실패했습니다.";
+    if (gachaResult) gachaResult.textContent = error instanceof Error ? error.message : "승리 항목 장착에 실패했습니다.";
     const result = document.getElementById("collection-victory-ceremony-result");
     if (result) result.textContent = error instanceof Error ? error.message : "승리 항목 장착에 실패했습니다.";
   }
@@ -875,7 +880,7 @@ async function drawPersistentItemsAction(count: number) {
 
   } catch (err) {
     closeGachaReveal();
-    gachaResult.textContent = err instanceof Error ? err.message : "아이템 소환에 실패했습니다.";
+    if (gachaResult) gachaResult.textContent = err instanceof Error ? err.message : "아이템 소환에 실패했습니다.";
     alert(err instanceof Error ? err.message : "아이템 소환에 실패했습니다.");
   } finally {
     if (item1Btn) item1Btn.disabled = false;
