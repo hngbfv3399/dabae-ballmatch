@@ -208,6 +208,7 @@ export interface CharacterState extends CharacterConfig {
   persistentItemOrbitRadius?: number;
   persistentItemOrbitInterval?: number;
   persistentItemOrbitTimer?: number;
+  persistentItemOrbitSatellites?: Array<{ count: number; style: "drone" | "shard" | "nova" | "singularity" }>;
   persistentItemPulseDamage?: number;
   persistentItemPulseRadius?: number;
   persistentItemPulseInterval?: number;

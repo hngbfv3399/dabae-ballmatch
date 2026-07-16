@@ -2405,16 +2405,22 @@ export class GameLounge {
   private renderPersistentItemCombatEffects(char: CharacterState) {
     const orbitRadius = char.persistentItemOrbitRadius;
     if (orbitRadius) {
-      this.ctx.save();
-      this.ctx.strokeStyle = "rgba(167, 139, 250, 0.68)";
-      this.ctx.lineWidth = 2;
-      this.ctx.setLineDash([5, 6]);
-      this.ctx.lineDashOffset = -performance.now() / 25;
-      this.ctx.beginPath();
-      this.ctx.arc(char.x, char.y, orbitRadius, 0, Math.PI * 2);
-      this.ctx.stroke();
-      this.ctx.setLineDash([]);
-      this.ctx.restore();
+      const satelliteDefinitions = char.persistentItemOrbitSatellites?.length
+        ? char.persistentItemOrbitSatellites
+        : [{ count: 1, style: "shard" as const }];
+      const satellites = satelliteDefinitions.flatMap((definition) =>
+        Array.from({ length: definition.count }, () => definition.style),
+      ).slice(0, 8);
+      const time = performance.now() / 1000;
+      satellites.forEach((style, index) => {
+        const direction = style === "singularity" ? -1 : 1;
+        const speed = style === "drone" ? 1.65 : style === "shard" ? 2.05 : style === "nova" ? 2.45 : 1.3;
+        const angle = direction * time * speed + (Math.PI * 2 * index) / satellites.length;
+        const radiusOffset = satellites.length > 3 ? (index % 2 === 0 ? -5 : 5) : 0;
+        const x = char.x + Math.cos(angle) * (orbitRadius + radiusOffset);
+        const y = char.y + Math.sin(angle) * (orbitRadius + radiusOffset);
+        this.renderOrbitSatellite(x, y, angle, style);
+      });
     }
     const pulseRadius = char.persistentItemPulseRadius;
     if (pulseRadius) {
@@ -2445,6 +2451,57 @@ export class GameLounge {
       this.ctx.fillText("✦", x, y + 1);
       this.ctx.restore();
     }
+  }
+
+  /** 아이템 계열별 공전 위성 렌더링. 점선 가이드 대신 실제 물체가 공전한다. */
+  private renderOrbitSatellite(
+    x: number,
+    y: number,
+    angle: number,
+    style: "drone" | "shard" | "nova" | "singularity",
+  ) {
+    const palette = style === "drone"
+      ? { core: "#67e8f9", glow: "#22d3ee", size: 7 }
+      : style === "shard"
+        ? { core: "#c4b5fd", glow: "#8b5cf6", size: 7 }
+        : style === "nova"
+          ? { core: "#fff7ed", glow: "#fb923c", size: 8 }
+          : { core: "#1e102f", glow: "#c084fc", size: 9 };
+    const { core, glow, size } = palette;
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(angle + Math.PI / 2);
+    this.ctx.shadowColor = glow;
+    this.ctx.shadowBlur = style === "singularity" ? 18 : 13;
+
+    if (style === "drone") {
+      this.ctx.fillStyle = glow;
+      this.ctx.fillRect(-size * 1.35, -2, size * 2.7, 4);
+      this.ctx.fillStyle = core;
+      this.ctx.beginPath(); this.ctx.arc(0, 0, size * 0.68, 0, Math.PI * 2); this.ctx.fill();
+      this.ctx.fillStyle = "#082f49";
+      this.ctx.beginPath(); this.ctx.arc(0, 0, 2, 0, Math.PI * 2); this.ctx.fill();
+    } else if (style === "shard") {
+      this.ctx.fillStyle = core;
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, -size); this.ctx.lineTo(size * .72, 0); this.ctx.lineTo(0, size); this.ctx.lineTo(-size * .72, 0);
+      this.ctx.closePath(); this.ctx.fill();
+      this.ctx.strokeStyle = glow; this.ctx.lineWidth = 1.5; this.ctx.stroke();
+    } else if (style === "nova") {
+      this.ctx.fillStyle = glow;
+      this.ctx.beginPath(); this.ctx.arc(0, 0, size, 0, Math.PI * 2); this.ctx.fill();
+      this.ctx.fillStyle = core;
+      this.ctx.beginPath(); this.ctx.arc(0, 0, size * .48, 0, Math.PI * 2); this.ctx.fill();
+      this.ctx.strokeStyle = "#fde68a"; this.ctx.lineWidth = 2;
+      this.ctx.beginPath(); this.ctx.ellipse(0, 0, size * 1.35, size * .44, 0, 0, Math.PI * 2); this.ctx.stroke();
+    } else {
+      this.ctx.fillStyle = core;
+      this.ctx.beginPath(); this.ctx.arc(0, 0, size, 0, Math.PI * 2); this.ctx.fill();
+      this.ctx.strokeStyle = glow; this.ctx.lineWidth = 1.5;
+      this.ctx.beginPath(); this.ctx.ellipse(0, 0, size * 1.5, size * .52, 0, 0, Math.PI * 2); this.ctx.stroke();
+      this.ctx.beginPath(); this.ctx.ellipse(0, 0, size * 1.1, size * .35, Math.PI / 2, 0, Math.PI * 2); this.ctx.stroke();
+    }
+    this.ctx.restore();
   }
 
   private renderCinematic() {

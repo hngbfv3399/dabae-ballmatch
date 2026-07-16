@@ -27,17 +27,19 @@ const SEED_ITEMS = [
   { itemId: "titanium_guard", name: "티타늄 가드", description: "최대 DEF 보호막 +24", rarity: "rare" as const, isActive: true, effects: { defenseShieldBonus: 24 } },
   { itemId: "amplifier_chip", name: "증폭 칩", description: "공격력 +4", rarity: "rare" as const, isActive: true, effects: { attackPowerBonus: 4 } },
   { itemId: "adaptive_mesh", name: "적응형 메시", description: "방어력 +2 (피해 1회당 -2)", rarity: "rare" as const, isActive: true, effects: { defenseBonus: 2 } },
+  { itemId: "guardian_satellite", name: "수호 위성", description: "위성 드론 1기가 주변 70px의 적에게 1.8초마다 6 피해", rarity: "rare" as const, isActive: true, effects: { orbitDamage: 6, orbitRadius: 70, orbitInterval: 1.8, orbitSatelliteCount: 1, orbitSatelliteStyle: "drone" as const } },
   
-  { itemId: "orbiting_shard", name: "궤도 파편", description: "주변 82px 궤도 링이 1.4초마다 적에게 9 피해", rarity: "epic" as const, isActive: true, effects: { orbitDamage: 9, orbitRadius: 82, orbitInterval: 1.4 } },
+  { itemId: "orbiting_shard", name: "궤도 파편", description: "파편 위성 2기가 주변 82px의 적에게 1.4초마다 9 피해", rarity: "epic" as const, isActive: true, effects: { orbitDamage: 9, orbitRadius: 82, orbitInterval: 1.4, orbitSatelliteCount: 2, orbitSatelliteStyle: "shard" as const } },
   { itemId: "resonance_emitter", name: "공명 방출기", description: "주변 116px에 3초마다 충격파 16 피해", rarity: "epic" as const, isActive: true, effects: { pulseDamage: 16, pulseRadius: 116, pulseInterval: 3.0 } },
   { itemId: "overclock_matrix", name: "오버클록 매트릭스", description: "공격력 +6, 스킬 쿨다운 속도 +18%", rarity: "epic" as const, isActive: true, effects: { attackPowerBonus: 6, skillChargeRateMultiplier: 1.18 } },
   { itemId: "fortress_heart", name: "요새의 심장", description: "최대 체력 +32, 최대 DEF 보호막 +20", rarity: "epic" as const, isActive: true, effects: { maxHpBonus: 32, defenseShieldBonus: 20 } },
   
-  { itemId: "nova_ring", name: "노바 링", description: "주변 104px 궤도 링이 1초마다 적에게 16 피해", rarity: "legendary" as const, isActive: true, effects: { orbitDamage: 16, orbitRadius: 104, orbitInterval: 1.0 } },
+  { itemId: "nova_ring", name: "노바 위성군", description: "노바 위성 3기가 주변 104px의 적에게 1초마다 16 피해", rarity: "legendary" as const, isActive: true, effects: { orbitDamage: 16, orbitRadius: 104, orbitInterval: 1.0, orbitSatelliteCount: 3, orbitSatelliteStyle: "nova" as const } },
   { itemId: "aegis_protocol", name: "이지스 프로토콜", description: "최대 DEF 보호막 +38, 방어력 +3 (피해 1회당 -3)", rarity: "legendary" as const, isActive: true, effects: { defenseShieldBonus: 38, defenseBonus: 3 } },
   { itemId: "apex_drive", name: "에이펙스 드라이브", description: "공격력 +9, 이동 속도 +16%", rarity: "legendary" as const, isActive: true, effects: { attackPowerBonus: 9, speedMultiplier: 1.16 } },
   
   { itemId: "singularity_engine", name: "특이점 엔진", description: "주변 132px에 2.4초마다 충격파 28 피해, 스킬 쿨다운 속도 +25%", rarity: "unique" as const, isActive: true, effects: { pulseDamage: 28, pulseRadius: 132, pulseInterval: 2.4, skillChargeRateMultiplier: 1.25 } },
+  { itemId: "singularity_satellite_array", name: "특이점 위성군", description: "특이점 위성 4기가 주변 130px의 적에게 0.75초마다 25 피해", rarity: "unique" as const, isActive: true, effects: { orbitDamage: 25, orbitRadius: 130, orbitInterval: 0.75, orbitSatelliteCount: 4, orbitSatelliteStyle: "singularity" as const } },
 ];
 
 // 장비 제물 합성 경험치 계수

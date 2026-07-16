@@ -1,5 +1,11 @@
 import type { CharacterState } from "../characters/character.interface";
 
+export type OrbitSatelliteStyle = "drone" | "shard" | "nova" | "singularity";
+export interface OrbitSatelliteDefinition {
+  count: number;
+  style: OrbitSatelliteStyle;
+}
+
 export interface PersistentItemEffects {
   maxHpBonus?: number;
   maxHpMultiplier?: number;
@@ -14,6 +20,10 @@ export interface PersistentItemEffects {
   orbitDamage?: number;
   orbitRadius?: number;
   orbitInterval?: number;
+  orbitSatelliteCount?: number;
+  orbitSatelliteStyle?: OrbitSatelliteStyle;
+  // 장착 아이템에서 해석한 전투 전용 결과값이며 DB에는 저장하지 않는다.
+  orbitSatellites?: OrbitSatelliteDefinition[];
   pulseDamage?: number;
   pulseRadius?: number;
   pulseInterval?: number;
@@ -57,6 +67,7 @@ export function resolvePersistentItemEffects(
     orbitDamage: 0,
     orbitRadius: 0,
     orbitInterval: 0,
+    orbitSatellites: [],
     pulseDamage: 0,
     pulseRadius: 0,
     pulseInterval: 0,
@@ -98,6 +109,12 @@ export function resolvePersistentItemEffects(
     if (item.effects.orbitDamage) effects.orbitDamage = (effects.orbitDamage ?? 0) + item.effects.orbitDamage;
     if (item.effects.orbitRadius) effects.orbitRadius = Math.max(effects.orbitRadius ?? 0, item.effects.orbitRadius);
     if (item.effects.orbitInterval) effects.orbitInterval = Math.min(effects.orbitInterval || Infinity, item.effects.orbitInterval);
+    if (item.effects.orbitDamage && item.effects.orbitSatelliteStyle) {
+      effects.orbitSatellites?.push({
+        count: Math.max(1, item.effects.orbitSatelliteCount ?? 1),
+        style: item.effects.orbitSatelliteStyle,
+      });
+    }
     if (item.effects.pulseDamage) effects.pulseDamage = (effects.pulseDamage ?? 0) + item.effects.pulseDamage;
     if (item.effects.pulseRadius) effects.pulseRadius = Math.max(effects.pulseRadius ?? 0, item.effects.pulseRadius);
     if (item.effects.pulseInterval) effects.pulseInterval = Math.min(effects.pulseInterval || Infinity, item.effects.pulseInterval);
@@ -155,6 +172,9 @@ export function applyPersistentItemStats(state: CharacterState, effects: Persist
     state.persistentItemOrbitRadius = effects.orbitRadius;
     state.persistentItemOrbitInterval = effects.orbitInterval;
     state.persistentItemOrbitTimer = 0;
+    state.persistentItemOrbitSatellites = effects.orbitSatellites?.length
+      ? effects.orbitSatellites
+      : [{ count: 1, style: "shard" }];
   }
   if (effects.pulseDamage && effects.pulseRadius && effects.pulseInterval) {
     state.persistentItemPulseDamage = effects.pulseDamage;
