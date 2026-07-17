@@ -12,7 +12,7 @@ const SKILL_CONSTANTS = {
   SHIELD_DURATION: 3.0,
   COMBO_SEARCH_RADIUS: 145,
   COMBO_MAX_FOLLOW_UPS: 2,
-  COMBO_INTERVAL: 0.35,
+  COMBO_INTERVAL: 0.18,
   COMBO_DAMAGE_MULTIPLIER: 1.15,
   COMBO_DAMAGE_BASE: -2,
   COMBO_KNOCKBACK_SPEED: 10,
@@ -27,6 +27,7 @@ const SKILL_CONSTANTS = {
 interface DoyunState extends CharacterState {
   doyunComboHitsLeft?: number;
   doyunComboTimer?: number;
+  doyunComboTargetIds?: string[];
   doyunDodgeFlashTimeLeft?: number;
 }
 // #endregion TYPES
@@ -63,6 +64,7 @@ export const doyunConfig: CharacterConfig = {
     char.scaleMultiplier = 1.6; // Scale up for jump
     state.doyunComboHitsLeft = 0;
     state.doyunComboTimer = 0;
+    state.doyunComboTargetIds = [];
 
     // Target closest enemy
     let closestEnemy: CharacterState | null = null;
@@ -137,6 +139,8 @@ export const doyunConfig: CharacterConfig = {
     // Slam movement update
     if (char.skillActive) {
       if ((state.doyunComboHitsLeft ?? 0) > 0) {
+        char.vx = 0;
+        char.vy = 0;
         state.doyunComboTimer = (state.doyunComboTimer ?? 0) - dt;
         if (state.doyunComboTimer <= 0) executeFollowUpDunk(state, ctx);
         return;
@@ -323,11 +327,13 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
     console.log(`🛡️ [실드 획득] 도윤 -> 덩크슛 적중으로 ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 보호막 획득`);
     ctx.logMessage?.(`🛡️ [실드 획득] 도윤 ➡️ ${SKILL_CONSTANTS.SHIELD_DURATION}초간 ${SKILL_CONSTANTS.SHIELD_AMOUNT} 흡수 실드 활성화`, 'skill');
     const state = char as DoyunState;
-    if (findClosestEnemy(char, ctx, SKILL_CONSTANTS.COMBO_SEARCH_RADIUS)) {
-      state.doyunComboHitsLeft = SKILL_CONSTANTS.COMBO_MAX_FOLLOW_UPS;
+    const comboTargetIds = findComboTargets(char, target?.id, ctx);
+    if (comboTargetIds.length > 0) {
+      state.doyunComboTargetIds = comboTargetIds;
+      state.doyunComboHitsLeft = comboTargetIds.length;
       state.doyunComboTimer = SKILL_CONSTANTS.COMBO_INTERVAL;
       char.skillActive = true;
-      ctx.logMessage?.(`🏀 [덩크 러시] 도윤 ➡️ 추가 덩크 ${SKILL_CONSTANTS.COMBO_MAX_FOLLOW_UPS}회 준비!`, 'skill');
+      ctx.logMessage?.(`🏀 [덩크 러시] 도윤 ➡️ 추가 덩크 ${comboTargetIds.length}회 준비!`, 'skill');
     }
   } else {
     console.log(`🏀 [실드 미획득] 도윤 -> 덩크슛이 빗나가 실드를 획득하지 못했습니다.`);
@@ -341,9 +347,11 @@ function executeDunkSlam(char: CharacterState, target: CharacterState | undefine
 }
 
 function executeFollowUpDunk(char: DoyunState, ctx: CharacterBehaviorContext) {
-  const target = findClosestEnemy(char, ctx, SKILL_CONSTANTS.COMBO_SEARCH_RADIUS);
+  const targetId = char.doyunComboTargetIds?.shift();
+  const target = ctx.characters.find((enemy) => enemy.id === targetId && !enemy.isDead);
   if (!target) {
     char.doyunComboHitsLeft = 0;
+    char.doyunComboTargetIds = [];
     char.skillActive = false;
     return;
   }
@@ -369,18 +377,20 @@ function executeFollowUpDunk(char: DoyunState, ctx: CharacterBehaviorContext) {
   }
 }
 
-function findClosestEnemy(char: CharacterState, ctx: CharacterBehaviorContext, maxDistance: number): CharacterState | undefined {
-  let closest: CharacterState | undefined;
-  let minDistance = maxDistance;
-  for (const enemy of ctx.characters) {
-    if (enemy.isDead || enemy.id === char.id || isSameTeam(char, enemy)) continue;
-    const distance = Math.hypot(enemy.x - char.x, enemy.y - char.y);
-    if (distance < minDistance) {
-      closest = enemy;
-      minDistance = distance;
-    }
-  }
-  return closest;
+function findComboTargets(char: CharacterState, initialTargetId: string | undefined, ctx: CharacterBehaviorContext): string[] {
+  return ctx.characters
+    .filter((enemy) => (
+      !enemy.isDead
+      && enemy.id !== char.id
+      && enemy.id !== initialTargetId
+      && !isSameTeam(char, enemy)
+      && Math.hypot(enemy.x - char.x, enemy.y - char.y) <= SKILL_CONSTANTS.COMBO_SEARCH_RADIUS
+    ))
+    .sort((left, right) => (
+      Math.hypot(left.x - char.x, left.y - char.y) - Math.hypot(right.x - char.x, right.y - char.y)
+    ))
+    .slice(0, SKILL_CONSTANTS.COMBO_MAX_FOLLOW_UPS)
+    .map((enemy) => enemy.id);
 }
 
 function isSameTeam(source: CharacterState, target: CharacterState): boolean {

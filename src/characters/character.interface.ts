@@ -172,6 +172,7 @@ export interface CharacterState extends CharacterConfig {
   doyunShieldTimeLeft?: number; // 도윤 실드 지속 시간
   doyunComboHitsLeft?: number; // 도윤 적중 후 추가 덩크 횟수
   doyunComboTimer?: number; // 도윤 추가 덩크까지 남은 시간 (초)
+  doyunComboTargetIds?: string[]; // 도윤이 첫 덩크 적중 시 예약한 추가 덩크 대상
   doyunDodgeFlashTimeLeft?: number; // 도윤 회피 연출 잔여 시간 (초)
   defenseShield?: number; // 기본 DEF에서 생성된 영구 보호막의 현재 값
   maxDefenseShield?: number; // 기본 DEF와 레벨 성장으로 계산한 보호막 최대값
